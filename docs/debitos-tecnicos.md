@@ -37,6 +37,8 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 | T22 | Listagem de projetos com subconsultas por linha | Baixa | Fase 4 |
 | T25 | O diálogo de devolução não oferece documentos opcionais vazios | Baixa | Fase 5 |
 | T26 | Cada aba da fila faz uma consulta só para o contador | Baixa | F5 (Fase 5) |
+| T31 | Rascunho abandonado some sem aviso na visão geral do proponente | Baixa | Visão geral do proponente (D8) |
+| T32 | Visão geral da equipe ainda é só um texto; o resumo do proponente conta só 5 rascunhos com pendências | Baixa | Visão geral do proponente (D5) |
 | T29 | Painel de prazos entre projetos (médias e filas por responsável) | Baixa | Fase 6 do histórico de etapas |
 | T30 | Exportação em CSV do painel de prazos | Baixa | Fase 6 do histórico de etapas |
 | T23 | Etapas depois de "Aguardando parecer" ainda não existem | Fora do escopo | D1 |
@@ -133,6 +135,13 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 
 ### T26. Cada aba da fila faz uma consulta só para o contador
 - A fila do Analista dispara até 7 consultas pequenas (`pageSize=1`) para os contadores das abas. Serve ao volume previsto; sob carga, um endpoint de contagem por etapa resolveria com uma consulta. (Decisão F5.)
+
+### T31. Rascunho abandonado some sem aviso na visão geral do proponente
+- `CleanupAbandonedDrafts` apaga rascunhos sem alteração há mais de N dias, mas N vem do `--draft-days` do comando `cleanup`; **a API não sabe o valor**, então a visão geral não pode dizer "este rascunho será excluído em N dias". Decisão D8 do [planejamento da visão geral](planejamento-visao-geral-proponente.md). **Saída:** variável `DRAFT_RETENTION_DAYS` na configuração, lida pelo `cleanup` (como padrão do `--draft-days`) e pelo resumo, que passaria a mandar `deleteAt` nos itens `draft`. Junto, decidir se o aviso também sai por e-mail.
+
+### T32. Visão geral da equipe e limites do resumo do proponente
+- A visão geral da equipe (Analista, Revisor, Secretário, Supervisor) continua sendo o texto de boas-vindas: `GET /admin/projects/overview` e `/activity` olham só o que é da própria pessoa (titular ou membro), de propósito. Para a equipe, o equivalente seria um resumo das filas (já há contagem por aba, T26) e dos prazos (T29).
+- No resumo do proponente, só os 5 rascunhos mais recentes trazem o número de pendências que bloqueiam o envio (`blocking`), porque o cálculo roda a validação inteira (D5). O feed não tem paginação (máximo 30) e mostra só 7 tipos de marco; eventos novos (declaração assinada, troca de analista) só entram incluindo a ação em `activityKinds` de propósito. **Saída:** índice `(entity, entity_id, created_at DESC)` em `audit_logs` e cursor no feed se a medição pedir.
 
 ### T29. Painel de prazos entre projetos (melhoria futura)
 - O [histórico de etapas](planejamento-historico-etapas.md) já guarda, por projeto, em que etapa e com quem ele esteve e por quanto tempo, mas só se enxerga um projeto por vez e, na fila de análise, "há quanto tempo na etapa atual" (opção A da fase 6, feita). Falta olhar entre projetos. **Saída:** uma página nova em Análise com o tempo médio e o pior caso por etapa, a fila e o trecho mais antigo por analista e por departamento, e a lista dos parados. Os índices `(stage, entered_at)` e `(holder_admin_id, entered_at)` já existem para isso; falta a rota de agregação (por exemplo `GET /admin/projects/stats/stage-times`), a tela e os testes.

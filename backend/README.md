@@ -409,7 +409,7 @@ internal/mailer    interface Mailer + SMTP, log (dev) e descarte
 internal/outbox    caixa de saída de e-mails: gravação na transação + envio assíncrono com tentativas
 internal/catalog   cadastros de referência: tipos de entidade, municípios (IBGE, embutidos) e parlamentares
 internal/rules     parâmetros das regras de negócio (limites, prazos, datas), versionados por vigência
-internal/project   cadastro de projetos pelo proponente (rascunho em seções: Proponente, Instituição, Proposta) e perfil do proponente
+internal/project   cadastro de projetos pelo proponente (rascunho em seções: Proponente, Instituição, Proposta) e perfil do proponente; visão geral do proponente (`overview.go`, `activity.go`)
 internal/cnpj      normalização, validação e formatação de CNPJ
 internal/document  recurso de exemplo "documentos"
 internal/seed      dados iniciais (idempotente)
@@ -476,6 +476,7 @@ idempotente; e a coerência entre `openapi.yaml` e as rotas.
 - **Seed não destrutivo**: permissões padrão só na criação da role; o que o administrador mudou depois é preservado.
 - **Auditoria** de toda alteração de roles, permissões, administradores, usuários finais, tokens, configurações e templates, com
   `before`/`after` na mesma transação; nunca grava senhas, tokens nem hashes. Conteúdo (documentos) não é auditado.
+- **Visão geral do proponente** (`GET /api/admin/projects/overview` e `/activity`): sempre limitada ao que é da pessoa (titular ou membro ativo), mesmo para quem tem leitura ampla (equipe, Super Admin), somada ao filtro da permissão `admin::projects.read`; `GET /api/admin/projects?access=owner|member|all` faz o mesmo na listagem. O feed lê `audit_logs` só pelas ações de `activityKinds` (lista permitida) e monta `kind` e `data` no servidor, nunca repassa o `payload`, porque o log mistura o que é do proponente com o que é interno da equipe (departamento, recusa de enquadramento, conferência). Evento novo só aparece no feed se alguém o incluir lá de propósito. Ver [`docs/planejamento-visao-geral-proponente.md`](../docs/planejamento-visao-geral-proponente.md).
 - **Estrutura pronta para OAuth** (`end_users.provider` e a interface `enduser.Provider`), sem implementação.
 
 ---

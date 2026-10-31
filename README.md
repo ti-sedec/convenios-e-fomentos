@@ -157,6 +157,7 @@ Tudo isso é feito no painel, em **Administração → Usuários** (`/dashboard/
   | `analyst` | Analista | sim | Assume a análise dos projetos enviados, confere documentos e informações, devolve para complementação, arquiva por falta de documentos obrigatórios e administra os departamentos. | Lê os projetos enviados; pede complementação e arquiva (não nega); lê, edita e exclui departamentos (não cria); lê catálogos e parâmetros de regra. |
   | `state-secretary` | Secretário de Estado | sim | Vê todos os projetos enviados e pode negá-los a qualquer momento, arquivando-os na hora. | Lê os projetos enviados e nega; lê catálogos e parâmetros de regra. |
 
+- A **Visão geral** do Proponente mostra o que pede ação dele (correções com prazo, rascunhos, convites), os projetos por situação, os recentes e a atividade, com o filtro "Todos / Meus / Compartilhados comigo" ([planejamento](docs/planejamento-visao-geral-proponente.md)).
 - Também no painel: **Departamentos**, **Auditoria** (com o antes/depois de cada alteração), **Tokens de API** e o grupo **Portal público**
   (usuários finais, perfis públicos, configurações e templates de e-mail).
 - O seed ainda cria, **só em desenvolvimento**, um administrador de exemplo por role (`super@`, `editor@`, `author@`,
