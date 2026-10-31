@@ -292,3 +292,26 @@ func TestMigracaoDoHistoricoInicial(t *testing.T) {
 	}
 	assert.Empty(t, p.history(draft.id), "rascunho não tem histórico")
 }
+
+func TestAuditLogsEImutavel(t *testing.T) {
+	p := newProjEnv(t)
+	ctx := context.Background()
+	var before int
+	require.NoError(t, p.pool.QueryRow(ctx, "SELECT count(*) FROM audit_logs").Scan(&before))
+	require.Positive(t, before)
+
+	_, err := p.pool.Exec(ctx, "UPDATE audit_logs SET action = 'x'")
+	assert.ErrorContains(t, err, "imutável")
+	_, err = p.pool.Exec(ctx, "DELETE FROM audit_logs")
+	assert.ErrorContains(t, err, "imutável")
+	_, err = p.pool.Exec(ctx, "TRUNCATE audit_logs CASCADE")
+	assert.ErrorContains(t, err, "imutável")
+
+	// Inserir continua funcionando, e a consulta da API também.
+	_, err = p.pool.Exec(ctx, "INSERT INTO audit_logs (actor_type, action, entity) VALUES ('system', 'test.insert', 'test')")
+	require.NoError(t, err)
+	var after int
+	require.NoError(t, p.pool.QueryRow(ctx, "SELECT count(*) FROM audit_logs").Scan(&after))
+	assert.Equal(t, before+1, after)
+	assert.Equal(t, 200, p.do("GET", "/api/admin/audit-logs?action=test.insert", nil, p.boss).Status)
+}

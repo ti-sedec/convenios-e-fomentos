@@ -219,7 +219,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 
 ## 9. Fases de entrega
 
-**Andamento:** fase 1 implementada (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`).
+**Andamento:** fases 1 e 2 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`).
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|
