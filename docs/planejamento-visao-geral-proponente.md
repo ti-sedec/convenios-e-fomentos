@@ -45,7 +45,7 @@ Olá, <nome>                                  [ Todos | Meus | Compartilhados co
 Mostra os projetos **do Proponente** e os **em que é membro**, com três opções: **Todos** (padrão), **Meus** (titular) e **Compartilhados comigo** (membro, qualquer nível). O filtro vale para todos os blocos. Cada opção mostra o seu total (`Meus (3)`, `Compartilhados comigo (2)`), calculado sem depender da opção escolhida. Fica na URL (`?acesso=meus`, nuqs), para o link e o botão voltar funcionarem. O mesmo filtro entra na página "Meus projetos".
 
 ### 2.2 Precisa da sua atenção
-Só mostra o que o Proponente **pode agir**: projetos em que é titular ou membro com edição. Membro de leitura não recebe alerta de ação. Em ordem de urgência:
+Mostra o que o Proponente **pode agir**: projetos em que é titular ou membro com edição. Membro de leitura não recebe alerta de ação, **exceto** o aviso de convite novo (`shared_new`), que vale para qualquer nível. Em ordem de urgência:
 
 | Tipo | Quando aparece | Mostra | Ação |
 |---|---|---|---|
@@ -53,7 +53,7 @@ Só mostra o que o Proponente **pode agir**: projetos em que é titular ou membr
 | `profile_incomplete` | `proponent-profile.complete = false` | Aviso do perfil | Ir ao perfil |
 | `signature_pending` | Declaração em `awaiting_signature` no MT-ID | Projeto e declaração | Abrir o projeto (conferir na implementação se a assinatura expira) |
 | `draft` | Rascunho do Proponente | Projeto, última alteração e **quantas pendências bloqueiam o envio** (só dos 5 rascunhos mais recentes, ver D5) | Continuar o rascunho |
-| `shared_new` | Convite ativo ainda não aberto (`accepted_at` nulo) | Projeto e quem compartilhou (rótulo que o titular deu) e o nível | Abrir o projeto |
+| `shared_new` | Convite ativo ainda não aberto (`accepted_at` nulo), em qualquer nível | Projeto, nome de quem convidou e o nível | Abrir o projeto (abrir aceita o convite e o aviso some) |
 
 `profile_incomplete` vem do frontend (usa a rota do perfil que já existe); os demais vêm do resumo. O bloco some inteiro quando não há nada, para não virar ruído.
 
@@ -135,7 +135,7 @@ data: {
     { kind: 'complement_open', projectId, title, code, dueAt, overdue, items },
     { kind: 'signature_pending', projectId, title, declaration },
     { kind: 'draft', projectId, title, updatedAt, blocking? },       // blocking só nos 5 primeiros
-    { kind: 'shared_new', projectId, title, level, invitedBy }       // rótulo dado pelo titular
+    { kind: 'shared_new', projectId, title, level, invitedBy }       // nome de quem convidou
   ]  // ordenado por urgência e limitado a 20
 }
 ```
@@ -198,8 +198,8 @@ Seguindo `frontend/CLAUDE.md`: camadas `types` → `service` → `queries`, pref
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|
-| **1** | `access` na listagem (4.3), regra de alcance (D3), testes | Filtro funciona; `make test` verde |
-| **2** | `GET /projects/overview`: contagens, valores e atenção; OpenAPI; testes | Cobertura de rotas e testes da seção 7 (resumo) passam |
+| **1 (feita)** | `access` na listagem (4.3), regra de alcance (D3), testes | Filtro funciona; `make test` verde |
+| **2 (feita)** | `GET /projects/overview`: contagens, valores e atenção; OpenAPI; testes (`overview.go`, `project_overview_test.go`) | Cobertura de rotas e testes da seção 7 (resumo) passam |
 | **3** | `GET /projects/activity` com lista permitida; OpenAPI; teste de não vazar | Teste de vazamento passa |
 | **4** | Frontend: camadas de API e "Meus projetos" com filtros na URL | Cartões de destino funcionam |
 | **5** | Frontend: a tela de visão geral (blocos, filtro, estado vazio) | Percorrida no navegador |

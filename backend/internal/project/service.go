@@ -370,6 +370,28 @@ func accessCondition(access string, actor Actor, membership map[uuid.UUID]string
 	return ""
 }
 
+// scopeConds são as condições que toda consulta de projetos da pessoa começa por: o filtro da permissão de leitura e, se pedido, o de
+// acesso. Os argumentos de cada uma já vêm numerados ($1...); quem continua a consulta acrescenta os seus depois dos devolvidos.
+// Devolve também os projetos em que a pessoa é membro ativo.
+func (s *Service) scopeConds(ctx context.Context, perm authz.Filter, actor Actor, access string) (conds []string, args []any, member map[uuid.UUID]string, err error) {
+	if !perm.IsTrue() {
+		clause, pargs, err := perm.ToSQL(Schema.Column, 1)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		args = append(args, pargs...)
+		conds = append(conds, clause)
+	}
+	if member, err = s.memberships(ctx, actor); err != nil {
+		return nil, nil, nil, err
+	}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+	if c := accessCondition(access, actor, member, arg); c != "" {
+		conds = append(conds, c)
+	}
+	return conds, args, member, nil
+}
+
 // stageSinceSQL é desde quando um projeto enviado está na etapa atual, pelo histórico de etapas: o início dos trechos seguidos que têm
 // a etapa de hoje (um enquadramento pendente continua na etapa de análise). Nulo fora de projeto enviado.
 const stageSinceSQL = `(CASE WHEN projects.status = 'submitted' THEN (SELECT min(h.entered_at) FROM project_stage_history h
@@ -387,25 +409,11 @@ func escapeLike(s string) string {
 
 // List lista os projetos combinando SEMPRE o filtro de permissão com os filtros do usuário.
 func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error) {
-	var conds []string
-	var args []any
-	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-
-	if !p.Perm.IsTrue() {
-		clause, pargs, err := p.Perm.ToSQL(Schema.Column, 1)
-		if err != nil {
-			return nil, 0, err
-		}
-		args = append(args, pargs...)
-		conds = append(conds, clause)
-	}
-	member, err := s.memberships(ctx, p.Actor)
+	conds, args, member, err := s.scopeConds(ctx, p.Perm, p.Actor, p.Access)
 	if err != nil {
 		return nil, 0, err
 	}
-	if c := accessCondition(p.Access, p.Actor, member, arg); c != "" {
-		conds = append(conds, c)
-	}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	if p.Status != "" {
 		conds = append(conds, "status = "+arg(p.Status))
 	}

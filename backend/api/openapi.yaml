@@ -983,6 +983,19 @@ paths:
         "201": {description: Criado}
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/overview:
+    get:
+      tags: [Projetos]
+      summary: Resumo dos projetos do proponente (visão geral)
+      description: "Resume o que é **da própria pessoa** (titular ou membro ativo), mesmo para quem tem leitura ampla: soma-se ao filtro da permissão de leitura, nunca o amplia. Permissão: `admin::projects.read`. `access` (`all` padrão, `owner`, `member`) filtra tudo, menos `byAccess`. Resposta: `counts {draft, awaiting_checklist, in_analysis, awaiting_proponent, awaiting_opinion, archived}` (um projeto conta em uma só; enquadramento pendente conta em `in_analysis`; arquivado só em `archived`), `byAccess {owner, member}` (sem o filtro de acesso, para o seletor), `activeCents {total, convenio, fomento}` (projetos enviados e ativos, sem rascunho nem arquivado) e `attention` (até 20 itens, por urgência): `complement_open` (`dueAt`, `overdue`, `items`; o resumo não arquiva o projeto vencido), `signature_pending` (`declaration`), `draft` (`updatedAt`; `blocking` só nos 5 mais recentes) e `shared_new` (`level`, `invitedBy`; convite ainda não aberto, vale para qualquer nível). Os três primeiros só para quem pode agir (titular ou membro com edição). Todo item traz `projectId`, `title` e, se enviado, `code`."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

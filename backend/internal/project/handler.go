@@ -64,6 +64,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionProfileUpdate)).Put("/admin/proponent-profile", h.putProfile)
 
 	r.With(g(ActionRead)).Get("/admin/projects", h.list)
+	r.With(g(ActionRead)).Get("/admin/projects/overview", h.overview)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -212,8 +213,8 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "status", Message: "Valores aceitos: draft, submitted, archived."}}}))
 		return
 	}
-	if p.Access = q.Get("access"); p.Access != "" && p.Access != AccessFilterOwner && p.Access != AccessFilterMember && p.Access != AccessFilterAny {
-		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "access", Message: "Valores aceitos: all, owner, member."}}}))
+	if p.Access = q.Get("access"); p.Access != "" && !validAccess(p.Access) {
+		httpapi.Error(w, r, errAccess())
 		return
 	}
 	if err := parseStaffFilters(q, &p); err != nil {
@@ -226,6 +227,29 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.JSON(w, http.StatusOK, list, page.Meta(total))
+}
+
+func (h *Handler) overview(w http.ResponseWriter, r *http.Request) {
+	read, _ := admin.DecisionFrom(r.Context())
+	access := r.URL.Query().Get("access")
+	if access != "" && !validAccess(access) {
+		httpapi.Error(w, r, errAccess())
+		return
+	}
+	v, err := h.svc.Overview(r.Context(), actorOf(r), read.Filter, access)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func validAccess(a string) bool {
+	return a == AccessFilterOwner || a == AccessFilterMember || a == AccessFilterAny
+}
+
+func errAccess() error {
+	return httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "access", Message: "Valores aceitos: all, owner, member."}}})
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
