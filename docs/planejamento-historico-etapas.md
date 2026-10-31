@@ -141,8 +141,12 @@ Trigger na tabela, no mesmo estilo de `project_versions`:
 ### 4.3 Concorrência
 A função central roda dentro da transação que já trava o projeto, então duas ações simultâneas não abrem dois trechos. O índice de "um trecho aberto por projeto" é a segunda barreira.
 
-### 4.4 Trava no banco (rede de segurança)
-Trigger de restrição **adiado até o commit**, na tabela `projects`: se (situação, etapa, enquadramento, departamento, analista) mudou na transação e não existe trecho aberto igual ao novo estado, a transação inteira é recusada. Isso pega alteração feita fora do serviço (script, SQL manual, rotina nova que esqueceu a função central). Entra na fase 4, depois que todos os caminhos estiverem cobertos pela função central.
+### 4.4 Trava no banco (rede de segurança) — feita na fase 4
+Trigger de restrição **adiado até o commit** na tabela `projects` (migração `00033`): ao confirmar, todo projeto enviado ou arquivado precisa ter um trecho aberto igual ao estado dele; senão a transação inteira é recusada. Pega alteração feita fora do serviço (script, SQL manual, rotina nova que esqueceu a função central). Só dispara quando situação, etapa, enquadramento, departamento ou analista mudam, e confere o estado no commit (não o `NEW` do comando), então vários `UPDATE` na mesma transação funcionam.
+
+A regra "com quem está" passou a existir também como função SQL `project_holder_type`, igual a `holderOf` em Go; dois testes (um em Go, outro no banco) usam os mesmos casos.
+
+**Exceção deliberada:** se o analista vira nulo e nada mais mudou, a trava deixa passar. É o que acontece quando o admin responsável é excluído (`ON DELETE SET NULL`), e bloquear a exclusão de um admin por causa disso seria pior. O trecho aberto continua apontando para quem era o responsável, e a próxima ação sobre o projeto abre um trecho novo, já sem analista.
 
 ### 4.5 O que o histórico não faz
 - Não substitui `audit_logs`: não guarda IP, justificativa nem payload. Para isso o `audit_log_id` leva ao evento.
@@ -219,7 +223,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 
 ## 9. Fases de entrega
 
-**Andamento:** fases 1 a 3 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`).
+**Andamento:** fases 1 a 4 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`; fase 4: migração `00033`, testes `TestTravaDoHistoricoDeEtapas` e `TestRegraDeQuemEstaComOProjeto`).
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|

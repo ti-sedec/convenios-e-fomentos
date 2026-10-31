@@ -364,3 +364,82 @@ func TestHistoricoPelaAPI(t *testing.T) {
 		assert.Equal(t, 404, p.do("GET", "/api/admin/projects/00000000-0000-0000-0000-000000000000/history", nil, staff.analyst).Status)
 	})
 }
+
+func TestTravaDoHistoricoDeEtapas(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	staff := p.newStaff()
+	fp := p.submitted("8301/2026")
+	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
+	ctx := context.Background()
+
+	t.Run("mudar de etapa por fora do serviço é recusado ao confirmar", func(t *testing.T) {
+		_, err := p.pool.Exec(ctx, "UPDATE projects SET stage = 'awaiting_proponent' WHERE id = $1", fp.id)
+		assert.ErrorContains(t, err, "sem um trecho no histórico")
+		_, err = p.pool.Exec(ctx, "UPDATE projects SET status = 'archived' WHERE id = $1", fp.id)
+		assert.Error(t, err)
+		var stage string
+		require.NoError(t, p.pool.QueryRow(ctx, "SELECT stage FROM projects WHERE id = $1", fp.id).Scan(&stage))
+		assert.Equal(t, "in_analysis", stage)
+	})
+
+	t.Run("mudar e registrar na mesma transação é aceito", func(t *testing.T) {
+		tx, err := p.pool.Begin(ctx)
+		require.NoError(t, err)
+		defer func() { _ = tx.Rollback(ctx) }()
+		_, err = tx.Exec(ctx, "UPDATE project_stage_history SET left_at = now() WHERE project_id = $1 AND left_at IS NULL", fp.id)
+		require.NoError(t, err)
+		_, err = tx.Exec(ctx, `INSERT INTO project_stage_history (project_id, seq, status, stage, holder_type, entered_at, entered_by_type, transition, source)
+			VALUES ($1, 3, 'submitted', 'awaiting_proponent', 'proponent', now(), 'system', 'manual', 'live')`, fp.id)
+		require.NoError(t, err)
+		_, err = tx.Exec(ctx, "UPDATE projects SET stage = 'awaiting_proponent' WHERE id = $1", fp.id)
+		require.NoError(t, err)
+		require.NoError(t, tx.Commit(ctx))
+		p.assertHistory(fp.id)
+	})
+
+	t.Run("campos que não são estado e rascunhos não são afetados", func(t *testing.T) {
+		_, err := p.pool.Exec(ctx, "UPDATE projects SET updated_at = now() WHERE id = $1", fp.id)
+		assert.NoError(t, err)
+		d := p.completeProject("8302/2026")
+		_, err = p.pool.Exec(ctx, "UPDATE projects SET department_id = $2 WHERE id = $1", d.id, p.deptID("Financeiro"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("a exclusão do analista não é bloqueada", func(t *testing.T) {
+		other := p.submitted("8303/2026")
+		an, anID := p.newAdmin(p.boss, "hist.analista.excluido@exemplo.com", "analyst")
+		require.Equal(t, 200, p.startAnalysis(an, other.id).Status)
+		_, err := p.pool.Exec(ctx, "DELETE FROM admins WHERE id = $1", anID)
+		require.NoError(t, err)
+		var analyst *string
+		require.NoError(t, p.pool.QueryRow(ctx, "SELECT analyst_id::text FROM projects WHERE id = $1", other.id).Scan(&analyst))
+		assert.Nil(t, analyst)
+		// Uma ação seguinte abre o trecho novo, já sem analista.
+		require.Equal(t, 200, p.complement(staff.analyst, other.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
+		p.assertHistory(other.id)
+	})
+}
+
+// A regra "com quem está" existe em Go (holderOf) e em SQL (project_holder_type); as duas precisam concordar.
+func TestRegraDeQuemEstaComOProjeto(t *testing.T) {
+	p := newProjEnv(t)
+	an := "11111111-1111-1111-1111-111111111111"
+	cases := []struct{ status, stage, framing, analyst, want string }{
+		{"archived", "in_analysis", "", an, "none"},
+		{"archived", "awaiting_proponent", "", "", "none"},
+		{"submitted", "awaiting_checklist", "", "", "team"},
+		{"submitted", "in_analysis", "", "", "team"},
+		{"submitted", "in_analysis", "", an, "analyst"},
+		{"submitted", "in_analysis", "pending", an, "department"},
+		{"submitted", "in_analysis", "pending", "", "department"},
+		{"submitted", "awaiting_proponent", "", an, "proponent"},
+		{"submitted", "awaiting_opinion", "confirmed", an, "department"},
+	}
+	for _, c := range cases {
+		var got string
+		require.NoError(t, p.pool.QueryRow(context.Background(),
+			"SELECT project_holder_type($1, $2, NULLIF($3, ''), NULLIF($4, '')::uuid)", c.status, c.stage, c.framing, c.analyst).Scan(&got))
+		assert.Equal(t, c.want, got, "%+v", c)
+	}
+}
