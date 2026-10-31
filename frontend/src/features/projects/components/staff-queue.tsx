@@ -8,7 +8,7 @@ import { Icons } from '@/components/icons';
 import { Pager } from '@/components/pager';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -30,7 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { departmentsQueryOptions } from '@/features/departments/api/queries';
 import { departmentActions } from '@/features/departments/api/types';
-import { useCan } from '@/features/auth/session-provider';
+import { useCan, useSession } from '@/features/auth/session-provider';
 import { useDebounce } from '@/hooks/use-debounce';
 import { projectsQueryOptions } from '../api/queries';
 import {
@@ -93,10 +93,12 @@ function Situation({ p }: { p: ProjectSummary }) {
 /** Fila de trabalho da equipe: uma aba por situação, conforme o perfil. */
 export function StaffQueue() {
   const can = useCan();
+  const session = useSession();
   const tabs = useMemo(() => queueTabsFor(can), [can]);
   const [filters, setFilters] = useQueryStates(
     {
       aba: parseAsString.withDefault(''),
+      analista: parseAsString.withDefault(''),
       q: parseAsString.withDefault(''),
       departamento: parseAsString.withDefault(''),
       parado: parseAsString.withDefault(''),
@@ -107,12 +109,15 @@ export function StaffQueue() {
   );
   const current = tabs.find((t) => t.key === filters.aba) ?? tabs[0];
   const search = useDebounce(filters.q, 300);
+  // "Só os que assumi": é o `?analista=eu` que a visão geral usa nos cartões de "só os meus".
+  const mine = filters.analista === 'eu';
 
   const list = useQuery({
     ...projectsQueryOptions({
       ...current.params,
       q: search,
       department: filters.departamento || undefined,
+      analyst: mine ? session.id : undefined,
       idleDays: filters.parado ? Number(filters.parado) : undefined,
       sort: filters.ordem === 'parados' ? 'stage_since:asc' : undefined,
       page: filters.page
@@ -122,7 +127,7 @@ export function StaffQueue() {
   // Tamanho de cada fila (sem a busca nem o filtro de departamento): uma consulta pequena por aba.
   const counts = useQueries({
     queries: tabs.map((t) => ({
-      ...projectsQueryOptions({ ...t.params, pageSize: 1 }),
+      ...projectsQueryOptions({ ...t.params, analyst: mine ? session.id : undefined, pageSize: 1 }),
       select: (r: { meta?: { total: number } }) => r.meta?.total ?? 0
     }))
   });
@@ -146,6 +151,14 @@ export function StaffQueue() {
           aria-label='Buscar projetos'
           className='max-w-md'
         />
+        <Button
+          size='sm'
+          variant={mine ? 'secondary' : 'outline'}
+          aria-pressed={mine}
+          onClick={() => void setFilters({ analista: mine ? '' : 'eu', page: 1 })}
+        >
+          Só os que assumi
+        </Button>
         {canFilterByDepartment && departmentItems.length > 1 && (
           <Select
             items={departmentItems}
@@ -261,6 +274,11 @@ export function StaffQueue() {
                         </Link>
                         {p.code && (
                           <div className='text-muted-foreground font-mono text-xs'>{p.code}</div>
+                        )}
+                        {p.lateSubmission && (
+                          <Badge variant='outline' className='mt-1'>
+                            Fora do prazo
+                          </Badge>
                         )}
                         {p.sigconNumber && (
                           <div className='text-muted-foreground text-xs'>

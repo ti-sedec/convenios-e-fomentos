@@ -319,6 +319,8 @@ export interface ProjectSummary {
   status: ProjectStatus;
   code: string;
   submittedAt: string | null;
+  /** O envio passou da data-limite eleitoral. */
+  lateSubmission: boolean;
   stage: ProjectStage | '';
   archiveReason: ArchiveReason | '';
   complementDueAt: string | null;
