@@ -68,6 +68,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionRead)).Get("/admin/projects/activity", h.activity)
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/overview", h.queueOverview)
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/activity", h.queueActivity)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/me", h.queueMe)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -305,6 +306,15 @@ func (h *Handler) queueActivity(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 	v, err := h.svc.QueueActivity(r.Context(), actorOf(r), dec.Filter, scope, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueMe(w http.ResponseWriter, r *http.Request) {
+	v, err := h.svc.QueueMe(r.Context(), actorOf(r))
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

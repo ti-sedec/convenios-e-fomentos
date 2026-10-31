@@ -237,7 +237,7 @@ O frontend não tem suíte automatizada: percorrer no navegador com um Analista 
 | **2 (feita)** | `GET /projects/queue/overview`: alcance, contagens e os blocos *entry*, *resubmitted*, *refused*, *stalled* e *deadlines*; OpenAPI; testes | Testes da seção 7 desses blocos passam |
 | **3 (feita)** | Bloco *ready* (E6) | Testes do bloco e do limite passam |
 | **4 (feita)** | `GET /projects/queue/activity` com lista permitida; teste de não vazar | Teste de vazamento passa |
-| **5** | `GET /projects/queue/me` | Testes das janelas passam |
+| **5 (feita)** | `GET /projects/queue/me` | Testes das janelas passam |
 | **6** | Frontend: camada de API, contadores, blocos de trabalho, seletor e estados vazios; selo na fila | Percorrida no navegador |
 | **7** | Frontend: feed da equipe e "Meu resumo"; ajustes de tema claro e celular | Percorrida no navegador |
 | **8** | Documentação (seção 10) | — |

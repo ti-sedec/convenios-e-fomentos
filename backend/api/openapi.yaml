@@ -1037,6 +1037,16 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/me:
+    get:
+      tags: [Projetos]
+      summary: Meu resumo (o que eu fiz nos últimos 7 e 30 dias)
+      description: "Quantas análises a pessoa assumiu, quantos pedidos de complementação fez, quantos departamentos indicou e quantos projetos arquivou, nos últimos 7 e 30 dias, pela auditoria. Permissão: `admin::projects.start-analysis`. **Devolve sempre e somente os números de quem chama**: a rota não aceita parâmetro de pessoa, e nenhum perfil consulta os números de outra. Desistência (do proponente) e arquivamento pelo sistema não contam como arquivamento. Resposta: `{last7: {assumed, complements, indicated, archived}, last30: {...}}`."
+      security: [{adminBearer: []}]
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

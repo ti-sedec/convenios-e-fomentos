@@ -406,3 +406,96 @@ func TestAtividadeDaFilaDaEquipe(t *testing.T) {
 		}
 	})
 }
+
+// backdateAudit recua um evento de auditoria (o log é imutável: só o teste desliga a trava, e a religa).
+func (p *projEnv) backdateAudit(projectID, action string, days int) {
+	p.t.Helper()
+	ctx := context.Background()
+	_, err := p.pool.Exec(ctx, "ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_change")
+	require.NoError(p.t, err)
+	_, err = p.pool.Exec(ctx, "UPDATE audit_logs SET created_at = now() - make_interval(days => $3) WHERE entity_id = $1 AND action = $2", projectID, action, days)
+	require.NoError(p.t, err)
+	_, err = p.pool.Exec(ctx, "ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_change")
+	require.NoError(p.t, err)
+}
+
+func (p *projEnv) queueMe(tok, query string) map[string]any {
+	p.t.Helper()
+	r := p.do("GET", "/api/admin/projects/queue/me"+query, nil, tok)
+	require.Equal(p.t, 200, r.Status, r.Body)
+	return r.data()
+}
+
+func counts(assumed, complements, indicated, archived int) map[string]any {
+	return map[string]any{"assumed": float64(assumed), "complements": float64(complements), "indicated": float64(indicated), "archived": float64(archived)}
+}
+
+func TestMeuResumoDoAnalista(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	other, otherID := p.newAdmin(p.boss, "outro.analista@exemplo.com", "analyst")
+	fin := p.deptID("Financeiro")
+	an := staff.analyst
+
+	a1, a2, a3 := p.submitted("8801/2026"), p.submitted("8802/2026"), p.submitted("8803/2026")
+	for _, fp := range []*fundingProject{a1, a2, a3} {
+		require.Equal(t, 200, p.startAnalysis(an, fp.id).Status)
+	}
+	require.Equal(t, 200, p.startAnalysis(an, a1.id).Status, "assumir de novo não conta outra vez")
+	require.Equal(t, 200, p.complement(an, a1.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
+	require.True(t, allApproved(p.approveAll(an, a2.id)))
+	require.Equal(t, 200, p.assign(an, a2.id, fin).Status)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+a3.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, an).Status)
+
+	// Outro Analista: assumiu um e arquivou outro. A desistência de um terceiro, feita pelo proponente, não é de nenhum dos dois.
+	b1, b2, w := p.submitted("8804/2026"), p.submitted("8805/2026"), p.submitted("8806/2026")
+	require.Equal(t, 200, p.startAnalysis(other, b1.id).Status)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+b2.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, other).Status)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+w.id+"/withdraw", map[string]any{"note": "Vamos refazer o projeto."}, p.maria).Status)
+
+	t.Run("só o que a própria pessoa fez", func(t *testing.T) {
+		mine := p.queueMe(an, "")
+		assert.Equal(t, map[string]any{"last7": counts(3, 1, 1, 1), "last30": counts(3, 1, 1, 1)}, mine)
+		assert.Equal(t, map[string]any{"last7": counts(1, 0, 0, 1), "last30": counts(1, 0, 0, 1)}, p.queueMe(other, ""))
+	})
+
+	t.Run("a rota não aceita pedir os números de outra pessoa", func(t *testing.T) {
+		own := p.queueMe(an, "")
+		for _, q := range []string{"?admin=" + otherID, "?actor=" + otherID, "?userId=" + otherID, "?scope=mine&adminId=" + otherID} {
+			assert.Equal(t, own, p.queueMe(an, q), q)
+		}
+		// Só duas janelas e quatro contagens: nada de nome, projeto nem lista.
+		for key, v := range own {
+			assert.Contains(t, []string{"last7", "last30"}, key)
+			assert.Len(t, v, 4)
+		}
+	})
+
+	t.Run("janelas de 7 e de 30 dias", func(t *testing.T) {
+		p.backdateAudit(a1.id, "project.start-analysis", 20) // fora dos 7, dentro dos 30
+		p.backdateAudit(a2.id, "project.start-analysis", 40) // fora dos dois
+		p.backdateAudit(a1.id, "project.complement-request", 10)
+		assert.Equal(t, map[string]any{"last7": counts(1, 0, 1, 1), "last30": counts(2, 1, 1, 1)}, p.queueMe(an, ""))
+	})
+
+	t.Run("quem não é Analista não vê", func(t *testing.T) {
+		for name, tok := range map[string]string{"proponente": p.maria, "supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame} {
+			assert.Equal(t, 403, p.do("GET", "/api/admin/projects/queue/me", nil, tok).Status, name)
+		}
+		assert.Equal(t, 401, p.do("GET", "/api/admin/projects/queue/me", nil, "").Status)
+	})
+
+	t.Run("arquivamento pelo sistema e desistência não contam", func(t *testing.T) {
+		exp := p.submitted("8807/2026")
+		require.Equal(t, 200, p.complement(an, exp.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
+		p.setDue(exp.id, time.Now().Add(-time.Hour))
+		n, err := p.app.Projects.ExpireComplements(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, 1, n)
+		got := p.queueMe(an, "")["last7"].(map[string]any)
+		assert.EqualValues(t, 1, got["archived"], "continua só o arquivamento feito pela equipe")
+		assert.EqualValues(t, 1, got["complements"], "mais o pedido novo")
+	})
+}
