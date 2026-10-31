@@ -239,7 +239,7 @@ O frontend não tem suíte automatizada: percorrer no navegador com um Analista 
 | **4 (feita)** | `GET /projects/queue/activity` com lista permitida; teste de não vazar | Teste de vazamento passa |
 | **5 (feita)** | `GET /projects/queue/me` | Testes das janelas passam |
 | **6 (feita, sem ver no navegador)** | Frontend: camada de API, contadores, blocos de trabalho, seletor e estados vazios; selo na fila | Percorrida no navegador |
-| **7** | Frontend: feed da equipe e "Meu resumo"; ajustes de tema claro e celular | Percorrida no navegador |
+| **7 (feita, sem ver no navegador)** | Frontend: feed da equipe e "Meu resumo"; ajustes de tema claro e celular | Percorrida no navegador |
 | **8** | Documentação (seção 10) | — |
 
 Cada fase termina com `make test` e `make lint` (backend) e `bun run typecheck`, `lint` e `format:check` (frontend), e commit próprio.

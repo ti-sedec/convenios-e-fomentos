@@ -5,8 +5,10 @@ import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { queueOverviewQueryOptions } from '../api/queries';
+import { MySummary } from './my-summary';
 import { QueueCounters } from './queue-counters';
 import { ScopeFilter, scopeApi, scopeKeys } from './scope-filter';
+import { StaffActivityFeed } from './staff-activity-feed';
 import { WorkBlocks } from './work-blocks';
 
 /** Visão geral do Analista: o que pede a ação dele e o panorama da fila. */
@@ -34,6 +36,10 @@ export function AnalystOverview({ name }: { name: string }) {
         <>
           <WorkBlocks overview={overview.data} escopo={escopo} />
           <QueueCounters counts={overview.data.counts} escopo={escopo} />
+          <div className='grid gap-4 lg:grid-cols-2'>
+            <StaffActivityFeed escopo={escopo} />
+            <MySummary />
+          </div>
         </>
       )}
     </div>

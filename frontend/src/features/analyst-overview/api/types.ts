@@ -64,3 +64,54 @@ export interface QueueOverview {
   limits: StalledLimits;
   blocks: Record<BlockKey, QueueBlock>;
 }
+
+/** Contratos de GET /admin/projects/queue/activity e /queue/me. */
+
+export type QueueActivityKind =
+  | 'submitted'
+  | 'resubmitted'
+  | 'analysis_started'
+  | 'complement_requested'
+  | 'department_assigned'
+  | 'framing_confirmed'
+  | 'framing_refused'
+  | 'archived'
+  | (string & {});
+
+/** Quem agiu: a equipe vem com nome; o proponente e o sistema, só como tipo. `self` é a própria pessoa. */
+export interface QueueActor {
+  type: 'admin' | 'proponent' | 'system';
+  name?: string;
+  self?: boolean;
+}
+
+export interface QueueActivityItem {
+  id: string;
+  at: string;
+  kind: QueueActivityKind;
+  by: QueueActor;
+  projectId: string;
+  title: string;
+  code?: string;
+  data: {
+    late?: boolean;
+    version?: number;
+    items?: number;
+    dueAt?: string;
+    department?: string;
+    reason?: string;
+  };
+}
+
+export interface MyCounts {
+  assumed: number;
+  complements: number;
+  indicated: number;
+  archived: number;
+}
+
+/** O que a própria pessoa fez nos últimos 7 e 30 dias. */
+export interface MySummary {
+  last7: MyCounts;
+  last30: MyCounts;
+}
