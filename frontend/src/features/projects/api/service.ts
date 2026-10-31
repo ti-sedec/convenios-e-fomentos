@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import { apiErrorFromResponse } from '@/lib/api/errors';
 import type { ApiResponse } from '@/lib/api/types';
+import type { AccessFilter } from '@/features/proponent-overview/api/types';
 import type {
   Checklist,
   Contact,
@@ -46,6 +47,8 @@ export interface ListProjectsParams {
   page?: number;
   pageSize?: number;
   status?: ProjectStatus;
+  /** Só o que é da própria pessoa: titular (`owner`), membro (`member`) ou um dos dois (`all`). Sem o parâmetro vale só a permissão. */
+  access?: AccessFilter;
   /** Filtros das filas da equipe. */
   stage?: ProjectStage[];
   framing?: 'pending' | 'confirmed' | 'none';
@@ -62,6 +65,7 @@ export async function listProjects({
   page = 1,
   pageSize = 25,
   status,
+  access,
   stage,
   framing,
   department,
@@ -72,6 +76,7 @@ export async function listProjects({
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (q) params.set('q', q);
   if (status) params.set('status', status);
+  if (access) params.set('access', access);
   if (stage?.length) params.set('stage', stage.join(','));
   if (framing) params.set('framing', framing);
   if (department) params.set('department', department);
