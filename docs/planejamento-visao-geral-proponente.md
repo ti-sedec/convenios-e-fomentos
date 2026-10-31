@@ -200,7 +200,7 @@ Seguindo `frontend/CLAUDE.md`: camadas `types` → `service` → `queries`, pref
 |---|---|---|
 | **1 (feita)** | `access` na listagem (4.3), regra de alcance (D3), testes | Filtro funciona; `make test` verde |
 | **2 (feita)** | `GET /projects/overview`: contagens, valores e atenção; OpenAPI; testes (`overview.go`, `project_overview_test.go`) | Cobertura de rotas e testes da seção 7 (resumo) passam |
-| **3** | `GET /projects/activity` com lista permitida; OpenAPI; teste de não vazar | Teste de vazamento passa |
+| **3 (feita)** | `GET /projects/activity` com lista permitida; OpenAPI; teste de não vazar (`activity.go`, `TestAtividadeRecenteDoProponente`) | Teste de vazamento passa |
 | **4** | Frontend: camadas de API e "Meus projetos" com filtros na URL | Cartões de destino funcionam |
 | **5** | Frontend: a tela de visão geral (blocos, filtro, estado vazio) | Percorrida no navegador |
 | **6** | Atualizar documentação (seção 10) | — |

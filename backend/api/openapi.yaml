@@ -996,6 +996,20 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/activity:
+    get:
+      tags: [Projetos]
+      summary: Atividade recente dos projetos do proponente
+      description: "Marcos dos projetos **da própria pessoa** (titular ou membro ativo, mesma regra de `/admin/projects/overview`), do mais novo ao mais antigo, escritos para o proponente. Permissão: `admin::projects.read`. Só entram os marcos de uma lista permitida; o que é interno da equipe (departamento, enquadramento recusado, conferência, abertura de arquivos) nunca aparece. O titular vê tudo desde a criação do projeto; o membro, só o que aconteceu depois de receber o acesso, e o convite aparece só para ele. Resposta: `[{id, at, kind, by, projectId, title, code, data}]`. `kind`: `submitted` (`data.late`), `analysis_started`, `complement_requested` (`data.items`, `data.dueAt`), `resubmitted` (`data.version`), `awaiting_opinion`, `archived` (`data.reason`: `complement_deadline`, `withdrawn`, `denied`, `missing_documents` ou `other`) e `shared_with_you` (`data.level`). `by`: `you`, `member` (titular ou outro membro), `team` ou `system`, sem nomes. Sem paginação."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 30, default: 10}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

@@ -65,6 +65,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 	r.With(g(ActionRead)).Get("/admin/projects", h.list)
 	r.With(g(ActionRead)).Get("/admin/projects/overview", h.overview)
+	r.With(g(ActionRead)).Get("/admin/projects/activity", h.activity)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -237,6 +238,31 @@ func (h *Handler) overview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := h.svc.Overview(r.Context(), actorOf(r), read.Filter, access)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
+	read, _ := admin.DecisionFrom(r.Context())
+	q := r.URL.Query()
+	access := q.Get("access")
+	if access != "" && !validAccess(access) {
+		httpapi.Error(w, r, errAccess())
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > maxActivityLimit {
+			httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxActivityLimit) + "."}}}))
+			return
+		}
+		limit = n
+	}
+	v, err := h.svc.Activity(r.Context(), actorOf(r), read.Filter, access, limit)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

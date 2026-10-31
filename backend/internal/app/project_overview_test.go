@@ -1,6 +1,8 @@
 package app_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,4 +181,122 @@ func TestVisaoGeralAvisaAssinaturaPendente(t *testing.T) {
 	assert.NotEmpty(t, it["declaration"], "traz o nome da declaração")
 	// O rascunho continua pedindo atenção ao mesmo tempo.
 	assert.NotNil(t, attention(p.overview(p.maria, ""))["draft:"+fp.id])
+}
+
+// activity lê o feed de GET /admin/projects/activity.
+func (p *projEnv) activity(tok, query string) resp {
+	p.t.Helper()
+	r := p.do("GET", "/api/admin/projects/activity"+query, nil, tok)
+	require.Equal(p.t, 200, r.Status, r.Body)
+	return r
+}
+
+// kinds e bys devolvem os tipos e os autores do feed, do mais novo ao mais antigo.
+func kindsOf(r resp) (kinds, bys []string) {
+	for _, it := range r.list() {
+		m := it.(map[string]any)
+		kinds, bys = append(kinds, m["kind"].(string)), append(bys, m["by"].(string))
+	}
+	return kinds, bys
+}
+
+func TestAtividadeRecenteDoProponente(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	fin := p.deptID("Financeiro")
+	fp := p.submitted("8301/2026")
+	const secret = "JUSTIFICATIVA-INTERNA-DA-RECUSA"
+
+	// Carla é convidada (edição) depois do envio; o convite é de antes dos demais marcos.
+	member := p.mustInvite(fp.id, "carla@exemplo.com", "edit")
+	carla := p.login("carla@exemplo.com")
+
+	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
+	require.Equal(t, 200, p.complement(staff.analyst, fp.id, map[string]any{"message": "Corrija o título.", "items": []any{section("proposal", "Título.")}}).Status)
+	pb := proposalBody(fp.current(p.maria))
+	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "8301/2026"
+	require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/resubmit", map[string]any{"version": fp.current(p.maria), "declaration": true}, p.maria).Status)
+	require.True(t, allApproved(p.approveAll(staff.analyst, fp.id)))
+	// Marcos internos: indicar o departamento, recusar (com justificativa) e indicar de novo.
+	require.Equal(t, 200, p.assign(staff.analyst, fp.id, fin).Status)
+	require.Equal(t, 200, p.refuse(staff.reviewerSame, fp.id, 1, secret).Status)
+	require.Equal(t, 200, p.assign(staff.analyst, fp.id, fin).Status)
+	require.Equal(t, 200, p.confirm(staff.reviewerSame, fp.id, 2).Status)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/withdraw", map[string]any{"note": "Vamos refazer o projeto."}, p.maria).Status)
+
+	t.Run("titular: só os marcos que ele pode saber, do mais novo ao mais antigo", func(t *testing.T) {
+		r := p.activity(p.maria, "")
+		kinds, bys := kindsOf(r)
+		assert.Equal(t, []string{"archived", "awaiting_opinion", "resubmitted", "complement_requested", "analysis_started", "submitted"}, kinds)
+		assert.Equal(t, []string{"you", "team", "you", "team", "team", "you"}, bys)
+		items := r.list()
+		for i, want := range []map[string]any{
+			{"reason": "withdrawn"}, {}, {"version": float64(2)}, {"items": float64(1)}, {}, {"late": false},
+		} {
+			data := items[i].(map[string]any)["data"].(map[string]any)
+			for k, v := range want {
+				assert.Equal(t, v, data[k], "%s.%s", kinds[i], k)
+			}
+		}
+		assert.NotEmpty(t, items[3].(map[string]any)["data"].(map[string]any)["dueAt"])
+		first := items[5].(map[string]any)
+		assert.Equal(t, fp.id, first["projectId"])
+		assert.Equal(t, p.project(p.maria, fp.id).data()["code"], first["code"])
+		assert.NotEmpty(t, first["title"])
+	})
+
+	t.Run("nada interno vaza", func(t *testing.T) {
+		// A resposta inteira, de todos os projetos, em qualquer acesso, para o titular e para a convidada.
+		for _, tok := range []string{p.maria, carla} {
+			for _, q := range []string{"", "?access=all&limit=30"} {
+				body := fmt.Sprint(p.activity(tok, q).Body)
+				for _, banned := range []string{secret, "Financeiro", "department", "framing", "refus", "m.analista", "m.revisor", "10.0.0.1",
+					cpfFor("maria@exemplo.com"), cpfFor("carla@exemplo.com"), "review", "file"} {
+					assert.NotContains(t, strings.ToLower(body), strings.ToLower(banned), "feed de %s contém %q", tok[:6], banned)
+				}
+			}
+		}
+	})
+
+	t.Run("convidada: só o que aconteceu depois do convite, e o convite é só dela", func(t *testing.T) {
+		kinds, bys := kindsOf(p.activity(carla, ""))
+		assert.Equal(t, []string{"archived", "awaiting_opinion", "resubmitted", "complement_requested", "analysis_started", "shared_with_you"}, kinds)
+		assert.Equal(t, "member", bys[2], "a Maria (titular) reenviou")
+		assert.NotContains(t, kinds, "submitted", "o envio é anterior ao convite")
+		invite := p.activity(carla, "").list()[5].(map[string]any)
+		assert.Equal(t, map[string]any{"level": "edit"}, invite["data"])
+		assert.NotContains(t, func() []string { k, _ := kindsOf(p.activity(p.maria, "")); return k }(), "shared_with_you")
+	})
+
+	t.Run("filtros e limite", func(t *testing.T) {
+		assert.Len(t, p.activity(p.maria, "?limit=2").list(), 2)
+		kinds, _ := kindsOf(p.activity(p.maria, "?limit=2"))
+		assert.Equal(t, []string{"archived", "awaiting_opinion"}, kinds, "os dois mais recentes")
+		assert.Empty(t, p.activity(p.maria, "?access=member").list(), "o titular não é membro dos próprios projetos")
+		assert.Len(t, p.activity(carla, "?access=member").list(), 6)
+		assert.Empty(t, p.activity(carla, "?access=owner").list())
+		for _, bad := range []string{"?limit=0", "?limit=31", "?limit=abc", "?access=mine"} {
+			assert.Equal(t, 422, p.do("GET", "/api/admin/projects/activity"+bad, nil, p.maria).Status, bad)
+		}
+		assert.Equal(t, 401, p.do("GET", "/api/admin/projects/activity", nil, "").Status)
+	})
+
+	t.Run("quem não é do projeto não vê nada, nem a equipe", func(t *testing.T) {
+		assert.Empty(t, p.activity(p.joao, "").list())
+		for name, tok := range map[string]string{"analista": staff.analyst, "supervisor": staff.supervisor, "secretário": staff.secretary, "super admin": p.boss} {
+			assert.Empty(t, p.activity(tok, "").list(), name)
+		}
+	})
+
+	t.Run("revogar o acesso tira o feed na hora", func(t *testing.T) {
+		require.Equal(t, 204, p.do("DELETE", membersPath(fp.id, "/", member), nil, p.maria).Status)
+		assert.Empty(t, p.activity(carla, "").list())
+		// Convidar de novo recomeça a janela: só o novo convite aparece.
+		p.mustInvite(fp.id, "carla@exemplo.com", "read")
+		kinds, _ := kindsOf(p.activity(carla, ""))
+		assert.Equal(t, []string{"shared_with_you"}, kinds)
+	})
 }
