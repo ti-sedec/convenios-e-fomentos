@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -269,5 +270,139 @@ func TestVisaoGeralFilaProntosParaIndicar(t *testing.T) {
 		blk := p.queueOverview(an, "").data()["blocks"].(map[string]any)["ready"].(map[string]any)
 		assert.Equal(t, true, blk["capped"], "havia mais candidatos que o limite")
 		assert.EqualValues(t, 1, blk["total"], "o mais antigo está entre os examinados")
+	})
+}
+
+// queueActivity lê o feed da equipe.
+func (p *projEnv) queueActivity(tok, query string) resp {
+	p.t.Helper()
+	r := p.do("GET", "/api/admin/projects/queue/activity"+query, nil, tok)
+	require.Equal(p.t, 200, r.Status, r.Body)
+	return r
+}
+
+// eventsOf devolve os marcos de um projeto, do mais novo ao mais antigo.
+func eventsOf(r resp, projectID string) (events []map[string]any) {
+	for _, it := range r.list() {
+		if m := it.(map[string]any); m["projectId"] == projectID {
+			events = append(events, m)
+		}
+	}
+	return events
+}
+
+func kindsOfEvents(events []map[string]any) (kinds []string) {
+	for _, e := range events {
+		kinds = append(kinds, e["kind"].(string))
+	}
+	return kinds
+}
+
+func TestAtividadeDaFilaDaEquipe(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	other, _ := p.newAdmin(p.boss, "outro.analista@exemplo.com", "analyst")
+	fin := p.deptID("Financeiro")
+	an := staff.analyst
+	const secret = "JUSTIFICATIVA-INTERNA-DA-RECUSA"
+
+	main := p.submitted("8701/2026")
+	require.Equal(t, 200, p.startAnalysis(an, main.id).Status)
+	p.returnAndResubmit(main, an, "8701/2026")
+	require.True(t, allApproved(p.approveAll(an, main.id)))
+	require.Equal(t, 200, p.assign(an, main.id, fin).Status)
+	require.Equal(t, 200, p.refuse(staff.reviewerSame, main.id, 1, secret).Status)
+	require.Equal(t, 200, p.assign(an, main.id, fin).Status)
+	require.Equal(t, 200, p.confirm(staff.reviewerSame, main.id, 2).Status)
+
+	archivedByTeam := p.submitted("8702/2026")
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+archivedByTeam.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, an).Status)
+	withdrawn := p.submitted("8703/2026")
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+withdrawn.id+"/withdraw", map[string]any{"note": "Vamos refazer o projeto."}, p.maria).Status)
+	expired := p.submitted("8704/2026")
+	require.Equal(t, 200, p.complement(an, expired.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
+	p.setDue(expired.id, time.Now().Add(-time.Hour))
+	n, err := p.app.Projects.ExpireComplements(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+	p.create(p.maria) // rascunho: nada dele entra
+
+	r := p.queueActivity(an, "?limit=30")
+
+	t.Run("o percurso do projeto, do mais novo ao mais antigo, com o interno", func(t *testing.T) {
+		ev := eventsOf(r, main.id)
+		assert.Equal(t, []string{"framing_confirmed", "department_assigned", "framing_refused", "department_assigned", "resubmitted",
+			"complement_requested", "analysis_started", "submitted"}, kindsOfEvents(ev))
+		for _, i := range []int{0, 1, 2, 3} {
+			assert.Equal(t, "Financeiro", ev[i]["data"].(map[string]any)["department"], ev[i]["kind"])
+		}
+		assert.EqualValues(t, 1, ev[5]["data"].(map[string]any)["items"])
+		assert.EqualValues(t, 2, ev[4]["data"].(map[string]any)["version"])
+		assert.NotEmpty(t, ev[5]["data"].(map[string]any)["dueAt"])
+		assert.NotEmpty(t, ev[0]["title"])
+		assert.NotEmpty(t, ev[0]["code"])
+	})
+
+	t.Run("quem agiu: a equipe com nome, o proponente sem", func(t *testing.T) {
+		ev := eventsOf(r, main.id)
+		by := func(i int) map[string]any { return ev[i]["by"].(map[string]any) }
+		assert.Equal(t, "admin", by(0)["type"], "o Revisor confirmou")
+		assert.NotEmpty(t, by(0)["name"])
+		assert.NotEqual(t, true, by(0)["self"], "não foi o Analista que consulta")
+		assert.Equal(t, "admin", by(1)["type"])
+		assert.Equal(t, true, by(1)["self"], "o Analista que consulta indicou")
+		assert.Equal(t, "proponent", by(4)["type"], "o reenvio é do proponente")
+		assert.Nil(t, by(4)["name"])
+		assert.Equal(t, "proponent", by(7)["type"], "o envio")
+		assert.Nil(t, by(7)["name"])
+		assert.NotEqual(t, true, by(7)["self"])
+	})
+
+	t.Run("arquivamentos: pela equipe, pelo proponente e pelo sistema", func(t *testing.T) {
+		ev := eventsOf(r, archivedByTeam.id)
+		require.Equal(t, []string{"archived", "submitted"}, kindsOfEvents(ev))
+		assert.Equal(t, map[string]any{"reason": "other"}, ev[0]["data"])
+		assert.Equal(t, "admin", ev[0]["by"].(map[string]any)["type"])
+		ev = eventsOf(r, withdrawn.id)
+		assert.Equal(t, map[string]any{"reason": "withdrawn"}, ev[0]["data"])
+		assert.Equal(t, "proponent", ev[0]["by"].(map[string]any)["type"])
+		ev = eventsOf(r, expired.id)
+		assert.Equal(t, map[string]any{"reason": "complement_deadline"}, ev[0]["data"])
+		assert.Equal(t, "system", ev[0]["by"].(map[string]any)["type"])
+		assert.Nil(t, ev[0]["by"].(map[string]any)["name"])
+	})
+
+	t.Run("nada interno demais vaza", func(t *testing.T) {
+		for _, q := range []string{"?limit=30", "?scope=mine&limit=30", ""} {
+			body := strings.ToLower(fmt.Sprint(p.queueActivity(an, q).Body))
+			for _, banned := range []string{strings.ToLower(secret), "justification", "10.0.0.1", cpfFor("maria@exemplo.com"), "maria@exemplo.com",
+				"review-item", "payload", "cpf", "telefone"} {
+				assert.NotContains(t, body, banned, "feed %q contém %q", q, banned)
+			}
+		}
+		for _, it := range r.list() {
+			assert.NotContains(t, []string{"review_item", ""}, it.(map[string]any)["kind"])
+		}
+	})
+
+	t.Run("só os meus e o limite", func(t *testing.T) {
+		// O Analista que assumiu vê os do projeto principal; outro Analista, que não assumiu nada, não vê nenhum com "só os meus".
+		assert.NotEmpty(t, eventsOf(p.queueActivity(an, "?scope=mine&limit=30"), main.id))
+		assert.Empty(t, p.queueActivity(other, "?scope=mine&limit=30").list())
+		assert.NotEmpty(t, p.queueActivity(other, "?limit=30").list(), "a equipe inteira vê tudo")
+		assert.Len(t, p.queueActivity(an, "?limit=3").list(), 3)
+		assert.LessOrEqual(t, len(p.queueActivity(an, "").list()), 15, "padrão de 15")
+	})
+
+	t.Run("quem não é Analista não vê", func(t *testing.T) {
+		for name, tok := range map[string]string{"proponente": p.maria, "supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame} {
+			assert.Equal(t, 403, p.do("GET", "/api/admin/projects/queue/activity", nil, tok).Status, name)
+		}
+		assert.Equal(t, 401, p.do("GET", "/api/admin/projects/queue/activity", nil, "").Status)
+		for _, bad := range []string{"?limit=0", "?limit=31", "?limit=abc", "?scope=minhas"} {
+			assert.Equal(t, 422, p.do("GET", "/api/admin/projects/queue/activity"+bad, nil, an).Status, bad)
+		}
 	})
 }

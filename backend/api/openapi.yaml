@@ -1023,6 +1023,20 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/activity:
+    get:
+      tags: [Projetos]
+      summary: Atividade recente da fila (equipe)
+      description: "Marcos dos projetos que o Analista enxerga (a condição da permissão somada a projeto enviado ou arquivado), do mais novo ao mais antigo, escritos para a equipe. Permissão: `admin::projects.start-analysis`. `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); `limit` de 1 a 30 (padrão 15), sem paginação. Só entram os marcos de uma lista permitida própria da equipe (diferente da do proponente): `submitted` (`data.late`), `resubmitted` (`data.version`), `analysis_started`, `complement_requested` (`data.items`, `data.dueAt`), `department_assigned`, `framing_confirmed` e `framing_refused` (`data.department`) e `archived` (`data.reason`: `complement_deadline`, `withdrawn`, `denied`, `missing_documents` ou `other`). Fora: conferência de itens, abertura de arquivos, edições e compartilhamento. Resposta: `[{id, at, kind, by {type: admin|proponent|system, name, self}, projectId, title, code, data}]`. `by.name` só existe para a equipe (`admin`); o proponente (titular ou membro) aparece só como tipo, sem nome nem CPF; `self` marca a própria pessoa. A justificativa da recusa do enquadramento **não** vai no feed (fica no detalhe do projeto)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [team, mine]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 30, default: 15}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

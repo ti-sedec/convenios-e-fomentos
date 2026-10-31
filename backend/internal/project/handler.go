@@ -67,6 +67,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionRead)).Get("/admin/projects/overview", h.overview)
 	r.With(g(ActionRead)).Get("/admin/projects/activity", h.activity)
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/overview", h.queueOverview)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/activity", h.queueActivity)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -279,6 +280,31 @@ func (h *Handler) queueOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v, err := h.svc.QueueOverview(r.Context(), actorOf(r), dec.Filter, scope)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueActivity(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	q := r.URL.Query()
+	scope := q.Get("scope")
+	if scope != "" && scope != QueueScopeTeam && scope != QueueScopeMine {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "scope", Message: "Valores aceitos: team, mine."}}}))
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > maxQueueActivityLimit {
+			httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxQueueActivityLimit) + "."}}}))
+			return
+		}
+		limit = n
+	}
+	v, err := h.svc.QueueActivity(r.Context(), actorOf(r), dec.Filter, scope, limit)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

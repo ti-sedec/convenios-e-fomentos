@@ -69,3 +69,47 @@ func TestDadosDoFeedCopiamSoOPermitido(t *testing.T) {
 		t.Errorf("data inválida deve ser descartada: %v", got)
 	}
 }
+
+func TestListaPermitidaDoFeedDaEquipe(t *testing.T) {
+	// O que é só de conferência, arquivo, edição e compartilhamento nunca entra, nem no feed da equipe.
+	for _, banned := range []string{"project.review-item", "project.file-download", "project.file-preview", "project.file-infected", "project.receipt-download",
+		"project.update", "project.create", "project.delete", "project.duplicate", "project.draft-expired", "project.member-invited",
+		"project.member-updated", "project.member-revoked", "project.declaration-request", "project.declaration-signed"} {
+		if _, ok := queueActivityKinds[banned]; ok {
+			t.Errorf("%s não pode estar na lista permitida do feed da equipe", banned)
+		}
+	}
+}
+
+func TestDadosDoFeedDaEquipeCopiamSoOPermitido(t *testing.T) {
+	for _, x := range []struct {
+		name, kind, payload, dept string
+		want                      map[string]any
+	}{
+		{"indicação leva o departamento", QueueActDepartmentAssigned, `{"round":1,"department":"d1f0"}`, "Financeiro", map[string]any{"department": "Financeiro"}},
+		{"recusa leva só o departamento", QueueActFramingRefused, `{"round":2,"department":"d1f0","justification":"texto interno"}`, "Jurídico", map[string]any{"department": "Jurídico"}},
+		{"confirmação", QueueActFramingConfirmed, `{"round":1}`, "Financeiro", map[string]any{"department": "Financeiro"}},
+		{"sem departamento", QueueActFramingConfirmed, `{}`, "", map[string]any{}},
+		{"análise não leva nada", QueueActAnalysisStarted, `{"stage":"in_analysis"}`, "", map[string]any{}},
+		{"envio", QueueActSubmitted, `{"code":"2026-000001","late":true,"version":1}`, "", map[string]any{"late": true}},
+		{"reenvio", QueueActResubmitted, `{"version":3}`, "", map[string]any{"version": 3}},
+		{"arquivamento conhecido", QueueActArchived, `{"reason":"denied","note":"texto interno"}`, "", map[string]any{"reason": "denied"}},
+		{"arquivamento de motivo desconhecido", QueueActArchived, `{"reason":"qualquer coisa"}`, "", map[string]any{"reason": "other"}},
+		{"payload ilegível", QueueActSubmitted, `não é json`, "", map[string]any{}},
+	} {
+		got := queueActivityData(x.kind, []byte(x.payload), x.dept)
+		if len(got) != len(x.want) {
+			t.Errorf("%s: %v, esperado %v", x.name, got, x.want)
+			continue
+		}
+		for k, v := range x.want {
+			if got[k] != v {
+				t.Errorf("%s: %s = %v, esperado %v", x.name, k, got[k], v)
+			}
+		}
+	}
+	got := queueActivityData(QueueActComplementRequest, []byte(`{"number":1,"items":4,"dueAt":"2026-11-03T12:00:00Z"}`), "")
+	if got["items"] != 4 || got["dueAt"] == nil || len(got) != 2 {
+		t.Errorf("pedido de complementação: %v", got)
+	}
+}
