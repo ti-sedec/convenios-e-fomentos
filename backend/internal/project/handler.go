@@ -66,6 +66,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionRead)).Get("/admin/projects", h.list)
 	r.With(g(ActionRead)).Get("/admin/projects/overview", h.overview)
 	r.With(g(ActionRead)).Get("/admin/projects/activity", h.activity)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/overview", h.queueOverview)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -263,6 +264,21 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 	v, err := h.svc.Activity(r.Context(), actorOf(r), read.Filter, access, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueOverview(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	scope := r.URL.Query().Get("scope")
+	if scope != "" && scope != QueueScopeTeam && scope != QueueScopeMine {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "scope", Message: "Valores aceitos: team, mine."}}}))
+		return
+	}
+	v, err := h.svc.QueueOverview(r.Context(), actorOf(r), dec.Filter, scope)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

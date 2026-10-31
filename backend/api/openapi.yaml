@@ -1010,6 +1010,19 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/overview:
+    get:
+      tags: [Projetos]
+      summary: Resumo da fila do Analista (visão geral)
+      description: "Contagens por etapa e os blocos do que pede a ação do Analista. Permissão: `admin::projects.start-analysis`. O alcance é a condição dessa permissão somada a projeto enviado ou arquivado (rascunho nunca). `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); o bloco `entry` ignora `mine`, pois projeto não assumido não tem dono. Resposta: `counts {awaiting_checklist, in_analysis, framing_pending, awaiting_proponent, awaiting_opinion, archived_30d}` (enquadramento pendente conta só em `framing_pending`); `limits {awaiting_checklist, in_analysis, framing, awaiting_opinion}` (dias vigentes do parâmetro `stalled_after_days`; zero = sem regra, nada é marcado como parado); `blocks {refused, resubmitted, entry, stalled, deadlines}`, cada um `{total, items}` com até 15 itens do mais urgente para o menos. Item: `projectId`, `title`, `code`, `institution`, `sinceSeconds` (tempo com o responsável atual, do trecho aberto do histórico), `stage` (etapa de trabalho: `awaiting_checklist`, `in_analysis`, `framing`, `awaiting_opinion`), `late`, `analyst`; `entry` traz `overLimit`; `stalled` traz `holder` (`team`, `analyst`, `department`) e `limitDays`, e **não** inclui \"aguardando proponente\" (tem prazo próprio); `refused` traz `department` e `refusedAt` (projeto em análise, sem departamento, cuja última rodada de enquadramento foi recusada); `resubmitted` são os em análise cujo último trecho veio do reenvio do proponente e sem nenhuma conferência depois dele; `deadlines` traz `dueAt` e `overdue` (complementação que vence em até 48 horas). Nenhum dado pessoal do proponente (CPF, e-mail, telefone)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [team, mine]}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

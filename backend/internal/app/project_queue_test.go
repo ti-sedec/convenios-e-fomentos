@@ -1,0 +1,202 @@
+package app_test
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// queueOverview lê o resumo da fila do Analista.
+func (p *projEnv) queueOverview(tok, query string) resp {
+	p.t.Helper()
+	r := p.do("GET", "/api/admin/projects/queue/overview"+query, nil, tok)
+	require.Equal(p.t, 200, r.Status, r.Body)
+	return r
+}
+
+// block devolve o total e os ids (na ordem) de um bloco da visão geral.
+func block(r resp, name string) (total int, ids []string, items []map[string]any) {
+	b := r.data()["blocks"].(map[string]any)[name].(map[string]any)
+	for _, it := range b["items"].([]any) {
+		m := it.(map[string]any)
+		ids, items = append(ids, m["projectId"].(string)), append(items, m)
+	}
+	return int(b["total"].(float64)), ids, items
+}
+
+// returnAndResubmit devolve o projeto à correção e o proponente o reenvia.
+func (p *projEnv) returnAndResubmit(fp *fundingProject, analyst, sigcon string) {
+	p.t.Helper()
+	require.Equal(p.t, 200, p.complement(analyst, fp.id, map[string]any{"message": "Corrija o título.", "items": []any{section("proposal", "Título.")}}).Status)
+	pb := proposalBody(fp.current(p.maria))
+	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", sigcon
+	require.Equal(p.t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
+	require.Equal(p.t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/resubmit", map[string]any{"version": fp.current(p.maria), "declaration": true}, p.maria).Status)
+}
+
+func TestVisaoGeralDaFilaDoAnalista(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	other, _ := p.newAdmin(p.boss, "outro.analista@exemplo.com", "analyst")
+	fin := p.deptID("Financeiro")
+	an := staff.analyst
+	assume := func(fp *fundingProject) *fundingProject {
+		require.Equal(t, 200, p.startAnalysis(an, fp.id).Status)
+		return fp
+	}
+	p.create(p.maria) // rascunho: nunca entra
+
+	entryOld := p.submitted("8501/2026")         // fila de entrada, há 3 dias (limite 2)
+	entryNew := p.submitted("8502/2026")         // fila de entrada, agora
+	stalled := assume(p.submitted("8503/2026"))  // em análise há 8 dias (limite 7)
+	due40 := assume(p.submitted("8504/2026"))    // complementação que vence em 40 horas
+	due60 := assume(p.submitted("8505/2026"))    // a que vence em 60 horas
+	resub := assume(p.submitted("8506/2026"))    // reenviado, sem conferência depois
+	reviewed := assume(p.submitted("8507/2026")) // reenviado e já conferido
+	refused := assume(p.submitted("8508/2026"))  // enquadramento recusado, sem nova indicação
+	again := assume(p.submitted("8509/2026"))    // recusado e indicado de novo (no Revisor há 6 dias)
+	archived := assume(p.submitted("8510/2026")) // arquivado pelo Analista
+
+	p.age(entryOld.id, 3)
+	p.age(stalled.id, 10, 8)
+	for _, fp := range []*fundingProject{due40, due60} {
+		require.Equal(t, 200, p.complement(an, fp.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
+	}
+	p.setDue(due40.id, time.Now().Add(40*time.Hour))
+	p.setDue(due60.id, time.Now().Add(60*time.Hour))
+	p.returnAndResubmit(resub, an, "8506/2026")
+	p.returnAndResubmit(reviewed, an, "8507/2026")
+	require.Equal(t, 200, p.review(an, reviewed.id, "section", "institution", true).Status)
+	for _, fp := range []*fundingProject{refused, again} {
+		require.True(t, allApproved(p.approveAll(an, fp.id)))
+		require.Equal(t, 200, p.assign(an, fp.id, fin).Status)
+		require.Equal(t, 200, p.refuse(staff.reviewerSame, fp.id, 1, "Não é da nossa área.").Status)
+	}
+	require.Equal(t, 200, p.assign(an, again.id, fin).Status)
+	p.age(again.id, 20, 19, 18, 17, 6)
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+archived.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, an).Status)
+
+	r := p.queueOverview(an, "")
+	counts := r.data()["counts"].(map[string]any)
+	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(4), "framing_pending": float64(1),
+		"awaiting_proponent": float64(2), "awaiting_opinion": float64(0), "archived_30d": float64(1)}, counts)
+	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(7), "framing": float64(5), "awaiting_opinion": float64(15)}, r.data()["limits"])
+
+	t.Run("aguardando assumir: a fila de entrada, a mais antiga primeiro", func(t *testing.T) {
+		total, ids, items := block(r, "entry")
+		assert.Equal(t, 2, total)
+		assert.Equal(t, []string{entryOld.id, entryNew.id}, ids)
+		assert.Equal(t, true, items[0]["overLimit"])
+		assert.NotEqual(t, true, items[1]["overLimit"])
+		assert.NotEmpty(t, items[0]["title"])
+		assert.NotEmpty(t, items[0]["code"])
+		assert.Nil(t, items[0]["analyst"])
+	})
+	t.Run("parados: o mais além do limite da própria etapa primeiro", func(t *testing.T) {
+		total, ids, items := block(r, "stalled")
+		assert.Equal(t, 3, total)
+		// 3 dias para 2 (1,5), 6 dias para 5 (1,2), 8 dias para 7 (1,14).
+		assert.Equal(t, []string{entryOld.id, again.id, stalled.id}, ids)
+		assert.Equal(t, "framing", items[1]["stage"])
+		assert.Equal(t, "department", items[1]["holder"])
+		assert.EqualValues(t, 5, items[1]["limitDays"])
+		assert.Equal(t, "team", items[0]["holder"])
+		assert.Equal(t, "analyst", items[2]["holder"])
+		assert.EqualValues(t, 7, items[2]["limitDays"])
+		assert.NotNil(t, items[2]["analyst"])
+		for _, it := range items {
+			assert.NotEqual(t, "awaiting_proponent", it["stage"], "o prazo do proponente não conta como parado")
+		}
+	})
+	t.Run("prazos a vencer em 48 horas", func(t *testing.T) {
+		total, ids, items := block(r, "deadlines")
+		assert.Equal(t, 1, total)
+		assert.Equal(t, []string{due40.id}, ids)
+		assert.NotEmpty(t, items[0]["dueAt"])
+		assert.NotEqual(t, true, items[0]["overdue"])
+	})
+	t.Run("reenviados sem conferência depois do reenvio", func(t *testing.T) {
+		total, ids, _ := block(r, "resubmitted")
+		assert.Equal(t, 1, total)
+		assert.Equal(t, []string{resub.id}, ids)
+	})
+	t.Run("recusados pelo Revisor, até indicar de novo", func(t *testing.T) {
+		total, ids, items := block(r, "refused")
+		assert.Equal(t, 1, total)
+		assert.Equal(t, []string{refused.id}, ids)
+		assert.Equal(t, "Financeiro", items[0]["department"])
+		assert.NotEmpty(t, items[0]["refusedAt"])
+		for _, name := range []string{"stalled", "entry", "resubmitted", "deadlines"} {
+			_, _, others := block(r, name)
+			for _, it := range others {
+				assert.Nil(t, it["department"], "a rodada recusada de antes não aparece em %s", name)
+			}
+		}
+	})
+
+	t.Run("só os meus", func(t *testing.T) {
+		mine := p.queueOverview(an, "?scope=mine")
+		c := mine.data()["counts"].(map[string]any)
+		assert.EqualValues(t, 0, c["awaiting_checklist"], "ninguém é dono antes de assumir")
+		assert.EqualValues(t, 4, c["in_analysis"])
+		total, ids, _ := block(mine, "entry")
+		assert.Equal(t, 2, total, "a fila de entrada ignora o filtro")
+		assert.Equal(t, []string{entryOld.id, entryNew.id}, ids)
+		_, stalledIDs, _ := block(mine, "stalled")
+		assert.Equal(t, []string{again.id, stalled.id}, stalledIDs, "o que está na entrada não é de ninguém")
+
+		// Outro Analista não assumiu nada: só vê a fila de entrada.
+		theirs := p.queueOverview(other, "?scope=mine")
+		for k, v := range theirs.data()["counts"].(map[string]any) {
+			assert.EqualValues(t, 0, v, k)
+		}
+		for _, name := range []string{"refused", "resubmitted", "stalled", "deadlines"} {
+			total, _, _ := block(theirs, name)
+			assert.Equal(t, 0, total, name)
+		}
+		total, _, _ = block(theirs, "entry")
+		assert.Equal(t, 2, total)
+		// Mas o escopo "equipe" mostra tudo para quem for.
+		assert.Equal(t, counts, p.queueOverview(other, "").data()["counts"])
+	})
+
+	t.Run("prazo já vencido continua listado, marcado", func(t *testing.T) {
+		p.setDue(due40.id, time.Now().Add(-time.Hour))
+		_, ids, items := block(p.queueOverview(an, ""), "deadlines")
+		assert.Equal(t, []string{due40.id}, ids)
+		assert.Equal(t, true, items[0]["overdue"])
+	})
+
+	t.Run("nada pessoal do proponente", func(t *testing.T) {
+		body := strings.ToLower(fmt.Sprint(r.Body))
+		for _, banned := range []string{cpfFor("maria@exemplo.com"), "maria@exemplo.com", "phone", "cpf", "email"} {
+			assert.NotContains(t, body, banned)
+		}
+	})
+
+	t.Run("quem não é Analista não vê", func(t *testing.T) {
+		for name, tok := range map[string]string{"proponente": p.maria, "supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame} {
+			assert.Equal(t, 403, p.do("GET", "/api/admin/projects/queue/overview", nil, tok).Status, name)
+		}
+		assert.Equal(t, 401, p.do("GET", "/api/admin/projects/queue/overview", nil, "").Status)
+		assert.Equal(t, 422, p.do("GET", "/api/admin/projects/queue/overview?scope=minhas", nil, an).Status)
+	})
+
+	t.Run("sem regra vigente, nada é marcado como parado", func(t *testing.T) {
+		list := p.do("GET", "/api/admin/rule-parameters?key=stalled_after_days", nil, p.boss).list()
+		require.Len(t, list, 1)
+		require.Equal(t, 204, p.do("DELETE", "/api/admin/rule-parameters/"+list[0].(map[string]any)["id"].(string), nil, p.boss).Status)
+		none := p.queueOverview(an, "")
+		assert.Equal(t, map[string]any{"awaiting_checklist": float64(0), "in_analysis": float64(0), "framing": float64(0), "awaiting_opinion": float64(0)}, none.data()["limits"])
+		total, _, _ := block(none, "stalled")
+		assert.Equal(t, 0, total)
+		total, _, _ = block(none, "entry")
+		assert.Equal(t, 2, total, "os demais blocos seguem")
+	})
+}
