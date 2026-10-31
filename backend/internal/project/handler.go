@@ -3,6 +3,7 @@ package project
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -165,6 +166,14 @@ func parseStaffFilters(q url.Values, p *ListParams) error {
 		p.Framing = v
 	default:
 		bad = append(bad, httpapi.FieldError{Field: "framing", Message: "Valores aceitos: pending, confirmed, none."})
+	}
+	if v := q.Get("idleDays"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 3650 {
+			bad = append(bad, httpapi.FieldError{Field: "idleDays", Message: "Informe um número de dias entre 1 e 3650."})
+		} else {
+			p.IdleDays = n
+		}
 	}
 	for _, f := range []struct {
 		name string

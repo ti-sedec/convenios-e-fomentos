@@ -330,12 +330,22 @@ type ListParams struct {
 	Framing    string
 	Department *uuid.UUID
 	Analyst    *uuid.UUID
-	Sort       httpapi.Sort
-	Page       httpapi.Page
+	// IdleDays, quando maior que zero, só deixa os projetos enviados que estão na etapa atual há pelo menos tantos dias corridos.
+	IdleDays int
+	Sort     httpapi.Sort
+	Page     httpapi.Page
 }
 
-// SortColumns é a lista permitida de ordenação.
-var SortColumns = map[string]string{"updated_at": "updated_at", "created_at": "created_at", "title": "title", "institution_name": "institution_name"}
+// stageSinceSQL é desde quando um projeto enviado está na etapa atual, pelo histórico de etapas: o início dos trechos seguidos que têm
+// a etapa de hoje (um enquadramento pendente continua na etapa de análise). Nulo fora de projeto enviado.
+const stageSinceSQL = `(CASE WHEN projects.status = 'submitted' THEN (SELECT min(h.entered_at) FROM project_stage_history h
+	WHERE h.project_id = projects.id AND h.seq > COALESCE((SELECT max(h2.seq) FROM project_stage_history h2
+	WHERE h2.project_id = projects.id AND h2.stage <> projects.stage), 0)) END)`
+
+// SortColumns é a lista permitida de ordenação. stage_since:asc põe primeiro quem está há mais tempo na etapa atual (e por último o
+// que não é projeto enviado).
+var SortColumns = map[string]string{"updated_at": "updated_at", "created_at": "created_at", "title": "title", "institution_name": "institution_name",
+	"stage_since": "COALESCE(" + stageSinceSQL + ", 'infinity'::timestamptz)"}
 
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
@@ -374,6 +384,9 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 	if p.Analyst != nil {
 		conds = append(conds, "analyst_id = "+arg(*p.Analyst))
 	}
+	if p.IdleDays > 0 {
+		conds = append(conds, stageSinceSQL+" <= now() - make_interval(days => "+arg(p.IdleDays)+")")
+	}
 	if q := strings.TrimSpace(p.Q); q != "" {
 		like := arg("%" + escapeLike(q) + "%")
 		cond := fmt.Sprintf("(title ILIKE %[1]s OR institution_name ILIKE %[1]s OR sigcon_number ILIKE %[1]s", like)
@@ -394,9 +407,10 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		COALESCE(sigcon_number, ''), total_amount_cents, COALESCE(code, ''), submitted_at, COALESCE(stage, ''), COALESCE(archive_reason, ''),
 		(SELECT due_at FROM project_complement_requests c WHERE c.project_id = projects.id AND c.status = 'open'), created_by_id, created_at, updated_at,
 		department_id, (SELECT d.name FROM departments d WHERE d.id = projects.department_id), COALESCE(framing_status, ''),
-		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = projects.analyst_id)
-		FROM projects%s ORDER BY %s, id LIMIT %d OFFSET %d`,
-		where, p.Sort.SQL(), p.Page.PageSize, p.Page.Offset())
+		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = projects.analyst_id),
+		EXTRACT(EPOCH FROM now() - %[1]s)::bigint
+		FROM projects%[2]s ORDER BY %[3]s, id LIMIT %[4]d OFFSET %[5]d`,
+		stageSinceSQL, where, p.Sort.SQL(), p.Page.PageSize, p.Page.Offset())
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
@@ -412,8 +426,9 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		var owner uuid.UUID
 		var depID, anID *uuid.UUID
 		var depName, anName *string
+		var idle *int64
 		if err := rows.Scan(&x.ID, &x.Status, &x.Version, &x.Instrument, &x.Title, &x.InstitutionName, &x.InstitutionCNPJ, &x.SigconNumber, &x.TotalCents, &x.Code, &x.SubmittedAt, &x.Stage, &x.ArchiveReason, &x.ComplementDueAt, &owner, &x.CreatedAt, &x.UpdatedAt,
-			&depID, &depName, &x.FramingStatus, &anID, &anName); err != nil {
+			&depID, &depName, &x.FramingStatus, &anID, &anName, &idle); err != nil {
 			return nil, 0, err
 		}
 		x.IsOwner = owner == p.Actor.ID
@@ -429,6 +444,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 			if anID != nil {
 				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName)}
 			}
+			x.StageSeconds = idle
 		} else {
 			x.FramingStatus = ""
 		}

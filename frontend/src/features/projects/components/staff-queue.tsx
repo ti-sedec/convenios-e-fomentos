@@ -41,10 +41,24 @@ import {
   statusLabels,
   type ProjectSummary
 } from '../api/types';
-import { formatBrl, formatCnpj, formatDateTimeCuiaba } from '../format';
+import { formatBrl, formatCnpj, formatDateTimeCuiaba, formatDuration } from '../format';
 import { queueTabsFor } from '../queues';
 
 const ALL = 'all';
+
+/** "Parado há": o mínimo de dias corridos na etapa atual. Vazio = sem filtro. */
+const idleOptions = [
+  { value: ALL, label: 'Qualquer tempo na etapa' },
+  { value: '3', label: 'Na etapa há 3 dias ou mais' },
+  { value: '7', label: 'Na etapa há 7 dias ou mais' },
+  { value: '15', label: 'Na etapa há 15 dias ou mais' },
+  { value: '30', label: 'Na etapa há 30 dias ou mais' }
+];
+
+const orderOptions = [
+  { value: 'recentes', label: 'Atualizados há menos tempo' },
+  { value: 'parados', label: 'Há mais tempo na etapa' }
+];
 
 /** A situação do projeto na fila: etapa e, quando há, enquadramento e departamento. Sempre em texto, nunca só cor. */
 function Situation({ p }: { p: ProjectSummary }) {
@@ -85,6 +99,8 @@ export function StaffQueue() {
       aba: parseAsString.withDefault(''),
       q: parseAsString.withDefault(''),
       departamento: parseAsString.withDefault(''),
+      parado: parseAsString.withDefault(''),
+      ordem: parseAsString.withDefault('recentes'),
       page: parseAsInteger.withDefault(1)
     },
     { clearOnDefault: true, limitUrlUpdates: debounce(300) }
@@ -97,6 +113,8 @@ export function StaffQueue() {
       ...current.params,
       q: search,
       department: filters.departamento || undefined,
+      idleDays: filters.parado ? Number(filters.parado) : undefined,
+      sort: filters.ordem === 'parados' ? 'stage_since:asc' : undefined,
       page: filters.page
     }),
     placeholderData: (prev) => prev
@@ -150,6 +168,42 @@ export function StaffQueue() {
             </SelectContent>
           </Select>
         )}
+        <Select
+          items={idleOptions}
+          value={filters.parado || ALL}
+          onValueChange={(v) => void setFilters({ parado: v === ALL ? '' : (v ?? ''), page: 1 })}
+        >
+          <SelectTrigger aria-label='Filtrar por tempo na etapa'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {idleOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select
+          items={orderOptions}
+          value={filters.ordem}
+          onValueChange={(v) => void setFilters({ ordem: v ?? 'recentes', page: 1 })}
+        >
+          <SelectTrigger aria-label='Ordenar a fila'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {orderOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <Tabs value={current.key} onValueChange={(v) => void setFilters({ aba: v, page: 1 })}>
@@ -181,6 +235,7 @@ export function StaffQueue() {
                     <TableHead>Valor solicitado</TableHead>
                     <TableHead>Situação</TableHead>
                     <TableHead>Analista</TableHead>
+                    <TableHead>Na etapa há</TableHead>
                     <TableHead>Atualizado em</TableHead>
                     <TableHead className='w-px' />
                   </TableRow>
@@ -188,8 +243,8 @@ export function StaffQueue() {
                 <TableBody>
                   {rows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-muted-foreground text-center'>
-                        {search || filters.departamento
+                      <TableCell colSpan={9} className='text-muted-foreground text-center'>
+                        {search || filters.departamento || filters.parado
                           ? 'Nenhum projeto encontrado com estes filtros.'
                           : 'Nenhum projeto nesta fila.'}
                       </TableCell>
@@ -240,6 +295,13 @@ export function StaffQueue() {
                       </TableCell>
                       <TableCell>
                         {p.analyst?.name ?? <span className='text-muted-foreground'>—</span>}
+                      </TableCell>
+                      <TableCell className='tabular-nums'>
+                        {p.stageSeconds === undefined ? (
+                          <span className='text-muted-foreground'>—</span>
+                        ) : (
+                          formatDuration(p.stageSeconds)
+                        )}
                       </TableCell>
                       <TableCell className='tabular-nums'>
                         {formatDateTimeCuiaba(p.updatedAt)}

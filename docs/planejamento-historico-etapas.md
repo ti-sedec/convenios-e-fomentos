@@ -223,7 +223,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 
 ## 9. Fases de entrega
 
-**Andamento:** fases 1 a 5 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`; fase 4: migração `00033`, testes `TestTravaDoHistoricoDeEtapas` e `TestRegraDeQuemEstaComOProjeto`; fase 5: `stage-timeline.tsx` na aba "Histórico", conferida no navegador com um projeto estimado).
+**Andamento:** fases 1 a 5 e a opção A da fase 6 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`; fase 4: migração `00033`, testes `TestTravaDoHistoricoDeEtapas` e `TestRegraDeQuemEstaComOProjeto`; fase 5: `stage-timeline.tsx` na aba "Histórico", conferida no navegador com um projeto estimado; fase 6, opção A: filtro `idleDays`, ordenação `stage_since` e coluna `stageSeconds` na fila da equipe, teste `TestFilaPorTempoNaEtapa`).
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|
@@ -232,7 +232,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 | **3** | API `GET /history` e `/history/summary`, OpenAPI, testes | Cobertura de rotas passa |
 | **4** | Trava adiada no banco (seção 4.4) | Alteração sem trecho é recusada no commit |
 | **5** | Aba "Histórico" no frontend, com durações em dias e horas | Percorrida num navegador (ver T24) |
-| **6** | Relatórios entre projetos (média por etapa, fila por responsável). Só depois de usar a linha do tempo; não bloqueia as fases 1 a 5 | Escopo definido com base no uso |
+| **6** | Relatórios entre projetos. **A (feita):** na fila de análise, filtro "na etapa há N dias ou mais" (3, 7, 15, 30), ordenação "há mais tempo na etapa" e coluna "Na etapa há", sem tela nova. **B e C (a decidir depois de usar a A):** painel de prazos (média e pior caso por etapa, fila por analista e por departamento) e exportação em CSV. Se a B vier, os trechos `initial` ficam fora das médias | A feita; B e C só se a equipe pedir |
 
 As fases 1 a 5 são a entrega básica. A fase 1 é a única que muda código de escrita. Cada fase termina com `make test` e `make lint` verdes e commit próprio.
 

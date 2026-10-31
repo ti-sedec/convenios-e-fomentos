@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -442,4 +443,99 @@ func TestRegraDeQuemEstaComOProjeto(t *testing.T) {
 			"SELECT project_holder_type($1, $2, NULLIF($3, ''), NULLIF($4, '')::uuid)", c.status, c.stage, c.framing, c.analyst).Scan(&got))
 		assert.Equal(t, c.want, got, "%+v", c)
 	}
+}
+
+// age recua os trechos de um projeto: ages[i] é quantos dias atrás o trecho i+1 começou (o fim de cada trecho é o início do seguinte).
+func (p *projEnv) age(id string, ages ...int) {
+	p.t.Helper()
+	ctx := context.Background()
+	_, err := p.pool.Exec(ctx, "ALTER TABLE project_stage_history DISABLE TRIGGER project_stage_history_guard")
+	require.NoError(p.t, err)
+	for i, d := range ages {
+		left := "NULL"
+		if i+1 < len(ages) {
+			left = "now() - make_interval(days => " + itoa(ages[i+1]) + ")"
+		}
+		_, err = p.pool.Exec(ctx, "UPDATE project_stage_history SET entered_at = now() - make_interval(days => $3), left_at = "+left+
+			" WHERE project_id = $1 AND seq = $2", id, i+1, d)
+		require.NoError(p.t, err)
+	}
+	_, err = p.pool.Exec(ctx, "ALTER TABLE project_stage_history ENABLE TRIGGER project_stage_history_guard")
+	require.NoError(p.t, err)
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
+
+func TestFilaPorTempoNaEtapa(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	fin := p.deptID("Financeiro")
+
+	// A: envio, análise e enquadramento pendente. A etapa de hoje (em análise) vale desde o trecho 2: 10 dias.
+	a := p.submitted("8401/2026")
+	require.Equal(t, 200, p.startAnalysis(staff.analyst, a.id).Status)
+	require.True(t, allApproved(p.approveAll(staff.analyst, a.id)))
+	require.Equal(t, 200, p.assign(staff.analyst, a.id, fin).Status)
+	p.age(a.id, 20, 10, 2)
+	// B: só enviado, há 5 dias. C: acabou de ser enviado.
+	b := p.submitted("8402/2026")
+	p.age(b.id, 5)
+	c := p.submitted("8403/2026")
+	// D: arquivado: não conta tempo na etapa.
+	d := p.submitted("8404/2026")
+	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+d.id+"/withdraw", map[string]any{"note": "Desistimos do projeto."}, p.maria).Status)
+
+	list := func(tok, query string) []map[string]any {
+		r := p.do("GET", "/api/admin/projects?pageSize=50&"+query, nil, tok)
+		require.Equal(t, 200, r.Status, r.Body)
+		out := []map[string]any{}
+		for _, x := range r.list() {
+			out = append(out, x.(map[string]any))
+		}
+		return out
+	}
+	ids := func(rows []map[string]any) []string {
+		out := make([]string, len(rows))
+		for i, r := range rows {
+			out[i] = r["id"].(string)
+		}
+		return out
+	}
+
+	t.Run("filtro de dias", func(t *testing.T) {
+		assert.Equal(t, []string{a.id}, ids(list(staff.analyst, "status=submitted&idleDays=7")))
+		assert.ElementsMatch(t, []string{a.id, b.id}, ids(list(staff.analyst, "status=submitted&idleDays=3")))
+		assert.Empty(t, list(staff.analyst, "status=submitted&idleDays=30"))
+	})
+
+	t.Run("ordem: há mais tempo na etapa primeiro", func(t *testing.T) {
+		rows := list(staff.analyst, "status=submitted&sort=stage_since:asc")
+		require.Len(t, rows, 3)
+		assert.Equal(t, []string{a.id, b.id, c.id}, ids(rows))
+		desc := list(staff.analyst, "status=submitted&sort=stage_since:desc")
+		assert.Equal(t, c.id, ids(desc)[0])
+	})
+
+	t.Run("há quanto tempo, em segundos, só para a equipe", func(t *testing.T) {
+		rows := list(staff.analyst, "status=submitted&sort=stage_since:asc")
+		day := float64(86400)
+		assert.InDelta(t, 10*day, rows[0]["stageSeconds"], 120, "trechos seguidos da mesma etapa contam juntos")
+		assert.InDelta(t, 5*day, rows[1]["stageSeconds"], 120)
+		assert.Less(t, rows[2]["stageSeconds"], 120.0)
+		archived := list(staff.analyst, "status=archived")
+		require.Len(t, archived, 1)
+		assert.NotContains(t, archived[0], "stageSeconds")
+		_ = d
+		for _, r := range list(p.maria, "") {
+			assert.NotContains(t, r, "stageSeconds", "o proponente não recebe o campo interno")
+		}
+	})
+
+	t.Run("valores inválidos", func(t *testing.T) {
+		for _, v := range []string{"0", "-1", "abc", "9999"} {
+			assert.Equal(t, 422, p.do("GET", "/api/admin/projects?idleDays="+v, nil, staff.analyst).Status, v)
+		}
+	})
 }

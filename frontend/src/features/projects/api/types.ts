@@ -337,6 +337,8 @@ export interface ProjectSummary {
   department?: DepartmentRef;
   framingStatus?: FramingStatus;
   analyst?: AnalystInfo;
+  /** Há quanto tempo (horas corridas) o projeto enviado está na etapa atual. */
+  stageSeconds?: number;
 }
 
 export const instrumentLabels: Record<Instrument, string> = {

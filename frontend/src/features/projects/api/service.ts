@@ -51,6 +51,10 @@ export interface ListProjectsParams {
   framing?: 'pending' | 'confirmed' | 'none';
   department?: string;
   analyst?: string;
+  /** Só projetos enviados na etapa atual há pelo menos tantos dias. */
+  idleDays?: number;
+  /** Ex.: 'stage_since:asc' (há mais tempo na etapa primeiro). */
+  sort?: string;
 }
 
 export async function listProjects({
@@ -61,7 +65,9 @@ export async function listProjects({
   stage,
   framing,
   department,
-  analyst
+  analyst,
+  idleDays,
+  sort
 }: ListProjectsParams = {}) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (q) params.set('q', q);
@@ -70,6 +76,8 @@ export async function listProjects({
   if (framing) params.set('framing', framing);
   if (department) params.set('department', department);
   if (analyst) params.set('analyst', analyst);
+  if (idleDays) params.set('idleDays', String(idleDays));
+  if (sort) params.set('sort', sort);
   return await apiClient<ApiResponse<ProjectSummary[]>>(`/admin/projects?${params}`);
 }
 

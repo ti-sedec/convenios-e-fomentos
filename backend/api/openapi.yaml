@@ -955,7 +955,7 @@ paths:
     get:
       tags: [Projetos]
       summary: Lista projetos
-      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (com ou sem pontuação). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`) e `analyst {id, name}` (ausentes quando não se aplicam); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
+      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (com ou sem pontuação). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`), `analyst {id, name}` (ausentes quando não se aplicam) e `stageSeconds` (há quanto tempo, em segundos corridos, o projeto enviado está na etapa atual); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst`, `idleDays` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
       security: [{adminBearer: []}]
       parameters:
         - {name: q, in: query, schema: {type: string}}
@@ -964,7 +964,8 @@ paths:
         - {name: framing, in: query, schema: {type: string, enum: [pending, confirmed, none]}, description: "Situação do enquadramento. `none` = sem enquadramento em andamento."}
         - {name: department, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo departamento atual é este."}
         - {name: analyst, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo analista responsável é este."}
-        - {name: sort, in: query, schema: {type: string, enum: [updated_at, created_at, title, institution_name]}, description: "Prefixo `-` para decrescente. Padrão: `-updated_at`."}
+        - {name: idleDays, in: query, schema: {type: integer, minimum: 1, maximum: 3650}, description: "Só projetos enviados que estão na etapa atual há pelo menos este número de dias corridos (pelo histórico de etapas; o enquadramento pendente continua na etapa de análise)."}
+        - {name: sort, in: query, schema: {type: string, enum: [updated_at, created_at, title, institution_name, stage_since]}, description: "Formato `campo:direção` (ex.: `stage_since:asc`). Padrão: `updated_at:desc`. `stage_since` ordena por quando o projeto entrou na etapa atual: ascendente põe primeiro quem está há mais tempo e, por último, o que não é projeto enviado."}
         - {name: page, in: query, schema: {type: integer, minimum: 1}}
         - {name: pageSize, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
       responses:

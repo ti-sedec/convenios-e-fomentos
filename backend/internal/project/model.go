@@ -362,9 +362,11 @@ type Summary struct {
 	Department    *DepartmentRef `json:"department,omitempty"`
 	FramingStatus string         `json:"framingStatus,omitempty"`
 	Analyst       *AnalystInfo   `json:"analyst,omitempty"`
-	TotalCents    int64          `json:"totalCents"`
-	IsOwner       bool           `json:"isOwner"`
-	Access        string         `json:"access"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
+	// StageSeconds é há quanto tempo (horas corridas) o projeto enviado está na etapa atual. Só a equipe recebe.
+	StageSeconds *int64    `json:"stageSeconds,omitempty"`
+	TotalCents   int64     `json:"totalCents"`
+	IsOwner      bool      `json:"isOwner"`
+	Access       string    `json:"access"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
