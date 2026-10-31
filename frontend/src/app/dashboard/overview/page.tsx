@@ -1,15 +1,19 @@
+import type { Metadata } from 'next';
 import { fullName } from '@/features/auth/full-name';
+import { ProponentOverview } from '@/features/proponent-overview/components/proponent-overview';
 import { getSession } from '@/lib/auth/session';
+import { isProjectProponentSession } from '@/lib/auth/access';
+
+export const metadata: Metadata = { title: 'Visão geral' };
 
 export default async function OverviewPage() {
   const session = await getSession();
-  const isProponent = session?.roles.some((r) => r.code === 'proponent') ?? false;
+  const name = session ? fullName(session) : 'bem-vindo';
+  // Mesmo critério do menu "Meus projetos": quem cadastra projetos. A equipe segue com o texto, até ter a sua visão geral.
+  if (await isProjectProponentSession()) return <ProponentOverview name={name} />;
   return (
     <p className='text-muted-foreground'>
-      Olá, {session ? fullName(session) : 'bem-vindo'}.{' '}
-      {isProponent
-        ? 'Comece pelo seu perfil de proponente e depois cadastre o seu projeto de convênio ou de termo de fomento em "Meus projetos".'
-        : 'Os módulos de convênios e fomentos aparecerão aqui.'}
+      Olá, {name}. Os módulos de convênios e fomentos aparecerão aqui.
     </p>
   );
 }

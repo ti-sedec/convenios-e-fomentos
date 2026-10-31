@@ -202,7 +202,7 @@ Seguindo `frontend/CLAUDE.md`: camadas `types` → `service` → `queries`, pref
 | **2 (feita)** | `GET /projects/overview`: contagens, valores e atenção; OpenAPI; testes (`overview.go`, `project_overview_test.go`) | Cobertura de rotas e testes da seção 7 (resumo) passam |
 | **3 (feita)** | `GET /projects/activity` com lista permitida; OpenAPI; teste de não vazar (`activity.go`, `TestAtividadeRecenteDoProponente`) | Teste de vazamento passa |
 | **4 (feita)** | Frontend: camadas de API (`features/proponent-overview/api`) e "Meus projetos" com filtros na URL (`acesso`, `situacao`, `q`, `page`) | Cartões de destino funcionam |
-| **5** | Frontend: a tela de visão geral (blocos, filtro, estado vazio) | Percorrida no navegador |
+| **5 (feita)** | Frontend: a tela de visão geral (blocos, filtro, estado vazio), com consultas no cliente (sem prefetch no servidor, como as demais telas) | Percorrida no navegador |
 | **6** | Atualizar documentação (seção 10) | — |
 | **7 (opcional)** | `DRAFT_RETENTION_DAYS` e o aviso "será excluído em N dias" (D8) | Só se pedido |
 
