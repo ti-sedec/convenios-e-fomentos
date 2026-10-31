@@ -325,6 +325,9 @@ type ListParams struct {
 	Actor  Actor
 	Q      string
 	Status string
+	// Access restringe a listagem ao que a pessoa tem como titular (AccessFilterOwner), como membro (AccessFilterMember) ou um dos dois
+	// (AccessFilterAny); vazio não restringe além da permissão. É sempre somado ao filtro de permissão, nunca o substitui.
+	Access string
 	// Filtros da equipe (filas): etapas, situação do enquadramento (pending, confirmed ou none), departamento e analista.
 	Stages     []string
 	Framing    string
@@ -334,6 +337,37 @@ type ListParams struct {
 	IdleDays int
 	Sort     httpapi.Sort
 	Page     httpapi.Page
+}
+
+// Valores de ListParams.Access.
+const (
+	AccessFilterOwner  = "owner"  // só os projetos de que a pessoa é titular
+	AccessFilterMember = "member" // só os projetos em que a pessoa é membro ativo (e não titular)
+	AccessFilterAny    = "all"    // titular ou membro ativo: o que é "dela", mesmo para quem tem leitura ampla
+)
+
+// accessCondition é a condição SQL de ListParams.Access. membership são os projetos em que a pessoa é membro ativo.
+func accessCondition(access string, actor Actor, membership map[uuid.UUID]string, arg func(any) string) string {
+	// Só registra o argumento de quem a condição usa: um argumento sobrando faz o Postgres recusar a consulta.
+	owner := func() string { return "created_by_id = " + arg(actor.ID) }
+	member := func() string {
+		ids := make([]string, 0, len(membership))
+		for id := range membership {
+			ids = append(ids, id.String())
+		}
+		return "id = ANY(" + arg(ids) + "::uuid[])"
+	}
+	switch access {
+	case AccessFilterOwner:
+		return owner()
+	case AccessFilterMember:
+		m := member()
+		return "(" + m + " AND NOT " + owner() + ")"
+	case AccessFilterAny:
+		o := owner()
+		return "(" + o + " OR " + member() + ")"
+	}
+	return ""
 }
 
 // stageSinceSQL é desde quando um projeto enviado está na etapa atual, pelo histórico de etapas: o início dos trechos seguidos que têm
@@ -364,6 +398,13 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		}
 		args = append(args, pargs...)
 		conds = append(conds, clause)
+	}
+	member, err := s.memberships(ctx, p.Actor)
+	if err != nil {
+		return nil, 0, err
+	}
+	if c := accessCondition(p.Access, p.Actor, member, arg); c != "" {
+		conds = append(conds, c)
 	}
 	if p.Status != "" {
 		conds = append(conds, "status = "+arg(p.Status))
@@ -416,10 +457,6 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		return nil, 0, err
 	}
 	defer rows.Close()
-	member, err := s.memberships(ctx, p.Actor)
-	if err != nil {
-		return nil, 0, err
-	}
 	out := []Summary{}
 	for rows.Next() {
 		var x Summary

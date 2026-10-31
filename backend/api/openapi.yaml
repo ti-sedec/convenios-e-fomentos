@@ -960,6 +960,7 @@ paths:
       parameters:
         - {name: q, in: query, schema: {type: string}}
         - {name: status, in: query, schema: {type: string, enum: [draft, submitted, archived]}}
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}, description: "Restringe ao que é da própria pessoa: `owner` (titular), `member` (convidada por CPF, com acesso ativo, sem ser titular) ou `all` (um dos dois). Sem o parâmetro, vale só a permissão de leitura. Soma-se a ela, nunca a amplia: quem tem leitura ampla (equipe) recebe, com `access`, só o que é dela, em geral nada."}
         - {name: stage, in: query, schema: {type: string}, description: "Uma ou mais etapas separadas por vírgula: `awaiting_checklist`, `in_analysis`, `awaiting_proponent`, `awaiting_opinion`."}
         - {name: framing, in: query, schema: {type: string, enum: [pending, confirmed, none]}, description: "Situação do enquadramento. `none` = sem enquadramento em andamento."}
         - {name: department, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo departamento atual é este."}

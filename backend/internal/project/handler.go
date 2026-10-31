@@ -212,6 +212,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "status", Message: "Valores aceitos: draft, submitted, archived."}}}))
 		return
 	}
+	if p.Access = q.Get("access"); p.Access != "" && p.Access != AccessFilterOwner && p.Access != AccessFilterMember && p.Access != AccessFilterAny {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "access", Message: "Valores aceitos: all, owner, member."}}}))
+		return
+	}
 	if err := parseStaffFilters(q, &p); err != nil {
 		httpapi.Error(w, r, err)
 		return
