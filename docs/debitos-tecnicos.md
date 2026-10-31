@@ -37,6 +37,8 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 | T22 | Listagem de projetos com subconsultas por linha | Baixa | Fase 4 |
 | T25 | O diálogo de devolução não oferece documentos opcionais vazios | Baixa | Fase 5 |
 | T26 | Cada aba da fila faz uma consulta só para o contador | Baixa | F5 (Fase 5) |
+| T29 | Painel de prazos entre projetos (médias e filas por responsável) | Baixa | Fase 6 do histórico de etapas |
+| T30 | Exportação em CSV do painel de prazos | Baixa | Fase 6 do histórico de etapas |
 | T23 | Etapas depois de "Aguardando parecer" ainda não existem | Fora do escopo | D1 |
 
 ---
@@ -131,6 +133,13 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 
 ### T26. Cada aba da fila faz uma consulta só para o contador
 - A fila do Analista dispara até 7 consultas pequenas (`pageSize=1`) para os contadores das abas. Serve ao volume previsto; sob carga, um endpoint de contagem por etapa resolveria com uma consulta. (Decisão F5.)
+
+### T29. Painel de prazos entre projetos (melhoria futura)
+- O [histórico de etapas](planejamento-historico-etapas.md) já guarda, por projeto, em que etapa e com quem ele esteve e por quanto tempo, mas só se enxerga um projeto por vez e, na fila de análise, "há quanto tempo na etapa atual" (opção A da fase 6, feita). Falta olhar entre projetos. **Saída:** uma página nova em Análise com o tempo médio e o pior caso por etapa, a fila e o trecho mais antigo por analista e por departamento, e a lista dos parados. Os índices `(stage, entered_at)` e `(holder_admin_id, entered_at)` já existem para isso; falta a rota de agregação (por exemplo `GET /admin/projects/stats/stage-times`), a tela e os testes.
+- **Antes de construir, decidir:** quem vê (Supervisor e Secretário, ou também o Analista, que hoje só enxerga o alcance da permissão dele); o que conta como "parado" (limite único ou por etapa; "aguardando proponente" já tem prazo de 3 dias por regra); e deixar os trechos `source = initial` (estimados pela migração) **fora das médias**. Só vale a pena depois de a equipe usar a opção A e dizer o que quer medir: definir "tempo médio" cedo demais costuma gerar métrica que ninguém usa.
+
+### T30. Exportação em CSV do painel de prazos (melhoria futura)
+- Depende de T29. O mesmo conteúdo do painel em CSV, para planilha ou relatório oficial. **Saída:** rota de exportação com o mesmo filtro e a mesma permissão do painel; durações em segundos corridos (a planilha formata como quiser), sem CPF nem outro dado pessoal, só nome do analista e do departamento. Para prazo com valor legal, usar apenas trechos `live`, não os estimados.
 
 ### T14. O Analista não é avisado quando o Revisor recusa
 - Decisão D20: o BPMN envia só ao Supervisor; o Analista vê o projeto de volta na fila, com o histórico. **Saída:** e-mail ao analista responsável, se a fila se mostrar pouco visível.

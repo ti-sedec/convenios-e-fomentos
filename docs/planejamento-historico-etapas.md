@@ -232,7 +232,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 | **3** | API `GET /history` e `/history/summary`, OpenAPI, testes | Cobertura de rotas passa |
 | **4** | Trava adiada no banco (seção 4.4) | Alteração sem trecho é recusada no commit |
 | **5** | Aba "Histórico" no frontend, com durações em dias e horas | Percorrida num navegador (ver T24) |
-| **6** | Relatórios entre projetos. **A (feita):** na fila de análise, filtro "na etapa há N dias ou mais" (3, 7, 15, 30), ordenação "há mais tempo na etapa" e coluna "Na etapa há", sem tela nova. **B e C (a decidir depois de usar a A):** painel de prazos (média e pior caso por etapa, fila por analista e por departamento) e exportação em CSV. Se a B vier, os trechos `initial` ficam fora das médias | A feita; B e C só se a equipe pedir |
+| **6** | Relatórios entre projetos. **A (feita):** na fila de análise, filtro "na etapa há N dias ou mais" (3, 7, 15, 30), ordenação "há mais tempo na etapa" e coluna "Na etapa há", sem tela nova. **B e C (registradas como T29 e T30 em `debitos-tecnicos.md`, a decidir depois de usar a A):** painel de prazos (média e pior caso por etapa, fila por analista e por departamento) e exportação em CSV. Se a B vier, os trechos `initial` ficam fora das médias | A feita; B e C só se a equipe pedir |
 
 As fases 1 a 5 são a entrega básica. A fase 1 é a única que muda código de escrita. Cada fase termina com `make test` e `make lint` verdes e commit próprio.
 
