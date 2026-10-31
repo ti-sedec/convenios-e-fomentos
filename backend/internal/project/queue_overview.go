@@ -16,9 +16,12 @@ const (
 	QueueScopeTeam = "team" // todos os projetos enviados que a pessoa enxerga
 	QueueScopeMine = "mine" // só os que a pessoa assumiu (analyst_id)
 
-	queueBlockItems    = 15
-	deadlineWindow     = 48 * time.Hour
-	archivedWindowDays = 30
+	queueBlockItems = 15
+	// defaultReadyCandidates é quantos projetos em análise e sem departamento (os mais antigos) têm a conferência calculada para o bloco
+	// "pronto para indicar": o cálculo roda a validação de cada um, então é limitado (ver SetReadyCandidates).
+	defaultReadyCandidates = 30
+	deadlineWindow         = 48 * time.Hour
+	archivedWindowDays     = 30
 )
 
 // Etapas de trabalho: o estado do projeto visto de quem está com ele. "Aguardando proponente" não tem etapa de trabalho (tem o prazo da
@@ -80,6 +83,9 @@ type QueueItem struct {
 type QueueBlock struct {
 	Total int         `json:"total"`
 	Items []QueueItem `json:"items"`
+	// Capped: só vale para o bloco "pronto para indicar". Havia mais projetos candidatos que o limite, e Total conta só os prontos entre os
+	// mais antigos. A tela mostra "N ou mais".
+	Capped bool `json:"capped,omitempty"`
 }
 
 // QueueBlocks são os blocos "Precisa de você".
@@ -87,6 +93,7 @@ type QueueBlocks struct {
 	Refused     QueueBlock `json:"refused"`
 	Resubmitted QueueBlock `json:"resubmitted"`
 	Entry       QueueBlock `json:"entry"`
+	Ready       QueueBlock `json:"ready"`
 	Stalled     QueueBlock `json:"stalled"`
 	Deadlines   QueueBlock `json:"deadlines"`
 }
@@ -126,7 +133,7 @@ func (s *Service) QueueOverview(ctx context.Context, actor Actor, perm authz.Fil
 		return nil, err
 	}
 	out := &QueueOverview{Blocks: QueueBlocks{
-		Refused: QueueBlock{Items: []QueueItem{}}, Resubmitted: QueueBlock{Items: []QueueItem{}}, Entry: QueueBlock{Items: []QueueItem{}},
+		Refused: QueueBlock{Items: []QueueItem{}}, Resubmitted: QueueBlock{Items: []QueueItem{}}, Entry: QueueBlock{Items: []QueueItem{}}, Ready: QueueBlock{Items: []QueueItem{}},
 		Stalled: QueueBlock{Items: []QueueItem{}}, Deadlines: QueueBlock{Items: []QueueItem{}},
 	}}
 	if snap.StalledAfter != nil {
@@ -181,6 +188,10 @@ func (s *Service) QueueOverview(ctx context.Context, actor Actor, perm authz.Fil
 	}, func(it *QueueItem) {
 		it.OverLimit = out.Limits.AwaitingChecklist > 0 && it.SinceSeconds >= int64(out.Limits.AwaitingChecklist)*86400
 	}); err != nil {
+		return nil, err
+	}
+	// Pronto para indicar o departamento: em análise, sem departamento e com tudo aprovado.
+	if err := s.queueReady(ctx, scoped(), actor, &out.Blocks.Ready); err != nil {
 		return nil, err
 	}
 	// Parados: o tempo com o responsável atual passou do limite da etapa. Mais atrasado (proporcional ao limite) primeiro.
@@ -242,24 +253,36 @@ func (s *Service) queueCounts(ctx context.Context, q *queueQuery, out *QueueOver
 // queueBlock preenche um bloco: where e orderBy definem quem entra e em que ordem; decorate acerta os campos de cada bloco. Só o bloco dos
 // recusados (refusals) leva o departamento e a data da recusa: nos outros, a rodada recusada de antes não diz nada do estado de hoje.
 func (s *Service) queueBlock(ctx context.Context, q *queueQuery, b *QueueBlock, refusals bool, build func(*queueQuery) (where, orderBy string), decorate func(*QueueItem)) error {
+	items, total, err := s.queueItems(ctx, q, refusals, queueBlockItems, build, decorate)
+	if err != nil {
+		return err
+	}
+	b.Items, b.Total = append(b.Items, items...), total
+	return nil
+}
+
+// queueItems devolve até limit projetos que casam com o where, na ordem pedida, e o total que casa (sem o limite).
+func (s *Service) queueItems(ctx context.Context, q *queueQuery, refusals bool, limit int, build func(*queueQuery) (where, orderBy string), decorate func(*QueueItem)) ([]QueueItem, int, error) {
 	where, order := build(q)
 	rows, err := s.pool.Query(ctx, q.cte()+` SELECT id, title, COALESCE(code, ''), institution_name, late_submission, COALESCE(since, 0), COALESCE(work, ''),
 		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = w.analyst_id), due_at,
 		COALESCE((SELECT f.department_name FROM project_framings f WHERE f.project_id = w.id AND f.decision = 'refused' ORDER BY f.round DESC LIMIT 1), ''),
 		(SELECT f.decided_at FROM project_framings f WHERE f.project_id = w.id AND f.decision = 'refused' ORDER BY f.round DESC LIMIT 1) AS refused_at,
 		count(*) OVER ()
-		FROM w WHERE `+where+` ORDER BY `+order+`, id LIMIT `+strconv.Itoa(queueBlockItems), q.args...)
+		FROM w WHERE `+where+` ORDER BY `+order+`, id LIMIT `+strconv.Itoa(limit), q.args...)
 	if err != nil {
-		return err
+		return nil, 0, err
 	}
 	defer rows.Close()
+	var items []QueueItem
+	total := 0
 	for rows.Next() {
 		var it QueueItem
 		var anID *uuid.UUID
 		var anName *string
 		if err := rows.Scan(&it.ProjectID, &it.Title, &it.Code, &it.Institution, &it.Late, &it.SinceSeconds, &it.Stage, &anID, &anName,
-			&it.DueAt, &it.Department, &it.RefusedAt, &b.Total); err != nil {
-			return err
+			&it.DueAt, &it.Department, &it.RefusedAt, &total); err != nil {
+			return nil, 0, err
 		}
 		if anID != nil {
 			it.Analyst = &AnalystInfo{ID: *anID, Name: str(anName)}
@@ -270,9 +293,45 @@ func (s *Service) queueBlock(ctx context.Context, q *queueQuery, b *QueueBlock, 
 		if decorate != nil {
 			decorate(&it)
 		}
-		b.Items = append(b.Items, it)
+		items = append(items, it)
 	}
-	return rows.Err()
+	return items, total, rows.Err()
+}
+
+// queueReady monta o bloco "pronto para indicar o departamento": em análise, sem departamento e com todos os itens aprovados. A
+// conferência é calculada em Go (depende do checklist do projeto), só para os readyCandidates mais antigos. Um projeto que falha no
+// cálculo é registrado no log e sai do bloco, sem derrubar a resposta.
+func (s *Service) queueReady(ctx context.Context, q *queueQuery, actor Actor, b *QueueBlock) error {
+	cands, total, err := s.queueItems(ctx, q, false, s.readyLimit(), func(*queueQuery) (string, string) {
+		return `work = '` + workInAnalysis + `' AND department_id IS NULL`, `since DESC`
+	}, nil)
+	if err != nil {
+		return err
+	}
+	b.Capped = total > len(cands)
+	for _, it := range cands {
+		row, err := s.q.GetProject(ctx, it.ProjectID)
+		if err == nil {
+			var cl *Checklist
+			if _, cl, err = s.viewWithChecklist(ctx, s.q, row, actor); err == nil {
+				var rv Review
+				if rv, err = s.reviewState(ctx, s.q, it.ProjectID, cl, nil); err == nil && !rv.AllApproved {
+					continue
+				}
+			}
+		}
+		if err != nil {
+			if s.log != nil {
+				s.log.ErrorContext(ctx, "calculando a conferência na visão geral da fila", "project", it.ProjectID, "error", err)
+			}
+			continue
+		}
+		b.Total++
+		if len(b.Items) < queueBlockItems {
+			b.Items = append(b.Items, it)
+		}
+	}
+	return nil
 }
 
 // holderOfWork diz com quem o projeto está em cada etapa de trabalho.
@@ -300,4 +359,15 @@ func limitOfWork(l rules.StalledAfterDays, work string) int {
 		return l.AwaitingOpinion
 	}
 	return 0
+}
+
+// SetReadyCandidates muda quantos projetos têm a conferência calculada no bloco "pronto para indicar" (padrão 30). Existe para os testes
+// poderem exercer o limite sem criar dezenas de projetos.
+func (s *Service) SetReadyCandidates(n int) { s.readyCandidates = n }
+
+func (s *Service) readyLimit() int {
+	if s.readyCandidates > 0 {
+		return s.readyCandidates
+	}
+	return defaultReadyCandidates
 }

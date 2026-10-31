@@ -235,7 +235,7 @@ O frontend não tem suíte automatizada: percorrer no navegador com um Analista 
 |---|---|---|
 | **1 (feita)** | Parâmetro `stalled_after_days` (chave, validação, padrão, leitura) e `lateSubmission` na listagem; OpenAPI; testes | Parâmetro aparece na administração e `make test` verde |
 | **2 (feita)** | `GET /projects/queue/overview`: alcance, contagens e os blocos *entry*, *resubmitted*, *refused*, *stalled* e *deadlines*; OpenAPI; testes | Testes da seção 7 desses blocos passam |
-| **3** | Bloco *ready* (E6) | Testes do bloco e do limite passam |
+| **3 (feita)** | Bloco *ready* (E6) | Testes do bloco e do limite passam |
 | **4** | `GET /projects/queue/activity` com lista permitida; teste de não vazar | Teste de vazamento passa |
 | **5** | `GET /projects/queue/me` | Testes das janelas passam |
 | **6** | Frontend: camada de API, contadores, blocos de trabalho, seletor e estados vazios; selo na fila | Percorrida no navegador |

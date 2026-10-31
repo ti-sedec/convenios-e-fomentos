@@ -200,3 +200,74 @@ func TestVisaoGeralDaFilaDoAnalista(t *testing.T) {
 		assert.Equal(t, 2, total, "os demais blocos seguem")
 	})
 }
+
+func TestVisaoGeralFilaProntosParaIndicar(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	other, _ := p.newAdmin(p.boss, "outro.analista@exemplo.com", "analyst")
+	fin := p.deptID("Financeiro")
+	an := staff.analyst
+	assume := func(fp *fundingProject) *fundingProject {
+		require.Equal(t, 200, p.startAnalysis(an, fp.id).Status)
+		return fp
+	}
+
+	ready := assume(p.submitted("8601/2026"))    // tudo aprovado, sem departamento
+	pending := assume(p.submitted("8602/2026"))  // ainda com itens por conferir
+	rejected := assume(p.submitted("8603/2026")) // aprovado e depois reprovado um item
+	refused := assume(p.submitted("8604/2026"))  // recusado pelo Revisor: volta pronto para indicar de novo
+	framing := assume(p.submitted("8605/2026"))  // com o Revisor: já tem departamento
+	for _, fp := range []*fundingProject{ready, rejected, refused, framing} {
+		require.True(t, allApproved(p.approveAll(an, fp.id)))
+	}
+	require.Equal(t, 200, p.reject(an, rejected.id, "section", "proposal", "Corrija o título do projeto.").Status)
+	for _, fp := range []*fundingProject{refused, framing} {
+		require.Equal(t, 200, p.assign(an, fp.id, fin).Status)
+	}
+	require.Equal(t, 200, p.refuse(staff.reviewerSame, refused.id, 1, "Não é da nossa área.").Status)
+	p.age(ready.id, 9, 8)
+
+	r := p.queueOverview(an, "")
+	total, ids, items := block(r, "ready")
+	assert.Equal(t, 2, total)
+	assert.ElementsMatch(t, []string{ready.id, refused.id}, ids)
+	assert.Equal(t, ready.id, ids[0], "o mais antigo primeiro")
+	assert.NotEmpty(t, items[0]["title"])
+	assert.NotEqual(t, true, r.data()["blocks"].(map[string]any)["ready"].(map[string]any)["capped"])
+	assert.NotContains(t, ids, pending.id)
+	assert.NotContains(t, ids, rejected.id, "um item reprovado impede")
+	assert.NotContains(t, ids, framing.id, "já tem departamento")
+
+	// Reprovar um item tira o projeto; aprovar de novo o devolve.
+	require.Equal(t, 200, p.reject(an, ready.id, "section", "institution", "Corrija os dados da instituição.").Status)
+	_, ids, _ = block(p.queueOverview(an, ""), "ready")
+	assert.Equal(t, []string{refused.id}, ids)
+	require.Equal(t, 200, p.review(an, ready.id, "section", "institution", true).Status)
+	_, ids, _ = block(p.queueOverview(an, ""), "ready")
+	assert.ElementsMatch(t, []string{ready.id, refused.id}, ids)
+
+	// Indicar o departamento tira o projeto do bloco.
+	require.Equal(t, 200, p.assign(an, ready.id, fin).Status)
+	_, ids, _ = block(p.queueOverview(an, ""), "ready")
+	assert.Equal(t, []string{refused.id}, ids)
+
+	// Só os meus: outro Analista não assumiu nenhum.
+	total, _, _ = block(p.queueOverview(other, "?scope=mine"), "ready")
+	assert.Equal(t, 0, total)
+	total, _, _ = block(p.queueOverview(other, ""), "ready")
+	assert.Equal(t, 1, total)
+
+	t.Run("limite de candidatos", func(t *testing.T) {
+		// Com o limite em 2, o terceiro candidato (o mais novo) nem é examinado.
+		p.app.Projects.SetReadyCandidates(2)
+		for i := 0; i < 2; i++ {
+			assume(p.submitted(fmt.Sprintf("87%02d/2026", i)))
+		}
+		p.age(refused.id, 40, 39, 38, 37)
+		blk := p.queueOverview(an, "").data()["blocks"].(map[string]any)["ready"].(map[string]any)
+		assert.Equal(t, true, blk["capped"], "havia mais candidatos que o limite")
+		assert.EqualValues(t, 1, blk["total"], "o mais antigo está entre os examinados")
+	})
+}

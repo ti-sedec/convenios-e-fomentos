@@ -65,6 +65,9 @@ type Service struct {
 	// MT-ID, que assina as declarações geradas pelo sistema (opcional; ver SetMTID).
 	mtid mtid.Client
 
+	// Candidatos do bloco "pronto para indicar" da visão geral da fila (ver SetReadyCandidates); zero usa o padrão.
+	readyCandidates int
+
 	// Link dos e-mails para o painel (ver SetNotifier). Os e-mails vão para a caixa de saída (internal/outbox), nunca direto ao SMTP.
 	publicURL string
 }
