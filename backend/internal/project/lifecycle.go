@@ -209,7 +209,7 @@ func (s *Service) RequestComplement(ctx context.Context, actor Actor, id uuid.UU
 		if out, err = s.view(ctx, q, row, actor); err != nil {
 			return err
 		}
-		if err := s.audit.Record(ctx, q, actor.entry("project.complement-request", id, map[string]any{"number": n, "items": len(in.Items), "dueAt": req.DueAt})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry("project.complement-request", id, map[string]any{"number": n, "items": len(in.Items), "dueAt": req.DueAt})); err != nil {
 			return err
 		}
 		return s.notifyComplementRequested(ctx, q, out)
@@ -312,7 +312,7 @@ func (s *Service) Resubmit(ctx context.Context, actor Actor, id uuid.UUID, in Su
 			SubmittedByID: &actor.ID, SubmissionIp: actor.IP, Snapshot: raw}); err != nil {
 			return err
 		}
-		if err := s.audit.Record(ctx, q, actor.entry("project.resubmit", id, map[string]any{"version": number})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry("project.resubmit", id, map[string]any{"version": number})); err != nil {
 			return err
 		}
 		if err := s.notifyResubmitted(ctx, q, final, int(number)); err != nil {
@@ -378,7 +378,7 @@ func (s *Service) archive(ctx context.Context, actor Actor, id uuid.UUID, reason
 		if out, err = s.view(ctx, q, row, actor); err != nil {
 			return err
 		}
-		if err := s.audit.Record(ctx, q, actor.entry("project.archive", id, map[string]any{"reason": reason})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry("project.archive", id, map[string]any{"reason": reason})); err != nil {
 			return err
 		}
 		return s.notifyArchived(ctx, q, out, row.DepartmentID, row.AnalystID)
@@ -447,7 +447,7 @@ func (s *Service) ExpireComplements(ctx context.Context) (int, error) {
 			if err != nil {
 				return err
 			}
-			if err := s.audit.Record(ctx, q, auditSystem("project.archive", row.ID, map[string]any{"reason": ArchiveComplementDeadline})); err != nil {
+			if err := s.transition(ctx, q, row, auditSystem("project.archive", row.ID, map[string]any{"reason": ArchiveComplementDeadline})); err != nil {
 				return err
 			}
 			p, err := s.view(ctx, q, row, Actor{})

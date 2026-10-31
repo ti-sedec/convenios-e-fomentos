@@ -493,6 +493,26 @@ type ProjectMunicipality struct {
 	IbgeCode  string    `json:"ibge_code"`
 }
 
+type ProjectStageHistory struct {
+	ID                   uuid.UUID  `json:"id"`
+	ProjectID            uuid.UUID  `json:"project_id"`
+	Seq                  int32      `json:"seq"`
+	Status               string     `json:"status"`
+	Stage                string     `json:"stage"`
+	FramingStatus        *string    `json:"framing_status"`
+	HolderType           string     `json:"holder_type"`
+	HolderAdminID        *uuid.UUID `json:"holder_admin_id"`
+	HolderDepartmentID   *uuid.UUID `json:"holder_department_id"`
+	HolderDepartmentName *string    `json:"holder_department_name"`
+	EnteredAt            time.Time  `json:"entered_at"`
+	LeftAt               *time.Time `json:"left_at"`
+	EnteredByType        string     `json:"entered_by_type"`
+	EnteredByID          *uuid.UUID `json:"entered_by_id"`
+	Transition           string     `json:"transition"`
+	AuditLogID           *uuid.UUID `json:"audit_log_id"`
+	Source               string     `json:"source"`
+}
+
 type ProjectVersion struct {
 	ID            uuid.UUID  `json:"id"`
 	ProjectID     uuid.UUID  `json:"project_id"`

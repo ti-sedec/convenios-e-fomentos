@@ -48,9 +48,10 @@ func (q *Queries) CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) 
 	return count, err
 }
 
-const insertAuditLog = `-- name: InsertAuditLog :exec
+const insertAuditLog = `-- name: InsertAuditLog :one
 INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, payload, ip)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id
 `
 
 type InsertAuditLogParams struct {
@@ -63,8 +64,8 @@ type InsertAuditLogParams struct {
 	Ip        *string `json:"ip"`
 }
 
-func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error {
-	_, err := q.db.Exec(ctx, insertAuditLog,
+func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertAuditLog,
 		arg.ActorType,
 		arg.ActorID,
 		arg.Action,
@@ -73,7 +74,9 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 		arg.Payload,
 		arg.Ip,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const listAuditLogs = `-- name: ListAuditLogs :many

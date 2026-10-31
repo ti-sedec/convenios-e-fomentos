@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/wagner/convenios-e-fomentos/backend/internal/database/db"
 )
 
@@ -26,12 +28,18 @@ type Recorder struct{}
 
 // Record insere a entrada. Passe as queries de uma transação para que a
 // auditoria seja confirmada junto com a alteração.
-func (Recorder) Record(ctx context.Context, q *db.Queries, e Entry) error {
+func (r Recorder) Record(ctx context.Context, q *db.Queries, e Entry) error {
+	_, err := r.RecordID(ctx, q, e)
+	return err
+}
+
+// RecordID faz o mesmo que Record e devolve o id do registro criado, para quem precisa ligar outro dado ao evento.
+func (Recorder) RecordID(ctx context.Context, q *db.Queries, e Entry) (uuid.UUID, error) {
 	payload := []byte("{}")
 	if e.Payload != nil {
 		b, err := json.Marshal(e.Payload)
 		if err != nil {
-			return fmt.Errorf("serializando payload de auditoria: %w", err)
+			return uuid.Nil, fmt.Errorf("serializando payload de auditoria: %w", err)
 		}
 		payload = b
 	}

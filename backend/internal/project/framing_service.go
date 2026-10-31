@@ -138,7 +138,7 @@ func (s *Service) AssignDepartment(ctx context.Context, actor Actor, id uuid.UUI
 		if err != nil {
 			return notFound(err)
 		}
-		if err := s.audit.Record(ctx, q, actor.entry("project.assign-department", id, map[string]any{"department": d.ID, "round": round})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry("project.assign-department", id, map[string]any{"department": d.ID, "round": round})); err != nil {
 			return err
 		}
 		if out, err = s.view(ctx, q, row, actor); err != nil {
@@ -217,7 +217,7 @@ func (s *Service) decideFraming(ctx context.Context, actor Actor, id uuid.UUID, 
 		if !confirm {
 			action = "project.framing-refuse"
 		}
-		if err := s.audit.Record(ctx, q, actor.entry(action, id, map[string]any{"round": pending.Round, "department": pending.DepartmentID})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry(action, id, map[string]any{"round": pending.Round, "department": pending.DepartmentID})); err != nil {
 			return err
 		}
 		if out, err = s.view(ctx, q, row, actor); err != nil {

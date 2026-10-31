@@ -1,6 +1,7 @@
--- name: InsertAuditLog :exec
+-- name: InsertAuditLog :one
 INSERT INTO audit_logs (actor_type, actor_id, action, entity, entity_id, payload, ip)
-VALUES ($1, $2, $3, $4, $5, $6, $7);
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id;
 
 -- O ator administrador é resolvido para o nome atual; vazio se foi excluído ou ainda sem nome.
 -- name: ListAuditLogs :many

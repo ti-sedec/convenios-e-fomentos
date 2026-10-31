@@ -100,7 +100,7 @@ func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, 
 			return errStage(str(cur.Stage))
 		}
 		if changed {
-			if err := s.audit.Record(ctx, q, actor.entry("project.start-analysis", id, map[string]any{"stage": StageInAnalysis})); err != nil {
+			if err := s.transition(ctx, q, row, actor.entry("project.start-analysis", id, map[string]any{"stage": StageInAnalysis})); err != nil {
 				return err
 			}
 		}
