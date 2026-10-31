@@ -1343,6 +1343,29 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/history:
+    get:
+      tags: [Projetos]
+      summary: Histórico de etapas do projeto (só equipe)
+      description: |
+        Linha do tempo de por onde o projeto passou e com quem estava, com os totais. Interno da equipe: o titular e os membros recebem 404,
+        como nos demais campos internos. Rascunho não tem histórico (`segments` vazio).
+        Resposta: `{segments, summary}`.
+        Cada trecho: `{seq, status, stage, holder (team|analyst|department|proponent|none), framingStatus, analyst {id,name}, department {id,name},
+        enteredAt, leftAt (nulo no trecho atual), durationSeconds, enteredBy {type,name}, transition (ação que abriu o trecho, igual à do
+        registro de auditoria), auditLogId, estimated}`. O trecho atual usa o instante da consulta. `holder: none` é o arquivamento e não
+        conta tempo. `estimated: true` é o trecho criado pela migração para um projeto que já existia (entrada aproximada).
+        `summary`: `{sinceSubmissionSeconds, currentStageSeconds, byHolder {holder: segundos}, byStage {etapa: segundos}}`, em horas corridas;
+        depois do arquivamento o tempo para de contar. `currentStageSeconds` soma os trechos seguidos da etapa atual.
+        Permissão: `admin::projects.read` (404 em projeto fora do alcance).
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}/declarations/{code}:
     get:
       tags: [Projetos]

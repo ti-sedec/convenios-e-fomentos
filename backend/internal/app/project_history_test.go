@@ -315,3 +315,52 @@ func TestAuditLogsEImutavel(t *testing.T) {
 	assert.Equal(t, before+1, after)
 	assert.Equal(t, 200, p.do("GET", "/api/admin/audit-logs?action=test.insert", nil, p.boss).Status)
 }
+
+func TestHistoricoPelaAPI(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	p.finalistic("Financeiro")
+	staff := p.newStaff()
+	fin := p.deptID("Financeiro")
+	fp := p.submitted("8201/2026")
+	hist := func(tok string) resp { return p.do("GET", "/api/admin/projects/"+fp.id+"/history", nil, tok) }
+
+	t.Run("só a equipe vê", func(t *testing.T) {
+		assert.Equal(t, 404, hist(p.maria).Status, "o titular não vê o histórico interno")
+		assert.Equal(t, 404, hist(p.joao).Status, "quem não tem acesso ao projeto também não")
+		assert.Equal(t, 404, hist(staff.reviewerOther).Status, "revisor de outro departamento não vê projeto sem departamento")
+		assert.Equal(t, 200, hist(staff.analyst).Status)
+		assert.Equal(t, 200, hist(staff.supervisor).Status)
+	})
+
+	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
+	require.True(t, allApproved(p.approveAll(staff.analyst, fp.id)))
+	require.Equal(t, 200, p.assign(staff.analyst, fp.id, fin).Status)
+
+	r := hist(staff.analyst)
+	require.Equal(t, 200, r.Status, r.Body)
+	segs := r.data()["segments"].([]any)
+	require.Len(t, segs, 3)
+	first, last := segs[0].(map[string]any), segs[2].(map[string]any)
+	assert.Equal(t, "team", first["holder"])
+	assert.Equal(t, "project.submit", first["transition"])
+	assert.NotNil(t, first["leftAt"])
+	assert.Nil(t, last["leftAt"], "o trecho atual está aberto")
+	assert.Equal(t, "department", last["holder"])
+	assert.Equal(t, "Financeiro", last["department"].(map[string]any)["name"])
+	assert.Equal(t, false, last["estimated"])
+	assert.NotEmpty(t, last["auditLogId"])
+	assert.NotEmpty(t, segs[1].(map[string]any)["analyst"].(map[string]any)["name"])
+
+	sum := r.data()["summary"].(map[string]any)
+	assert.GreaterOrEqual(t, sum["sinceSubmissionSeconds"], sum["currentStageSeconds"])
+	assert.Contains(t, sum["byHolder"], "analyst")
+	assert.Contains(t, sum["byStage"], "in_analysis")
+
+	t.Run("rascunho não tem histórico", func(t *testing.T) {
+		d := p.completeProject("8202/2026")
+		r := p.do("GET", "/api/admin/projects/"+d.id+"/history", nil, p.maria)
+		assert.Equal(t, 404, r.Status, "o titular não vê, nem do rascunho")
+		assert.Equal(t, 404, p.do("GET", "/api/admin/projects/00000000-0000-0000-0000-000000000000/history", nil, staff.analyst).Status)
+	})
+}

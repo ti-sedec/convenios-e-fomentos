@@ -46,7 +46,7 @@ Conferido no código (nada foi executado):
 | H8 | Proteção do `audit_logs` | **Entra agora**, na fase 2: o banco recusa `UPDATE` e `DELETE` | Decidido na revisão; o histórico aponta para o log, então o log precisa ser confiável |
 | H9 | Relatórios entre projetos | Fase própria **depois** da linha do tempo, sem atrasar a entrega básica (fase 6) | Decidido na revisão |
 | H5 | Retenção | A tabela **não entra** em nenhuma limpeza automática | É dado de prazo e de responsabilidade |
-| H6 | Quem pode ler | Mesma visibilidade de leitura do projeto (quem vê o projeto vê o histórico dele). Sem permissão nova nesta fase | Evita um segundo modelo de acesso |
+| H6 | Quem pode ler | **Só a equipe.** Mesma checagem de alcance do projeto (`admin::projects.read`), mas o titular e os membros recebem 404, como nos demais campos internos (analista, departamento, conferência). Sem permissão nova nesta fase | O histórico traz o nome do analista e o departamento, que o proponente não vê |
 | H7 | Conteúdo pessoal | A tabela guarda ids e o **nome copiado** do departamento. Não guarda CPF nem texto livre | Mantém as regras de LGPD da seção 8.3 do planejamento do fluxo |
 
 ---
@@ -152,12 +152,12 @@ Trigger de restrição **adiado até o commit**, na tabela `projects`: se (situa
 
 ## 5. API
 
-Todas sob `/api/admin/projects/{id}`, com a mesma checagem de visibilidade do projeto. Atualizar `backend/api/openapi.yaml` (um teste confere a cobertura).
+Uma só rota, `GET /api/admin/projects/{id}/history`, com `{segments, summary}`: a tela precisa dos dois e assim faz uma chamada. Atualizado `backend/api/openapi.yaml` (um teste confere a cobertura).
 
-| Rota | Retorno |
+| Campo | Conteúdo |
 |---|---|
-| `GET /history` | Lista de trechos em ordem, cada um com etapa, com quem, entrada, saída, duração em segundos (trecho aberto usa o instante atual; a tela formata como dias e horas), autor da entrada e `transition`. Envelope padrão `{data, meta}` |
-| `GET /history/summary` | Totais por `holder_type` e por etapa, mais "tempo desde o envio" e "tempo na etapa atual" |
+| `segments` | Trechos em ordem, cada um com etapa, com quem (`holder`, analista ou departamento com nome), entrada, saída, `durationSeconds` (o trecho aberto usa o instante da consulta; a tela formata como dias e horas), autor da entrada, `transition`, `auditLogId` e `estimated` |
+| `summary` | `sinceSubmissionSeconds`, `currentStageSeconds` (trechos seguidos da etapa atual), `byHolder` e `byStage`, em segundos. Depois do arquivamento o tempo para de contar |
 
 Relatório entre projetos (média por etapa, fila por responsável) fica para a fase 6, depois da linha do tempo. O modelo já comporta, com índice em `(stage, entered_at)` e em `(holder_admin_id, entered_at)`.
 
@@ -219,7 +219,7 @@ Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `se
 
 ## 9. Fases de entrega
 
-**Andamento:** fases 1 e 2 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`).
+**Andamento:** fases 1 a 3 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`).
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|

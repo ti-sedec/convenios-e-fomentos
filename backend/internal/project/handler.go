@@ -93,6 +93,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionShare)).Delete("/admin/projects/{id}/members/{memberId}", h.revokeMember)
 
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/documents", h.checklist)
+	r.With(g(ActionRead)).Get("/admin/projects/{id}/history", h.history)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/declarations/{code}", h.declarationPreview)
 	r.With(g(ActionUpdate), heavy).Post("/admin/projects/{id}/declarations/{code}/accept", h.acceptDeclaration)
 	r.With(g(ActionUpdate)).Delete("/admin/projects/{id}/declarations/{code}", h.cancelDeclaration)
@@ -386,6 +387,21 @@ func (h *Handler) checklist(w http.ResponseWriter, r *http.Request) {
 	}
 	read, _ := admin.DecisionFrom(r.Context())
 	v, err := h.svc.Checklist(r.Context(), actorOf(r), id, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	read, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.History(r.Context(), actorOf(r), id, read)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

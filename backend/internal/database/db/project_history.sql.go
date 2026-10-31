@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -112,4 +113,75 @@ func (q *Queries) InsertStageHistory(ctx context.Context, arg InsertStageHistory
 		&i.Source,
 	)
 	return i, err
+}
+
+const listStageHistory = `-- name: ListStageHistory :many
+SELECT h.id, h.seq, h.status, h.stage, h.framing_status, h.holder_type, h.holder_admin_id, h.holder_department_id,
+       h.holder_department_name, h.entered_at, h.left_at, h.entered_by_type, h.entered_by_id, h.transition, h.audit_log_id, h.source,
+       COALESCE((SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = h.holder_admin_id), '')::text AS holder_admin_name,
+       COALESCE((SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE h.entered_by_type = 'admin' AND a.id = h.entered_by_id), '')::text AS entered_by_name
+FROM project_stage_history h
+WHERE h.project_id = $1
+ORDER BY h.seq
+`
+
+type ListStageHistoryRow struct {
+	ID                   uuid.UUID  `json:"id"`
+	Seq                  int32      `json:"seq"`
+	Status               string     `json:"status"`
+	Stage                string     `json:"stage"`
+	FramingStatus        *string    `json:"framing_status"`
+	HolderType           string     `json:"holder_type"`
+	HolderAdminID        *uuid.UUID `json:"holder_admin_id"`
+	HolderDepartmentID   *uuid.UUID `json:"holder_department_id"`
+	HolderDepartmentName *string    `json:"holder_department_name"`
+	EnteredAt            time.Time  `json:"entered_at"`
+	LeftAt               *time.Time `json:"left_at"`
+	EnteredByType        string     `json:"entered_by_type"`
+	EnteredByID          *uuid.UUID `json:"entered_by_id"`
+	Transition           string     `json:"transition"`
+	AuditLogID           *uuid.UUID `json:"audit_log_id"`
+	Source               string     `json:"source"`
+	HolderAdminName      string     `json:"holder_admin_name"`
+	EnteredByName        string     `json:"entered_by_name"`
+}
+
+// Os nomes são resolvidos agora (como em audit.sql): vazios se o admin foi excluído.
+func (q *Queries) ListStageHistory(ctx context.Context, projectID uuid.UUID) ([]ListStageHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listStageHistory, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStageHistoryRow{}
+	for rows.Next() {
+		var i ListStageHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Seq,
+			&i.Status,
+			&i.Stage,
+			&i.FramingStatus,
+			&i.HolderType,
+			&i.HolderAdminID,
+			&i.HolderDepartmentID,
+			&i.HolderDepartmentName,
+			&i.EnteredAt,
+			&i.LeftAt,
+			&i.EnteredByType,
+			&i.EnteredByID,
+			&i.Transition,
+			&i.AuditLogID,
+			&i.Source,
+			&i.HolderAdminName,
+			&i.EnteredByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
