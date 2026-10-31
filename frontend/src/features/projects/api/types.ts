@@ -357,6 +357,49 @@ export const stageLabels: Record<ProjectStage, string> = {
   awaiting_opinion: 'Aguardando parecer'
 };
 
+// ---- Histórico de etapas (equipe) ----
+
+/** Com quem o projeto estava num trecho do histórico. */
+export type HistoryHolder = 'team' | 'analyst' | 'department' | 'proponent' | 'none';
+
+export const historyHolderLabels: Record<HistoryHolder, string> = {
+  team: 'Equipe (sem analista)',
+  analyst: 'Analista',
+  department: 'Departamento',
+  proponent: 'Proponente',
+  none: 'Arquivado'
+};
+
+export interface HistorySegment {
+  seq: number;
+  status: ProjectStatus;
+  stage: ProjectStage;
+  holder: HistoryHolder;
+  framingStatus?: FramingStatus;
+  analyst?: { id: string; name: string };
+  department?: { id: string; name: string };
+  enteredAt: string;
+  /** Nulo no trecho atual. */
+  leftAt: string | null;
+  durationSeconds: number;
+  enteredBy?: { type: string; name?: string };
+  /** Ação que abriu o trecho, igual à do registro de auditoria (project.submit, project.resubmit…). */
+  transition: string;
+  auditLogId?: string;
+  /** Trecho criado pela migração para um projeto que já existia: a entrada é aproximada. */
+  estimated: boolean;
+}
+
+export interface StageHistory {
+  segments: HistorySegment[];
+  summary: {
+    sinceSubmissionSeconds: number;
+    currentStageSeconds: number;
+    byHolder: Partial<Record<HistoryHolder, number>>;
+    byStage: Partial<Record<ProjectStage, number>>;
+  };
+}
+
 // ---- Conferência e enquadramento (equipe) ----
 
 export interface AnalystInfo {

@@ -51,3 +51,27 @@ export function formatDateTimeCuiaba(value: string | Date | null | undefined) {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? '' : cuiabaDateTime.format(d);
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Segundos → "2 dias e 4 horas" (horas corridas). Mostra as duas maiores unidades que não são zero; menos de uma hora vira
+ * minutos, e menos de um minuto, "menos de 1 minuto".
+ */
+export function formatDuration(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  if (days > 0) {
+    return hours > 0
+      ? `${plural(days, 'dia', 'dias')} e ${plural(hours, 'hora', 'horas')}`
+      : plural(days, 'dia', 'dias');
+  }
+  if (hours > 0) {
+    return minutes > 0
+      ? `${plural(hours, 'hora', 'horas')} e ${plural(minutes, 'minuto', 'minutos')}`
+      : plural(hours, 'hora', 'horas');
+  }
+  return minutes > 0 ? plural(minutes, 'minuto', 'minutos') : 'menos de 1 minuto';
+}

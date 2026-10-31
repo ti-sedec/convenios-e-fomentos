@@ -5,6 +5,7 @@ import {
   getDeclaration,
   getProfile,
   getProject,
+  getStageHistory,
   listMembers,
   listProjects,
   type ListProjectsParams
@@ -17,6 +18,7 @@ export const projectKeys = {
   detail: (id: string) => [...projectKeys.all, 'detail', id] as const,
   preview: (id: string, fileId: string) => [...projectKeys.all, 'preview', id, fileId] as const,
   checklist: (id: string) => [...projectKeys.all, 'checklist', id] as const,
+  history: (id: string) => [...projectKeys.all, 'history', id] as const,
   declaration: (id: string, code: string) => [...projectKeys.all, 'declaration', id, code] as const,
   members: (id: string) => [...projectKeys.all, 'members', id] as const,
   profile: () => ['proponent-profile'] as const
@@ -43,6 +45,9 @@ export const profileQueryOptions = () =>
 
 export const checklistQueryOptions = (id: string) =>
   queryOptions({ queryKey: projectKeys.checklist(id), queryFn: () => getChecklist(id) });
+
+export const stageHistoryQueryOptions = (id: string) =>
+  queryOptions({ queryKey: projectKeys.history(id), queryFn: () => getStageHistory(id) });
 
 export const membersQueryOptions = (id: string) =>
   queryOptions({ queryKey: projectKeys.members(id), queryFn: () => listMembers(id) });

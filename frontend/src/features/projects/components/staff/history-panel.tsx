@@ -3,13 +3,16 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Project } from '../../api/types';
+import { AuditHistory } from '@/features/audit-logs/components/audit-history';
 import { formatDateTimeCuiaba } from '../../format';
+import { StageTimeline } from './stage-timeline';
 
-/** Histórico do projeto para a equipe: o pedido de complementação mais recente. */
+/** Histórico do projeto para a equipe: as etapas, o pedido de complementação mais recente e, para quem pode, o registro de auditoria. */
 export function HistoryPanel({ project }: { project: Project }) {
   const c = project.complement;
   return (
     <div className='max-w-3xl space-y-4'>
+      {project.status !== 'draft' && <StageTimeline projectId={project.id} />}
       <Card>
         <CardHeader>
           <CardTitle className='text-base'>Pedido de complementação</CardTitle>
@@ -46,6 +49,7 @@ export function HistoryPanel({ project }: { project: Project }) {
           )}
         </CardContent>
       </Card>
+      <AuditHistory entity='project' entityId={project.id} />
     </div>
   );
 }

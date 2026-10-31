@@ -22,7 +22,8 @@ import type {
   ProposalInput,
   FilePreview,
   ReviewDecision,
-  ReviewKind
+  ReviewKind,
+  StageHistory
 } from './types';
 
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
@@ -120,6 +121,10 @@ const docs = (id: string) => `/admin/projects/${id}/documents`;
 
 export async function getChecklist(id: string) {
   return (await apiClient<ApiResponse<Checklist>>(docs(id))).data;
+}
+
+export async function getStageHistory(id: string) {
+  return (await apiClient<ApiResponse<StageHistory>>(`/admin/projects/${id}/history`)).data;
 }
 
 /** Passo 1 do envio: registra o arquivo e obtém a autorização para enviá-lo ao armazenamento. */

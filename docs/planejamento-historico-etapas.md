@@ -213,17 +213,17 @@ Se algum dia houver dados reais antes desta entrega, reabrir esta seção: a rec
 
 Seguindo as convenções de `frontend/CLAUDE.md` (camadas `api/types.ts` → `service.ts` → `queries.ts`, prefetch no servidor, ícones só por `@/components/icons`).
 
-- Nova aba **"Histórico"** no detalhe do projeto da equipe: linha do tempo vertical com etapa, com quem, entrada, duração e autor; trecho aberto destacado, mostrando "há X dias".
+- A aba **"Histórico"** que já existia no detalhe do projeto da equipe ganhou, no topo, o cartão "Etapas do projeto" (`staff/stage-timeline.tsx`), sem criar aba nova. Vem depois o pedido de complementação e, para quem pode ler a auditoria, o registro de auditoria do projeto (`AuditHistory`).
 - Durações sempre em dias e horas (ex.: "2 dias e 4 horas"; menos de 1 hora mostra minutos). Resumo no topo: tempo desde o envio, tempo na etapa atual, totais com a equipe, com o proponente e com o departamento.
 - Trechos `initial` com marca de "tempo estimado".
-- Cada trecho com `audit_log_id` oferece "ver registro" que abre o evento no painel de auditoria que já existe (`features/audit-logs`).
+- O vínculo com o log não vira link por trecho: o registro de auditoria do projeto aparece logo abaixo para quem tem a permissão de ler a auditoria (a equipe comum não tem), e `auditLogId` fica na API para uso futuro.
 - Textos em pt-BR; nomes de etapa reaproveitam os rótulos já usados na fila da equipe.
 
 ---
 
 ## 9. Fases de entrega
 
-**Andamento:** fases 1 a 4 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`; fase 4: migração `00033`, testes `TestTravaDoHistoricoDeEtapas` e `TestRegraDeQuemEstaComOProjeto`).
+**Andamento:** fases 1 a 5 implementadas (migração `00031`, `history.go`, `audit.Recorder.RecordID`, testes em `project_history_test.go`; fase 2: migração `00032`, teste `TestAuditLogsEImutavel`; fase 3: `history_view.go`, rota `/history`, testes `TestHistoricoPelaAPI` e `TestBuildHistory`; fase 4: migração `00033`, testes `TestTravaDoHistoricoDeEtapas` e `TestRegraDeQuemEstaComOProjeto`; fase 5: `stage-timeline.tsx` na aba "Histórico", conferida no navegador com um projeto estimado).
 
 | Fase | Conteúdo | Pronto quando |
 |---|---|---|
