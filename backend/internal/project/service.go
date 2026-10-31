@@ -457,7 +457,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		(SELECT due_at FROM project_complement_requests c WHERE c.project_id = projects.id AND c.status = 'open'), created_by_id, created_at, updated_at,
 		department_id, (SELECT d.name FROM departments d WHERE d.id = projects.department_id), COALESCE(framing_status, ''),
 		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = projects.analyst_id),
-		EXTRACT(EPOCH FROM now() - %[1]s)::bigint
+		EXTRACT(EPOCH FROM now() - %[1]s)::bigint, late_submission
 		FROM projects%[2]s ORDER BY %[3]s, id LIMIT %[4]d OFFSET %[5]d`,
 		stageSinceSQL, where, p.Sort.SQL(), p.Page.PageSize, p.Page.Offset())
 	rows, err := s.pool.Query(ctx, query, args...)
@@ -473,7 +473,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		var depName, anName *string
 		var idle *int64
 		if err := rows.Scan(&x.ID, &x.Status, &x.Version, &x.Instrument, &x.Title, &x.InstitutionName, &x.InstitutionCNPJ, &x.SigconNumber, &x.TotalCents, &x.Code, &x.SubmittedAt, &x.Stage, &x.ArchiveReason, &x.ComplementDueAt, &owner, &x.CreatedAt, &x.UpdatedAt,
-			&depID, &depName, &x.FramingStatus, &anID, &anName, &idle); err != nil {
+			&depID, &depName, &x.FramingStatus, &anID, &anName, &idle, &x.LateSubmission); err != nil {
 			return nil, 0, err
 		}
 		x.IsOwner = owner == p.Actor.ID

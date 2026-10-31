@@ -39,9 +39,11 @@ func effectiveByKey(t *testing.T, r resp) map[string]map[string]any {
 func TestParametrosPadraoDasNormas(t *testing.T) {
 	e, boss := setup(t)
 
-	// Em jun/2026 todos os cinco estão vigentes.
+	// Em jun/2026 todos os seis estão vigentes.
 	eff := effectiveByKey(t, e.do("GET", "/api/admin/rule-parameters/effective?date=2026-06-01", nil, boss))
-	require.Len(t, eff, 5)
+	require.Len(t, eff, 6)
+	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(7), "framing": float64(5), "awaiting_opinion": float64(15)},
+		eff["stalled_after_days"]["value"], "limites de parado, por etapa")
 	assert.EqualValues(t, 3, eff["complement_days"]["value"])
 	assert.EqualValues(t, 60, eff["price_reference_max_age_days"]["value"])
 	assert.Equal(t, "2026-05-15", eff["electoral_deadline"]["value"], "Portaria Conjunta 71/2026")
@@ -70,7 +72,7 @@ func TestParametrosPadraoDasNormas(t *testing.T) {
 	assert.Equal(t, 200, e.do("GET", "/api/admin/rule-parameters/effective", nil, boss).Status, "sem data usa hoje")
 
 	keys := e.do("GET", "/api/admin/rule-parameters/keys", nil, boss).list()
-	assert.Len(t, keys, 5)
+	assert.Len(t, keys, 6)
 	assert.NotEmpty(t, keys[0].(map[string]any)["description"])
 }
 
@@ -145,6 +147,11 @@ func TestParametrosValidamOValorDeCadaChave(t *testing.T) {
 		"lei sem teto":               {"lei_12082", map[string]any{"ceiling_cents": 0, "min_municipal_counterpart_pct": 10, "max_fees_pct": 50, "min_regional_fees_pct": 30}},
 		"lei com percentual > 100":   {"lei_12082", map[string]any{"ceiling_cents": 1, "min_municipal_counterpart_pct": 10, "max_fees_pct": 150, "min_regional_fees_pct": 30}},
 		"lei com campo desconhecido": {"lei_12082", map[string]any{"ceiling_cents": 1, "min_municipal_counterpart_pct": 10, "max_fees_pct": 50, "min_regional_fees_pct": 30, "extra": 1}},
+		"parado sem uma etapa":       {"stalled_after_days", map[string]any{"awaiting_checklist": 2, "in_analysis": 7, "framing": 5}},
+		"parado com dias zero":       {"stalled_after_days", map[string]any{"awaiting_checklist": 0, "in_analysis": 7, "framing": 5, "awaiting_opinion": 15}},
+		"parado acima do limite":     {"stalled_after_days", map[string]any{"awaiting_checklist": 2, "in_analysis": 400, "framing": 5, "awaiting_opinion": 15}},
+		"parado com etapa a mais":    {"stalled_after_days", map[string]any{"awaiting_checklist": 2, "in_analysis": 7, "framing": 5, "awaiting_opinion": 15, "awaiting_proponent": 3}},
+		"parado como número":         {"stalled_after_days", 7},
 		"faixas vazias":              {"indirect_costs_tiers", []any{}},
 		"última faixa com limite": {"indirect_costs_tiers", []any{
 			map[string]any{"up_to_cents": 100, "max_pct": 20, "cap_cents": 10}}},

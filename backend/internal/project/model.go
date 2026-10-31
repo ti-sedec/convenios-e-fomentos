@@ -358,6 +358,8 @@ type Summary struct {
 	ArchiveReason   string     `json:"archiveReason"`
 	ComplementDueAt *time.Time `json:"complementDueAt"`
 	SubmittedAt     *time.Time `json:"submittedAt"`
+	// LateSubmission: o envio passou da data-limite eleitoral vigente (o proponente já vê isso no detalhe do próprio projeto).
+	LateSubmission bool `json:"lateSubmission"`
 	// Department, FramingStatus e Analyst só vão para a equipe (são internos); o titular e os membros não os recebem.
 	Department    *DepartmentRef `json:"department,omitempty"`
 	FramingStatus string         `json:"framingStatus,omitempty"`
