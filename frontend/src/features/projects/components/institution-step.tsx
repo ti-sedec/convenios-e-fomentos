@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { entityTypesQueryOptions } from '@/features/entity-types/api/queries';
 import { UFS } from '@/features/municipalities/api/queries';
+import { useZipLookup } from '@/features/zip-codes/use-zip-lookup';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
 import { projectKeys } from '../api/queries';
@@ -96,6 +97,16 @@ export function InstitutionStep({
   const dirty = useStore(form.store, (s) => s.isDirty);
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   const values = useStore(form.store, (s) => s.values);
+  // Lê e grava no formulário na hora de aplicar, então vale o que a pessoa digitou enquanto a consulta rodava.
+  const zipLookup = useZipLookup((a) => {
+    const set = (name: 'street' | 'district' | 'uf' | 'municipalityIbge', v: string) => {
+      if (v) form.setFieldValue(name, v);
+    };
+    set('street', a.street);
+    set('district', a.district);
+    set('uf', a.uf);
+    set('municipalityIbge', a.ibgeCode);
+  });
 
   // Um tipo desativado depois da escolha continua aparecendo no projeto que já o usa.
   const options = (types.data ?? [])
@@ -240,12 +251,20 @@ export function InstitutionStep({
             />
           </div>
           <div className='grid gap-4 sm:grid-cols-[10rem_1fr_8rem]'>
-            <form.AppField
-              name='zip'
-              children={(f) => (
-                <f.TextField label='CEP' required inputMode='numeric' placeholder='00000-000' />
-              )}
-            />
+            <div onBlur={(e) => void zipLookup.lookup((e.target as HTMLInputElement).value)}>
+              <form.AppField
+                name='zip'
+                children={(f) => (
+                  <f.TextField
+                    label='CEP'
+                    required
+                    inputMode='numeric'
+                    placeholder='00000-000'
+                    description={zipLookup.loading ? 'Buscando…' : zipLookup.message || undefined}
+                  />
+                )}
+              />
+            </div>
             <form.AppField
               name='street'
               children={(f) => <f.TextField label='Logradouro' required maxLength={150} />}

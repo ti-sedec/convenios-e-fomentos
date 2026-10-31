@@ -53,6 +53,10 @@ Marque cada item ao concluir. Em qualquer divergência, anote a tela, o perfil e
 
 ### D. Devolver e reenviar
 - [ ] **Devolver para complementação**: os itens reprovados já vêm marcados, com a justificativa como observação. Escolha 2 itens com observação. O Proponente recebe o e-mail (log) e vê só esses itens editáveis, com o prazo.
+- [ ] Devolva também um **documento adicional** do Proponente. Ele troca o arquivo e edita título e descrição, mas não consegue excluí-lo.
+- [ ] Ao abrir o projeto devolvido, o Proponente cai na **primeira etapa devolvida**; as abas devolvidas têm o selo "Devolvido" (e "Alterado" depois de mexer). Nas outras abas aparece o aviso de que ficam só para consulta.
+- [ ] Em Documentos, "Mostrar só o que falta ou foi devolvido" já vem ligado e lista os documentos devolvidos (com a observação da equipe), mesmo os que já têm arquivo.
+- [ ] Na Revisão e envio, os itens devolvidos ainda não alterados são listados; reenviar sem alterá-los pede confirmação, citando-os.
 - [ ] O Proponente corrige e reenvia. De volta à análise, **só os 2 itens** estão pendentes; o resto segue aprovado.
 - [ ] Um arquivo novo exige ser visto de novo. Os itens devolvidos voltam a pendentes, sem reprovação.
 
@@ -61,6 +65,9 @@ Marque cada item ao concluir. Em qualquer divergência, anote a tela, o perfil e
 - [ ] Indica o Financeiro. Os Supervisores recebem o e-mail (log) **sem CPF, telefone ou endereço**.
 - [ ] O projeto some das ações do Analista (devolver, arquivar, aprovar) enquanto está pendente.
 - [ ] **Revisor 1** vê o projeto em *Pendentes*; **Revisor 2** não vê o projeto nem na lista nem pelo endereço.
+- [ ] **Revisor 1**, na aba *Documentos* do projeto pendente: cada arquivo (do checklist e dos adicionais) tem **Visualizar** ao lado de **Baixar**. Abre o arquivo no modal, sem decisão (só **Baixar original** e **Fechar**), com a lista lateral quando o documento tem vários arquivos. PDF, imagem e Word (convertido) aparecem; nada é baixado.
+- [ ] **Analista** em análise: o **Visualizar** da aba *Documentos* abre o mesmo modal da Conferência, com **Aprovar** e **Reprovar**. Fora da análise (ou com enquadramento pendente) o modal é só de leitura.
+- [ ] **Proponente**, nas abas *Documentos* e em projeto devolvido: **Visualizar** abre o próprio arquivo no modal, sem decisão e sem registrar "visto".
 - [ ] Revisor 1 **recusa** com justificativa: o projeto volta ao Analista, aparece no histórico com a justificativa, o Supervisor recebe o e-mail. O Analista **não** recebe e-mail.
 - [ ] O Analista indica o Jurídico (o diálogo lembra a última recusa). Revisor 2 **confirma**: etapa vira *Aguardando parecer*; o Proponente vê "Projeto enquadrado".
 

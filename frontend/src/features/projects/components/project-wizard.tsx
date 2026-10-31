@@ -17,6 +17,7 @@ import {
   projectActions,
   sectionLabels,
   statusLabels,
+  type ComplementItem,
   type Project,
   type SectionKey
 } from '../api/types';
@@ -41,13 +42,26 @@ const steps: SectionKey[] = [
   'submission'
 ];
 
+/** Selo da aba: o que a equipe devolveu nela e, quando já foi tudo alterado, que está pronto para o reenvio. */
+function ReturnedBadge({ items }: { items: ComplementItem[] }) {
+  if (items.length === 0) return null;
+  const done = items.every((i) => i.answered);
+  return (
+    <Badge variant='outline' className='border-amber-500/60'>
+      {done ? 'Alterado' : 'Devolvido'}
+    </Badge>
+  );
+}
+
 export function ProjectWizard({ id }: { id: string }) {
   const can = useCan();
   const qc = useQueryClient();
   const query = useQuery(projectQueryOptions(id));
   const [chosen, setStep] = useState<SectionKey | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [pending, setPending] = useState<SectionKey | null>(null);
+  const [pending, setPending] = useState<{ step: SectionKey; focus?: string } | null>(null);
+  // Elemento da aba Documentos a que o proponente foi levado pelo aviso de correções.
+  const [focus, setFocus] = useState<string | undefined>();
   const onDirty = useCallback((d: boolean) => setDirty(d), []);
   // Relógio da tela (prazo da complementação), fixado na montagem: a leitura da hora não pode acontecer a cada renderização.
   const [now] = useState(() => Date.now());
@@ -57,13 +71,16 @@ export function ProjectWizard({ id }: { id: string }) {
   const project = query.data;
   // Quem não é titular nem membro (a equipe) vê o projeto por outra tela: somente leitura, com a conferência e as decisões.
   if (project.access === '') return <StaffProjectView project={project} />;
-  // Projeto já enviado abre na tela do envio (código e comprovante); o rascunho, na primeira etapa.
-  const step: SectionKey = chosen ?? (project.status === 'draft' ? 'proponent' : 'submission');
 
   // Titular e convidado com edição alteram; convidado só com leitura apenas vê.
   const base =
     (project.access === 'owner' || project.access === 'edit') && can(projectActions.update);
   const access = accessOf(project, base, now);
+  // Projeto já enviado abre na tela do envio (código e comprovante); o rascunho, na primeira etapa; com correções pedidas, na primeira
+  // etapa devolvida, que é onde há o que fazer.
+  const firstReturned = steps.find((s) => access.returnedIn(s).length > 0);
+  const step: SectionKey =
+    chosen ?? (project.status === 'draft' ? 'proponent' : (firstReturned ?? 'submission'));
   const editable = access.draft;
   // Nos documentos, a pendência do servidor é uma só ("faltam N"); o selo da aba mostra os N.
   const blocksIn = (s: SectionKey) =>
@@ -72,10 +89,13 @@ export function ProjectWizard({ id }: { id: string }) {
     ).length + (s === 'documents' ? project.documents.requiredMissing : 0);
 
   // Trocar de etapa com alterações não salvas pede confirmação, para não perder o que foi digitado.
-  const go = (s: SectionKey) => {
-    if (s === step) return;
-    if (dirty) setPending(s);
-    else setStep(s);
+  const go = (s: SectionKey, to?: string) => {
+    if (s === step) return setFocus(to);
+    if (dirty) setPending({ step: s, focus: to });
+    else {
+      setFocus(to);
+      setStep(s);
+    }
   };
   const onSaved = (saved: Project, advance: boolean) => {
     setDirty(false);
@@ -140,6 +160,7 @@ export function ProjectWizard({ id }: { id: string }) {
               {idx + 1}
             </span>
             {sectionLabels[s]}
+            <ReturnedBadge items={access.returnedIn(s)} />
             {blocksIn(s) > 0 && (
               <Badge variant='secondary' aria-label={`${blocksIn(s)} pendências`}>
                 {blocksIn(s)}
@@ -151,6 +172,14 @@ export function ProjectWizard({ id }: { id: string }) {
 
       <div className='grid gap-6 lg:grid-cols-[1fr_20rem]'>
         <div className='min-w-0 max-w-3xl'>
+          {access.complement !== null && step !== 'submission' && readOnly(step) && (
+            <Alert className='mb-4'>
+              <AlertDescription>
+                A equipe não devolveu esta etapa: ela fica só para consulta. Corrija as etapas
+                marcadas como devolvidas.
+              </AlertDescription>
+            </Alert>
+          )}
           {/* A chave remonta o formulário com os valores já normalizados pelo servidor depois de cada gravação. */}
           {step === 'proponent' && (
             <ProponentStep key={project.version} {...common} readOnly={readOnly('proponent')} />
@@ -165,7 +194,12 @@ export function ProjectWizard({ id }: { id: string }) {
             <FundingStep key={project.version} {...common} readOnly={readOnly('funding')} />
           )}
           {step === 'documents' && (
-            <DocumentsStep project={project} access={access} onContinue={() => go('submission')} />
+            <DocumentsStep
+              project={project}
+              access={access}
+              focus={focus}
+              onContinue={() => go('submission')}
+            />
           )}
           {step === 'submission' && (
             <ReviewStep
@@ -188,7 +222,10 @@ export function ProjectWizard({ id }: { id: string }) {
         isOpen={pending !== null}
         onClose={() => setPending(null)}
         onConfirm={() => {
-          if (pending) setStep(pending);
+          if (pending) {
+            setFocus(pending.focus);
+            setStep(pending.step);
+          }
           setDirty(false);
           setPending(null);
         }}

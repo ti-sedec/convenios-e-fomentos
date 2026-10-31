@@ -313,9 +313,10 @@ type Project struct {
 	Issues          []Issue         `json:"issues"`
 }
 
-// ComplementItem é algo que a equipe devolveu: uma seção (Kind "section") ou um documento do checklist (Kind "document").
+// ComplementItem é algo que a equipe devolveu: uma seção (Kind "section"), um documento do checklist (Kind "document") ou um documento
+// adicional do proponente (Kind "extra").
 // Target é o identificador: o nome da seção (proponent, institution, proposal, funding, document-options) ou o documento
-// ("codigo" ou "codigo@id-da-emenda"). Answered indica que o proponente já mexeu no item depois do pedido.
+// ("codigo" ou "codigo@id-da-emenda") ou o id do documento adicional. Answered indica que o proponente já mexeu no item depois do pedido.
 type ComplementItem struct {
 	Kind     string `json:"kind"`
 	Target   string `json:"target"`

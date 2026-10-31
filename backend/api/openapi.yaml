@@ -686,6 +686,22 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/admin/catalog/zip-codes/{cep}:
+    get:
+      tags: [Catálogos de referência]
+      summary: Consulta o endereço de um CEP
+      description: "Consulta o ViaCEP (gratuito) pela API, com cache em memória, para preencher rua, bairro, município e UF. `cep` aceita 8 dígitos com ou sem hífen. `ibgeCode` é o mesmo código de `GET /admin/catalog/municipalities`. Limitada por IP (`RATE_LIMIT_CEP_PER_MINUTE`). Permissão: `admin::catalog.municipalities.read` (concedida ao proponente). Resposta: `{zip, street, district, city, uf, ibgeCode}`; `street` e `district` vêm vazios em CEPs gerais de município. Erros: `bad_request` (400), `cep_not_found` (404) e `cep_unavailable` (502, o ViaCEP não respondeu: o usuário preenche à mão)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: cep, in: path, required: true, schema: {type: string, maxLength: 12}}
+      responses:
+        "200": {description: OK}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
   /api/admin/catalog/parliamentarians:
     get:
       tags: [Catálogos de referência]
@@ -971,7 +987,7 @@ paths:
       summary: Detalha um projeto
       description: |
         Permissão: `admin::projects.read`. Um projeto fora do alcance da permissão responde 404.
-        Resposta: `{id, status, version, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt, proponent, institution, proposal, funding, documentOptions, documents {total, done, justified, missing, requiredTotal, requiredMissing}, code, stage, submittedAt, lateSubmission, complement, archive, originProjectId, originCode, issues}`. `code`, `stage` (`awaiting_checklist|in_analysis|awaiting_proponent`) e `submittedAt` só existem depois do envio; `complement` é o pedido de complementação aberto ou o mais recente `{number, status (open|answered|expired|cancelled), requestedAt, dueAt, overdue, message, items [{kind, target, label, note, answered}]}`; `archive` (`{at, reason (complement_deadline|withdrawn|denied|missing_documents|other), note}`) só existe em projeto arquivado. Projeto com o prazo de complementação vencido é arquivado na hora em que é aberto ou alterado (e pela rotina periódica).
+        Resposta: `{id, status, version, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt, proponent, institution, proposal, funding, documentOptions, documents {total, done, justified, missing, requiredTotal, requiredMissing}, code, stage, submittedAt, lateSubmission, complement, archive, originProjectId, originCode, issues}`. `code`, `stage` (`awaiting_checklist|in_analysis|awaiting_proponent`) e `submittedAt` só existem depois do envio; `complement` é o pedido de complementação aberto ou o mais recente `{number, status (open|answered|expired|cancelled), requestedAt, dueAt, overdue, message, items [{kind (section|document|extra), target, label, note, answered}]}`; `archive` (`{at, reason (complement_deadline|withdrawn|denied|missing_documents|other), note}`) só existe em projeto arquivado. Projeto com o prazo de complementação vencido é arquivado na hora em que é aberto ou alterado (e pela rotina periódica).
         `version` deve ser enviada em toda gravação de seção (controle de edição simultânea).
         `issues` lista as pendências: `{section, field, code, severity (block|warn), message}`. O rascunho aceita dados incompletos;
         as pendências `block` são o que o envio (fase seguinte) vai exigir.
@@ -1340,7 +1356,7 @@ paths:
         `ready: false` quando faltam dados (`issues` com `section: declaration`); `paramsSha256` resume o conteúdo e muda se o cadastro mudar.
         `current` é a última emissão (nulo se nunca houve): `{id, status (awaiting_signature|signed|rejected|expired|cancelled|superseded), acceptedAt,
         requestedBySigner, signerCpf (mascarado), signedAt, fileId, stale}`. `stale: true` quando o cadastro mudou depois da emissão: a declaração
-        deixa de valer e o item do checklist volta a faltar (`declarationStale`). Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o
+        deixa de valer e o item do checklist volta a faltar (`declarationStale`). `declarationAwaiting: true` no item enquanto a emissão aguarda a assinatura. Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o
         signatário já assinou, traz o arquivo assinado para o checklist.
         Código sem modelo ou projeto fora do alcance: 404. Declaração que não se aplica ao projeto: 409 `document_not_applicable`.
         Permissão: `admin::projects.read`.
@@ -1732,8 +1748,9 @@ paths:
       description: |
         Devolve itens ao proponente: o projeto vai de `awaiting_checklist` ou `in_analysis` para `awaiting_proponent` e o prazo começa a correr:
         `complement_days` dias corridos (padrão 3), até 23:59:59 de Cuiabá do último dia. Cada item é uma seção (`kind: section`; `target`:
-        `proponent|institution|proposal|funding|document-options`) ou um documento do checklist (`kind: document`; `target`: `codigo` ou `codigo@id-da-emenda`),
-        com uma nota opcional. Enquanto o pedido está aberto o proponente só altera o que foi devolvido (e documentos que ficarem pendentes);
+        `proponent|institution|proposal|funding|document-options`) um documento do checklist (`kind: document`; `target`: `codigo` ou `codigo@id-da-emenda`) ou um documento adicional (`kind: extra`; `target`: id do documento),
+        com uma nota opcional. Enquanto o pedido está aberto o proponente só altera o que foi devolvido (e documentos que ficarem pendentes;
+        num documento adicional devolvido ele troca o arquivo e edita título e descrição, mas não o exclui: 409 `extra_document_sent`);
         o resto responde 409 `not_returned`. O proponente recebe um e-mail com o prazo e os itens.
         Erros: 409 `project_not_submitted` (rascunho ou arquivado), 409 `project_stage_invalid` (já aguardando o proponente), 422 (itens inválidos).
         Permissão: `admin::projects.request-complement`. Responde o projeto completo (`complement` traz o pedido).
@@ -1757,7 +1774,7 @@ paths:
                     type: object
                     required: [kind, target]
                     properties:
-                      kind: {type: string, enum: [section, document]}
+                      kind: {type: string, enum: [section, document, extra]}
                       target: {type: string}
                       note: {type: string, maxLength: 500}
       responses:

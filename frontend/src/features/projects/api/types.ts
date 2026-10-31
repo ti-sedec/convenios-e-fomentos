@@ -227,6 +227,8 @@ export interface ChecklistItem {
   status: 'missing' | 'done' | 'justified';
   /** A declaração assinada deste item ficou desatualizada porque o cadastro mudou: emita de novo. */
   declarationStale: boolean;
+  /** A declaração foi emitida e aguarda a assinatura: nada a fazer pelo proponente. */
+  declarationAwaiting: boolean;
 }
 
 /** Documento adicional do proponente: título, descrição opcional e um único arquivo. Não conta nos obrigatórios. */
@@ -463,10 +465,10 @@ export const archiveReasonLabels: Record<ArchiveReason, string> = {
   other: 'Decisão da equipe'
 };
 
-/** Item devolvido pela equipe: uma seção ou um documento do checklist. */
+/** Item devolvido pela equipe: uma seção, um documento do checklist ou um documento adicional. */
 export interface ComplementItem {
-  kind: 'section' | 'document';
-  /** Seção: proponent, institution, proposal, funding ou document-options. Documento: código, ou código@id-da-emenda. */
+  kind: 'section' | 'document' | 'extra';
+  /** Seção: proponent, institution, proposal, funding ou document-options. Documento: código, ou código@id-da-emenda. Adicional: id. */
   target: string;
   label: string;
   note: string;

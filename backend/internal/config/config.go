@@ -43,6 +43,11 @@ type Config struct {
 	// Limite geral por IP em todas as rotas (0 desliga). Protege o banco de requisições em massa.
 	// RateLimitUploadPerMin limita, por usuário, os pedidos e confirmações de envio de arquivo dos projetos (0 desliga).
 	RateLimitUploadPerMin int `env:"RATE_LIMIT_UPLOAD_PER_MINUTE" envDefault:"120"`
+	// CEPAPIBaseURL é a raiz da consulta de CEP (ViaCEP, gratuito e sem chave); CEPTimeout limita cada consulta e
+	// RateLimitCEPPerMin, por IP, as consultas por minuto (0 desliga).
+	CEPAPIBaseURL      string        `env:"CEP_API_BASE_URL" envDefault:"https://viacep.com.br/ws"`
+	CEPTimeout         time.Duration `env:"CEP_TIMEOUT" envDefault:"3s"`
+	RateLimitCEPPerMin int           `env:"RATE_LIMIT_CEP_PER_MINUTE" envDefault:"60"`
 	// ClamAVAddr (host:porta do clamd) liga a verificação de vírus dos arquivos dos projetos; vazio desliga.
 	ClamAVAddr            string `env:"CLAMAV_ADDR"`
 	RateLimitGlobalPerMin int    `env:"RATE_LIMIT_GLOBAL_PER_MINUTE" envDefault:"600"`
@@ -150,7 +155,7 @@ func (c *Config) Validate() error {
 	if c.PasswordMinLength < 1 {
 		errs = append(errs, errors.New("PASSWORD_MIN_LENGTH deve ser >= 1"))
 	}
-	if c.RateLimitAuthPerMin < 1 || c.RateLimitGlobalPerMin < 0 || c.RateLimitUploadPerMin < 0 {
+	if c.RateLimitAuthPerMin < 1 || c.RateLimitGlobalPerMin < 0 || c.RateLimitUploadPerMin < 0 || c.RateLimitCEPPerMin < 0 {
 		errs = append(errs, errors.New("RATE_LIMIT_AUTH_PER_MINUTE deve ser >= 1 e RATE_LIMIT_GLOBAL_PER_MINUTE >= 0"))
 	}
 	if c.Argon2Iterations < 1 || c.Argon2Parallel < 1 || c.Argon2MemoryKiB < 8*uint32(c.Argon2Parallel) {

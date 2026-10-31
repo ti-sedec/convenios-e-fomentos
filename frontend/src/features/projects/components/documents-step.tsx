@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -106,14 +106,22 @@ function OptionsForm({ project, readOnly }: { project: Project; readOnly: boolea
 export function DocumentsStep({
   project,
   access,
+  focus,
   onContinue
 }: {
   project: Project;
   access: Access;
+  /** Id do elemento a levar para o centro da tela quando a lista aparecer (vindo do aviso de correções). */
+  focus?: string;
   onContinue?: () => void;
 }) {
   const checklist = useQuery(checklistQueryOptions(project.id));
-  const [onlyMissing, setOnlyMissing] = useState(false);
+  const loaded = !!checklist.data;
+  useEffect(() => {
+    if (focus && loaded) document.getElementById(focus)?.scrollIntoView({ block: 'center' });
+  }, [focus, loaded]);
+  // Com um pedido de complementação aberto, a lista já abre só no que falta ou foi devolvido.
+  const [onlyMissing, setOnlyMissing] = useState(access.complement !== null);
 
   if (checklist.isError)
     return <QueryError error={checklist.error} what='o checklist de documentos' />;
@@ -125,7 +133,10 @@ export function DocumentsStep({
   const requiredJustified = required.filter((i) => i.status === 'justified').length;
   const optionalSent = optional.filter((i) => i.status !== 'missing').length;
   const blockers = required.filter((i) => i.status === 'missing');
-  const visible = onlyMissing ? items.filter((i) => i.status === 'missing') : items;
+  // O que ainda pede ação: pendente (menos a declaração que só espera a assinatura) ou devolvido pela equipe, mesmo com arquivo.
+  const needsAction = (i: ChecklistItem) =>
+    (i.status === 'missing' && !i.declarationAwaiting) || !!access.returnedDocument(i);
+  const visible = onlyMissing ? items.filter(needsAction) : items;
   const groups = Array.from(new Set(visible.map((i) => i.group)));
   const byGroup = (g: string): ChecklistItem[] => visible.filter((i) => i.group === g);
 
@@ -188,7 +199,9 @@ export function DocumentsStep({
           <div className='flex items-center gap-2'>
             <Switch id='only-missing' checked={onlyMissing} onCheckedChange={setOnlyMissing} />
             <Label htmlFor='only-missing' className='text-sm'>
-              Mostrar só o que falta
+              {access.complement
+                ? 'Mostrar só o que falta ou foi devolvido'
+                : 'Mostrar só o que falta'}
             </Label>
           </div>
           {visible.length === 0 && (
@@ -203,18 +216,20 @@ export function DocumentsStep({
                 {byGroup(g).map((item) => (
                   <ChecklistItemCard
                     key={`${item.code}-${item.amendmentId}-${item.justification}`}
-                    projectId={project.id}
+                    project={project}
                     item={item}
                     editable={access.document(item)}
+                    returned={access.returnedDocument(item)}
                   />
                 ))}
               </ul>
             </section>
           ))}
           <ExtraDocuments
-            projectId={project.id}
+            project={project}
             docs={checklist.data.extraDocuments}
             access={access}
+            onlyReturned={onlyMissing && access.complement !== null}
           />
           {onContinue && <ContinueBar blockers={blockers} onContinue={onContinue} />}
         </>

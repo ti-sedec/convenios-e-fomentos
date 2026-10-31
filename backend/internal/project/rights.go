@@ -28,6 +28,7 @@ type openComplement struct {
 	id       uuid.UUID
 	sections map[string]bool
 	docs     map[string]bool
+	extras   map[string]bool // id do documento adicional devolvido
 }
 
 // rights diz o que o proponente pode alterar agora: no rascunho, tudo; depois do envio, só o que a equipe devolveu, enquanto o
@@ -66,11 +67,14 @@ func (s *Service) rightsOf(ctx context.Context, q *db.Queries, cur db.Project) (
 	if err != nil {
 		return rights{}, err
 	}
-	o := &openComplement{id: req.ID, sections: map[string]bool{}, docs: map[string]bool{}}
+	o := &openComplement{id: req.ID, sections: map[string]bool{}, docs: map[string]bool{}, extras: map[string]bool{}}
 	for _, it := range items {
-		if it.Kind == "section" {
+		switch it.Kind {
+		case "section":
 			o.sections[it.Target] = true
-		} else {
+		case "extra":
+			o.extras[it.Target] = true
+		default:
 			o.docs[it.Target] = true
 		}
 	}

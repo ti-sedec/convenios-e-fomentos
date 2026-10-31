@@ -17,6 +17,7 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/auth"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/authz"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/catalog"
+	"github.com/wagner/convenios-e-fomentos/backend/internal/cep"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/config"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/database/db"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/department"
@@ -184,6 +185,11 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 		}
 		projectSvc.SetPreview(conv, cfg.StoragePreviewTTL, log)
 	}
+	cepSvc := cep.NewService(cfg.CEPAPIBaseURL, cfg.CEPTimeout)
+	cepLimit := func(next http.Handler) http.Handler { return next }
+	if cfg.RateLimitCEPPerMin > 0 {
+		cepLimit = httpapi.RateLimitByIP(cfg.RateLimitCEPPerMin)
+	}
 	documentAdmin := document.NewAdminHandler(documentSvc, engine, adminHandler.Guard)
 	documentPublic := document.NewPublicHandler(documentSvc, identifier)
 
@@ -198,6 +204,8 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 			departmentAdmin.Routes(r)
 			documentAdmin.Routes(r)
 			catalog.NewHandler(catalogSvc, adminHandler.Guard).Routes(r)
+			// Quem lê o catálogo de municípios (o proponente) também consulta o CEP, que serve para preencher município e UF.
+			cep.NewHandler(cepSvc, adminHandler.Guard(catalog.ActionMunicipalitiesRead), cepLimit).Routes(r)
 			rules.NewHandler(rulesSvc, adminHandler.Guard).Routes(r)
 			project.NewHandler(projectSvc, adminHandler.Guard, project.Limits{Upload: cfg.RateLimitUploadPerMin, Heavy: project.DefaultHeavyLimit}).Routes(r)
 			documentPublic.Routes(r)

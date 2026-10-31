@@ -57,12 +57,19 @@ func (s *Service) complementView(ctx context.Context, q *db.Queries, r db.Projec
 		}
 		labels[it.key()] = l
 	}
+	extras := map[string]string{}
+	for _, x := range cl.ExtraDocuments {
+		extras[x.ID.String()] = x.Title
+	}
 	c := &Complement{Number: int(req.Number), Status: req.Status, RequestedAt: req.RequestedAt, DueAt: req.DueAt, Message: req.Message,
 		Overdue: req.Status == ComplementOpen && req.DueAt.Before(s.now()), Items: make([]ComplementItem, len(items))}
 	for i, it := range items {
 		label := labels[it.Target]
-		if it.Kind == "section" {
+		switch it.Kind {
+		case "section":
 			label = returnableSections[it.Target]
+		case "extra":
+			label = extras[it.Target]
 		}
 		if label == "" {
 			label = it.Target
@@ -87,8 +94,8 @@ func (s *Service) originView(ctx context.Context, q *db.Queries, r db.Project) s
 
 // ComplementItemInput é um item devolvido ao proponente.
 type ComplementItemInput struct {
-	Kind   string `json:"kind"`   // section | document
-	Target string `json:"target"` // nome da seção, ou "codigo" / "codigo@id-da-emenda"
+	Kind   string `json:"kind"`   // section | document | extra
+	Target string `json:"target"` // nome da seção, "codigo" / "codigo@id-da-emenda", ou o id do documento adicional
 	Note   string `json:"note"`
 }
 
@@ -144,6 +151,9 @@ func (s *Service) RequestComplement(ctx context.Context, actor Actor, id uuid.UU
 		for _, it := range cl.Items {
 			valid["document:"+it.key()] = true
 		}
+		for _, x := range cl.ExtraDocuments {
+			valid["extra:"+x.ID.String()] = true
+		}
 		for sec := range returnableSections {
 			valid["section:"+sec] = true
 		}
@@ -153,8 +163,8 @@ func (s *Service) RequestComplement(ctx context.Context, actor Actor, id uuid.UU
 			k := it.Kind + ":" + it.Target
 			note := multiline(it.Note)
 			switch {
-			case it.Kind != "section" && it.Kind != "document":
-				p.add(f+".kind", "Use section ou document.")
+			case it.Kind != "section" && it.Kind != "document" && it.Kind != "extra":
+				p.add(f+".kind", "Use section, document ou extra.")
 			case !valid[k]:
 				p.add(f+".target", "Item inexistente neste projeto.")
 			case seen[k]:

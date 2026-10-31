@@ -14,7 +14,7 @@ import { ApiError } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/errors';
 import { projectKeys } from '../api/queries';
 import { downloadReceipt, resubmitProject, submitProject } from '../api/service';
-import type { Access } from '../access';
+import { focusIdOf, stepOfItem, type Access } from '../access';
 import {
   fundingTypeLabels,
   instrumentLabels,
@@ -158,7 +158,7 @@ export function ReviewStep({
   project: Project;
   editable: boolean;
   access: Access;
-  onGo: (section: SectionKey) => void;
+  onGo: (section: SectionKey, focus?: string) => void;
 }) {
   const qc = useQueryClient();
   const [accepted, setAccepted] = useState(false);
@@ -166,6 +166,10 @@ export function ReviewStep({
 
   // Depois do envio, só se reenvia durante uma complementação aberta; fora disso, a tela mostra o projeto recebido.
   const resubmitting = project.status === 'submitted' && access.complement !== null;
+  // Itens devolvidos em que o proponente ainda não mexeu: o reenvio é permitido (a equipe confere), mas com aviso e confirmação.
+  const unanswered = resubmitting
+    ? (access.complement?.items.filter((i) => !i.answered) ?? [])
+    : [];
   const blocks = project.issues.filter((i) => i.severity === 'block');
   const warns = project.issues.filter((i) => i.severity === 'warn');
   const sections = (Object.keys(sectionLabels) as SectionKey[]).filter((s) =>
@@ -236,6 +240,28 @@ export function ReviewStep({
           </AlertDescription>
         </Alert>
       )}
+      {unanswered.length > 0 && (
+        <Alert>
+          <Icons.alertCircle aria-hidden />
+          <AlertTitle>Itens devolvidos que você ainda não alterou</AlertTitle>
+          <AlertDescription>
+            <ul className='mt-1 space-y-1'>
+              {unanswered.map((i) => (
+                <li key={`${i.kind}-${i.target}`}>
+                  <button
+                    type='button'
+                    className='font-medium underline underline-offset-4'
+                    onClick={() => onGo(stepOfItem(i), focusIdOf(i))}
+                  >
+                    {i.label}
+                  </button>
+                  {i.note && <span className='text-muted-foreground'>: {i.note}</span>}
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
       {warns.length > 0 && (
         <Alert>
           <AlertTitle>Avisos (não impedem o envio)</AlertTitle>
@@ -292,7 +318,11 @@ export function ReviewStep({
         title={resubmitting ? 'Reenviar o projeto com as correções?' : 'Enviar o projeto à SEDEC?'}
         description={
           resubmitting
-            ? 'O projeto volta para a análise da equipe e você não poderá alterar mais nada até um novo pedido de correção.'
+            ? `${
+                unanswered.length > 0
+                  ? `Você ainda não alterou: ${unanswered.map((i) => i.label).join(', ')}. `
+                  : ''
+              }O projeto volta para a análise da equipe e você não poderá alterar mais nada até um novo pedido de correção.`
             : 'Depois de enviado, o projeto e os documentos não poderão mais ser alterados por você. Confira se está tudo certo.'
         }
         confirmLabel={resubmitting ? 'Reenviar' : 'Enviar projeto'}

@@ -20,12 +20,20 @@ import {
   confirmFileUpload,
   createExtraDocument,
   deleteExtraDocument,
+  deleteProjectFile,
   getFileDownload,
   requestExtraFileUpload,
   updateExtraDocument
 } from '../api/service';
-import { MAX_EXTRA_DOCUMENTS, type ExtraDocument } from '../api/types';
+import {
+  MAX_EXTRA_DOCUMENTS,
+  type ComplementItem,
+  type ExtraDocument,
+  type Project
+} from '../api/types';
 import type { Access } from '../access';
+import { ProjectFileViewer, ViewFileButton, useFileViewer } from './project-file-viewer';
+import { ReturnedNote } from './returned-note';
 import { ServerErrors } from './server-errors';
 
 const schema = z.object({
@@ -49,7 +57,8 @@ function useRefresh(projectId: string) {
 
 /**
  * Formulário de um documento adicional. Ao criar, pede também o arquivo (obrigatório): cria o documento, envia o arquivo e, se o
- * envio falhar, desfaz a criação para não deixar um documento vazio para trás. Ao editar, só título e descrição.
+ * envio falhar, desfaz a criação para não deixar um documento vazio para trás. Ao editar, título e descrição; num documento já enviado
+ * (devolvido pela equipe) dá também para trocar o arquivo, que é opcional.
  */
 function ExtraForm({
   projectId,
@@ -69,28 +78,45 @@ function ExtraForm({
   const [fileError, setFileError] = useState<string | null>(null);
   const [percent, setPercent] = useState<number | null>(null);
 
+  // Troca de arquivo só no documento que já fez parte de uma versão enviada: tirar o único arquivo de um ainda não enviado apagaria o documento.
+  const replaceable = !!existing?.locked;
+
+  const upload = async (itemId: string, f: File) => {
+    try {
+      setPercent(0);
+      const grant = await requestExtraFileUpload(projectId, itemId, {
+        filename: f.name,
+        contentType: contentTypeOf(f)!,
+        sizeBytes: f.size
+      });
+      await uploadToStorage(grant.upload, f, setPercent);
+      await confirmFileUpload(projectId, grant.file.id);
+    } finally {
+      setPercent(null);
+    }
+  };
+
   const save = useMutation({
     mutationFn: async (v: { title: string; description: string }) => {
-      if (existing) return void (await updateExtraDocument(projectId, existing.id, v));
+      if (existing) {
+        await updateExtraDocument(projectId, existing.id, v);
+        if (file) {
+          // O documento comporta um só arquivo: o anterior sai antes (o já enviado fica guardado na versão enviada).
+          if (existing.file) await deleteProjectFile(projectId, existing.file.id);
+          await upload(existing.id, file);
+        }
+        return;
+      }
       if (!file) throw new Error('Anexe o arquivo do documento.');
       const before = new Set(known.map((x) => x.id));
       const created = await createExtraDocument(projectId, v);
       const item = created.extraDocuments.find((x) => !before.has(x.id));
       if (!item) throw new Error('Não foi possível criar o documento.');
       try {
-        setPercent(0);
-        const grant = await requestExtraFileUpload(projectId, item.id, {
-          filename: file.name,
-          contentType: contentTypeOf(file)!,
-          sizeBytes: file.size
-        });
-        await uploadToStorage(grant.upload, file, setPercent);
-        await confirmFileUpload(projectId, grant.file.id);
+        await upload(item.id, file);
       } catch (err) {
         await deleteExtraDocument(projectId, item.id).catch(() => undefined);
         throw err;
-      } finally {
-        setPercent(null);
       }
     },
     onSuccess: async () => {
@@ -104,7 +130,7 @@ function ExtraForm({
     defaultValues: { title: existing?.title ?? '', description: existing?.description ?? '' },
     validators: { onSubmit: schema },
     onSubmit: ({ value }) => {
-      if (!existing) {
+      if (!existing || file) {
         const problem = file ? validateFile(file) : 'Anexe o arquivo do documento.';
         setFileError(problem);
         if (problem) return;
@@ -134,9 +160,11 @@ function ExtraForm({
             <f.TextareaField label='Descrição (opcional)' rows={3} maxLength={1000} showCount />
           )}
         />
-        {!existing && (
+        {(!existing || replaceable) && (
           <div className='space-y-2'>
-            <p className='text-sm font-medium'>Arquivo *</p>
+            <p className='text-sm font-medium'>
+              {existing ? 'Novo arquivo (opcional)' : 'Arquivo *'}
+            </p>
             <input
               ref={input}
               type='file'
@@ -193,15 +221,20 @@ function ExtraForm({
 }
 
 function ExtraCard({
-  projectId,
+  project,
   doc,
-  editable
+  editable,
+  returned
 }: {
-  projectId: string;
+  project: Project;
   doc: ExtraDocument;
   editable: boolean;
+  /** O pedido de complementação aberto devolveu este documento. */
+  returned?: ComplementItem;
 }) {
+  const projectId = project.id;
   const refresh = useRefresh(projectId);
+  const viewer = useFileViewer();
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const download = useMutation({
@@ -238,7 +271,7 @@ function ExtraCard({
       </li>
     );
   return (
-    <li className='space-y-2 rounded-lg border p-4'>
+    <li id={`extra-${doc.id}`} className='scroll-mt-20 space-y-2 rounded-lg border p-4'>
       <div className='flex flex-wrap items-start justify-between gap-2'>
         <p className='min-w-0 font-medium'>{doc.title}</p>
         {editable && (
@@ -251,17 +284,20 @@ function ExtraCard({
             >
               <Icons.edit aria-hidden />
             </Button>
-            <Button
-              size='sm'
-              variant='ghost'
-              onClick={() => setRemoving(true)}
-              aria-label={`Remover ${doc.title}`}
-            >
-              <Icons.trash aria-hidden />
-            </Button>
+            {!doc.locked && (
+              <Button
+                size='sm'
+                variant='ghost'
+                onClick={() => setRemoving(true)}
+                aria-label={`Remover ${doc.title}`}
+              >
+                <Icons.trash aria-hidden />
+              </Button>
+            )}
           </span>
         )}
       </div>
+      {returned && <ReturnedNote item={returned} />}
       {doc.description && (
         <p className='text-muted-foreground text-sm whitespace-pre-line'>{doc.description}</p>
       )}
@@ -275,14 +311,17 @@ function ExtraCard({
             </span>
           </span>
           {doc.file.status === 'confirmed' && (
-            <Button
-              size='sm'
-              variant='ghost'
-              onClick={() => download.mutate()}
-              aria-label={`Baixar ${doc.file.filename}`}
-            >
-              Baixar
-            </Button>
+            <span className='flex shrink-0 gap-1'>
+              <ViewFileButton file={doc.file} onClick={() => viewer.show(doc.file!.id)} />
+              <Button
+                size='sm'
+                variant='ghost'
+                onClick={() => download.mutate()}
+                aria-label={`Baixar ${doc.file.filename}`}
+              >
+                Baixar
+              </Button>
+            </span>
           )}
         </div>
       ) : (
@@ -298,23 +337,39 @@ function ExtraCard({
         confirmLabel='Remover'
         cancelLabel='Cancelar'
       />
+      {doc.file && (
+        <ProjectFileViewer
+          project={project}
+          kind='extra'
+          target={doc.id}
+          label={doc.title}
+          files={[doc.file]}
+          fileId={viewer.fileId}
+          open={viewer.open}
+          onOpenChange={viewer.setOpen}
+        />
+      )}
     </li>
   );
 }
 
 /** Último bloco da aba Documentos: até 5 documentos livres (título, descrição opcional e arquivo), sempre opcionais. */
 export function ExtraDocuments({
-  projectId,
+  project,
   docs,
-  access
+  access,
+  onlyReturned
 }: {
-  projectId: string;
+  project: Project;
   docs: ExtraDocument[];
   access: Access;
+  /** Mostra só os devolvidos pela equipe (o filtro "só o que falta" da aba). */
+  onlyReturned?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const canAdd = access.extra(false);
   const full = docs.length >= MAX_EXTRA_DOCUMENTS;
+  const shown = onlyReturned ? docs.filter((d) => access.returned('extra', d.id)) : docs;
 
   return (
     <section aria-labelledby='group-extra' className='space-y-3'>
@@ -328,20 +383,21 @@ export function ExtraDocuments({
           ).
         </p>
       </div>
-      {docs.length > 0 && (
+      {shown.length > 0 && (
         <ul className='space-y-3'>
-          {docs.map((d) => (
+          {shown.map((d) => (
             <ExtraCard
-              key={`${d.id}-${d.title}-${d.description}`}
-              projectId={projectId}
+              key={`${d.id}-${d.title}-${d.description}-${d.file?.id}`}
+              project={project}
               doc={d}
-              editable={access.extra(d.locked)}
+              editable={access.extra(d.locked, d.id)}
+              returned={access.returned('extra', d.id)}
             />
           ))}
         </ul>
       )}
       {adding ? (
-        <ExtraForm projectId={projectId} known={docs} onDone={() => setAdding(false)} />
+        <ExtraForm projectId={project.id} known={docs} onDone={() => setAdding(false)} />
       ) : (
         canAdd && (
           <div className='space-y-1'>

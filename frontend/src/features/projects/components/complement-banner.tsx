@@ -2,6 +2,7 @@
 
 import { Icons } from '@/components/icons';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { focusIdOf, stepOfItem } from '../access';
 import {
   archiveReasonLabels,
   type ComplementItem,
@@ -15,14 +16,6 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Cuiaba'
 });
 
-const stepOf: Record<string, SectionKey> = {
-  proponent: 'proponent',
-  institution: 'institution',
-  proposal: 'proposal',
-  funding: 'funding',
-  'document-options': 'documents'
-};
-
 /** Quanto falta para o prazo, em linguagem simples. */
 function remaining(due: string, now: number): string {
   const ms = new Date(due).getTime() - now;
@@ -33,9 +26,13 @@ function remaining(due: string, now: number): string {
   return `${Math.ceil(hours / 24)} dias`;
 }
 
-function Item({ item, onGo }: { item: ComplementItem; onGo: (s: SectionKey) => void }) {
-  const step: SectionKey =
-    item.kind === 'document' ? 'documents' : (stepOf[item.target] ?? 'proponent');
+function Item({
+  item,
+  onGo
+}: {
+  item: ComplementItem;
+  onGo: (s: SectionKey, focus?: string) => void;
+}) {
   return (
     <li className='flex gap-2'>
       {item.answered ? (
@@ -53,7 +50,7 @@ function Item({ item, onGo }: { item: ComplementItem; onGo: (s: SectionKey) => v
         <button
           type='button'
           className='font-medium underline underline-offset-4'
-          onClick={() => onGo(step)}
+          onClick={() => onGo(stepOfItem(item), focusIdOf(item))}
         >
           {item.label}
         </button>
@@ -71,7 +68,7 @@ export function LifecycleBanner({
 }: {
   project: Project;
   now: number;
-  onGo: (s: SectionKey) => void;
+  onGo: (s: SectionKey, focus?: string) => void;
 }) {
   const c = project.complement;
 

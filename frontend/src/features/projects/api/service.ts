@@ -351,12 +351,12 @@ export async function reviewItem(
   ).data;
 }
 
-/** Devolve itens (seções e documentos do checklist) ao proponente, com prazo. */
+/** Devolve itens (seções, documentos do checklist e documentos adicionais) ao proponente, com prazo. */
 export const requestComplement = (
   id: string,
   input: {
     message: string;
-    items: { kind: 'section' | 'document'; target: string; note: string }[];
+    items: { kind: 'section' | 'document' | 'extra'; target: string; note: string }[];
   }
 ) => post(id, 'complement-requests', input);
 
