@@ -164,6 +164,12 @@ func TestMunicipiosDoIBGE(t *testing.T) {
 func TestCrudDeParlamentares(t *testing.T) {
 	e, boss := setup(t)
 
+	// A migração 00034 já carrega os parlamentares eleitos em 2026; as contagens abaixo partem deles.
+	count := func(query string) int {
+		return len(e.do("GET", "/api/admin/catalog/parliamentarians"+query, nil, boss).list())
+	}
+	all, federal, active := count(""), count("?chamber=federal"), count("?active=true")
+
 	r := e.do("POST", "/api/admin/catalog/parliamentarians", map[string]any{"name": "  Fulano   de Tal ", "chamber": "state"}, boss)
 	require.Equal(t, 201, r.Status, r.Body)
 	assert.Equal(t, "Fulano de Tal", r.data()["name"])
@@ -178,9 +184,9 @@ func TestCrudDeParlamentares(t *testing.T) {
 
 	assert.Equal(t, 201, e.do("POST", "/api/admin/catalog/parliamentarians", map[string]any{"name": "Beltrana Souza", "chamber": "state", "active": false}, boss).Status)
 
-	assert.Len(t, e.do("GET", "/api/admin/catalog/parliamentarians", nil, boss).list(), 3)
-	assert.Len(t, e.do("GET", "/api/admin/catalog/parliamentarians?chamber=federal", nil, boss).list(), 1)
-	assert.Len(t, e.do("GET", "/api/admin/catalog/parliamentarians?active=true", nil, boss).list(), 2)
+	assert.Equal(t, all+3, count(""))
+	assert.Equal(t, federal+1, count("?chamber=federal"))
+	assert.Equal(t, active+2, count("?active=true"))
 	assert.Len(t, e.do("GET", "/api/admin/catalog/parliamentarians?q=beltr", nil, boss).list(), 1)
 	assert.Equal(t, 422, e.do("GET", "/api/admin/catalog/parliamentarians?chamber=x", nil, boss).Status)
 
