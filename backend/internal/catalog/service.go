@@ -282,10 +282,13 @@ func (s *Service) EnsureDefaults(ctx context.Context) error {
 
 // Parliamentarian é um parlamentar que destina emendas.
 type Parliamentarian struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Chamber   string    `json:"chamber"`
-	Active    bool      `json:"active"`
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
+	Chamber string    `json:"chamber"`
+	Active  bool      `json:"active"`
+	// InUse indica que alguma emenda de projeto cita o parlamentar; ele não pode ser excluído, só desativado.
+	// Só é calculado nas respostas da API; omitido quando falso, o que também o mantém fora do payload da auditoria.
+	InUse     bool      `json:"inUse,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -331,9 +334,18 @@ func (s *Service) ListParliamentarians(ctx context.Context, f ParliamentarianFil
 	if err != nil {
 		return nil, err
 	}
+	ids, err := s.q.ListParliamentariansInUse(ctx)
+	if err != nil {
+		return nil, err
+	}
+	inUse := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		inUse[id] = true
+	}
 	out := make([]Parliamentarian, len(rows))
 	for i, r := range rows {
 		out[i] = parliamentarianView(r)
+		out[i].InUse = inUse[r.ID]
 	}
 	return out, nil
 }
@@ -345,6 +357,9 @@ func (s *Service) GetParliamentarian(ctx context.Context, id uuid.UUID) (*Parlia
 		return nil, notFound(err)
 	}
 	v := parliamentarianView(r)
+	if v.InUse, err = s.q.ParliamentarianInUse(ctx, &id); err != nil {
+		return nil, err
+	}
 	return &v, nil
 }
 
@@ -402,6 +417,9 @@ func (s *Service) UpdateParliamentarian(ctx context.Context, actor Actor, id uui
 		return s.audit.Record(ctx, q, actor.entry("parliamentarian.update", "parliamentarian", id, parliamentarianView(before), out))
 	})
 	if err != nil {
+		return nil, err
+	}
+	if out.InUse, err = s.q.ParliamentarianInUse(ctx, &id); err != nil {
 		return nil, err
 	}
 	return &out, nil

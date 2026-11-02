@@ -18,6 +18,8 @@ export interface Parliamentarian {
   name: string;
   chamber: Chamber;
   active: boolean;
+  /** Citado em emendas de projetos: não pode ser excluído, só desativado. Ausente quando falso. */
+  inUse?: boolean;
   createdAt: string;
   updatedAt: string;
 }

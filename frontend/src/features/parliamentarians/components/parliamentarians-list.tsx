@@ -87,9 +87,19 @@ export function ParliamentariansList() {
               <TableCell className='font-medium'>{p.name}</TableCell>
               <TableCell>{chamberLabels[p.chamber]}</TableCell>
               <TableCell>
-                <Badge variant={p.active ? 'secondary' : 'outline'}>
-                  {p.active ? 'Ativo' : 'Inativo'}
-                </Badge>
+                <div className='flex flex-wrap gap-1'>
+                  <Badge variant={p.active ? 'secondary' : 'outline'}>
+                    {p.active ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                  {p.inUse && (
+                    <Badge
+                      variant='outline'
+                      title='Citado em projetos: não pode ser excluído, apenas desativado.'
+                    >
+                      Em uso
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <div className='flex justify-end gap-1'>
@@ -98,7 +108,7 @@ export function ParliamentariansList() {
                       <Icons.edit aria-hidden /> Editar
                     </Button>
                   )}
-                  {can(parliamentarianActions.delete) && (
+                  {can(parliamentarianActions.delete) && !p.inUse && (
                     <Button size='sm' variant='ghost' onClick={() => setToDelete(p)}>
                       <Icons.trash aria-hidden /> Excluir
                     </Button>

@@ -706,7 +706,7 @@ paths:
     get:
       tags: [Catálogos de referência]
       summary: Lista os parlamentares que destinam emendas
-      description: "Filtros: `chamber` (`state` ou `federal`), `active=true` e `q` (parte do nome). Permissão: `admin::catalog.parliamentarians.read` (concedida ao proponente). Resposta: `[{id, name, chamber, active, createdAt, updatedAt}]`."
+      description: "Filtros: `chamber` (`state` ou `federal`), `active=true` e `q` (parte do nome). Permissão: `admin::catalog.parliamentarians.read` (concedida ao proponente). Resposta: `[{id, name, chamber, active, inUse, createdAt, updatedAt}]`; `inUse` (omitido quando falso) indica que alguma emenda de projeto cita o parlamentar, que então só pode ser desativado."
       security: [{adminBearer: []}]
       parameters:
         - {name: chamber, in: query, schema: {type: string, enum: [state, federal]}}
@@ -743,7 +743,7 @@ paths:
     get:
       tags: [Catálogos de referência]
       summary: Detalha um parlamentar
-      description: "Permissão: `admin::catalog.parliamentarians.read`."
+      description: "Traz `inUse` (omitido quando falso) como na listagem. Permissão: `admin::catalog.parliamentarians.read`."
       security: [{adminBearer: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}

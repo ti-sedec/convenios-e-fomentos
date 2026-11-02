@@ -188,6 +188,35 @@ func TestRecursosValidamFormatoECoerencia(t *testing.T) {
 	assert.Equal(t, 422, fp2.try("funding", funding(map[string]any{"type": "amendment", "amendments": []any{amendment(dep, "1", year, 100)}})).Status, "em outro projeto, o inativo não pode ser escolhido")
 }
 
+func TestParlamentarEmUsoNaoExcluiMasDesativa(t *testing.T) {
+	p := newProjEnv(t)
+	fp := p.newFundingProject("convenio", "municipal_government", nil)
+	used := p.parliamentarian("Fulano", "state")
+	free := p.parliamentarian("Beltrano", "state")
+	inUse := func(id string) bool {
+		for _, it := range p.do("GET", "/api/admin/catalog/parliamentarians", nil, p.boss).list() {
+			if m := it.(map[string]any); m["id"] == id {
+				v, _ := m["inUse"].(bool)
+				return v
+			}
+		}
+		require.Fail(t, "parlamentar fora da listagem", id)
+		return false
+	}
+	assert.False(t, inUse(used))
+
+	fp.save("funding", funding(map[string]any{"type": "amendment", "amendments": []any{amendment(used, "1", time.Now().Year(), 100)}}))
+	assert.True(t, inUse(used))
+	assert.False(t, inUse(free))
+	assert.Equal(t, true, p.do("GET", "/api/admin/catalog/parliamentarians/"+used, nil, p.boss).data()["inUse"])
+
+	assert.Equal(t, "parliamentarian_in_use", p.do("DELETE", "/api/admin/catalog/parliamentarians/"+used, nil, p.boss).errCode())
+	r := p.do("PUT", "/api/admin/catalog/parliamentarians/"+used, map[string]any{"name": "Fulano", "chamber": "state", "active": false}, p.boss)
+	require.Equal(t, 200, r.Status, r.Body)
+	assert.Equal(t, true, r.data()["inUse"], "desativar não tira o vínculo")
+	assert.Equal(t, 204, p.do("DELETE", "/api/admin/catalog/parliamentarians/"+free, nil, p.boss).Status)
+}
+
 func TestContrapartida(t *testing.T) {
 	p := newProjEnv(t)
 	conv := p.newFundingProject("convenio", "municipal_government", nil)
