@@ -65,6 +65,9 @@ type Service struct {
 	// MT-ID, que assina as declarações geradas pelo sistema (opcional; ver SetMTID).
 	mtid mtid.Client
 
+	// Candidatos do bloco "pronto para indicar" da visão geral da fila (ver SetReadyCandidates); zero usa o padrão.
+	readyCandidates int
+
 	// Link dos e-mails para o painel (ver SetNotifier). Os e-mails vão para a caixa de saída (internal/outbox), nunca direto ao SMTP.
 	publicURL string
 }
@@ -325,17 +328,83 @@ type ListParams struct {
 	Actor  Actor
 	Q      string
 	Status string
+	// Access restringe a listagem ao que a pessoa tem como titular (AccessFilterOwner), como membro (AccessFilterMember) ou um dos dois
+	// (AccessFilterAny); vazio não restringe além da permissão. É sempre somado ao filtro de permissão, nunca o substitui.
+	Access string
 	// Filtros da equipe (filas): etapas, situação do enquadramento (pending, confirmed ou none), departamento e analista.
 	Stages     []string
 	Framing    string
 	Department *uuid.UUID
 	Analyst    *uuid.UUID
-	Sort       httpapi.Sort
-	Page       httpapi.Page
+	// IdleDays, quando maior que zero, só deixa os projetos enviados que estão na etapa atual há pelo menos tantos dias corridos.
+	IdleDays int
+	Sort     httpapi.Sort
+	Page     httpapi.Page
 }
 
-// SortColumns é a lista permitida de ordenação.
-var SortColumns = map[string]string{"updated_at": "updated_at", "created_at": "created_at", "title": "title", "institution_name": "institution_name"}
+// Valores de ListParams.Access.
+const (
+	AccessFilterOwner  = "owner"  // só os projetos de que a pessoa é titular
+	AccessFilterMember = "member" // só os projetos em que a pessoa é membro ativo (e não titular)
+	AccessFilterAny    = "all"    // titular ou membro ativo: o que é "dela", mesmo para quem tem leitura ampla
+)
+
+// accessCondition é a condição SQL de ListParams.Access. membership são os projetos em que a pessoa é membro ativo.
+func accessCondition(access string, actor Actor, membership map[uuid.UUID]string, arg func(any) string) string {
+	// Só registra o argumento de quem a condição usa: um argumento sobrando faz o Postgres recusar a consulta.
+	owner := func() string { return "created_by_id = " + arg(actor.ID) }
+	member := func() string {
+		ids := make([]string, 0, len(membership))
+		for id := range membership {
+			ids = append(ids, id.String())
+		}
+		return "id = ANY(" + arg(ids) + "::uuid[])"
+	}
+	switch access {
+	case AccessFilterOwner:
+		return owner()
+	case AccessFilterMember:
+		m := member()
+		return "(" + m + " AND NOT " + owner() + ")"
+	case AccessFilterAny:
+		o := owner()
+		return "(" + o + " OR " + member() + ")"
+	}
+	return ""
+}
+
+// scopeConds são as condições que toda consulta de projetos da pessoa começa por: o filtro da permissão de leitura e, se pedido, o de
+// acesso. Os argumentos de cada uma já vêm numerados ($1...); quem continua a consulta acrescenta os seus depois dos devolvidos.
+// Devolve também os projetos em que a pessoa é membro ativo.
+func (s *Service) scopeConds(ctx context.Context, perm authz.Filter, actor Actor, access string) (conds []string, args []any, member map[uuid.UUID]string, err error) {
+	if !perm.IsTrue() {
+		clause, pargs, err := perm.ToSQL(Schema.Column, 1)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		args = append(args, pargs...)
+		conds = append(conds, clause)
+	}
+	if member, err = s.memberships(ctx, actor); err != nil {
+		return nil, nil, nil, err
+	}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
+	if c := accessCondition(access, actor, member, arg); c != "" {
+		conds = append(conds, c)
+	}
+	return conds, args, member, nil
+}
+
+// stageSinceSQL é desde quando um projeto enviado está na etapa atual, pelo histórico de etapas: o início dos trechos seguidos que têm
+// a etapa de hoje (um enquadramento pendente continua na etapa de análise). Nulo fora de projeto enviado.
+const stageSinceSQL = `(CASE WHEN projects.status = 'submitted' THEN (SELECT min(h.entered_at) FROM project_stage_history h
+	WHERE h.project_id = projects.id AND h.seq > COALESCE((SELECT max(h2.seq) FROM project_stage_history h2
+	WHERE h2.project_id = projects.id AND h2.stage <> projects.stage), 0)) END)`
+
+// SortColumns é a lista permitida de ordenação. stage_since:asc põe primeiro quem está há mais tempo na etapa atual (e por último o
+// que não é projeto enviado).
+var SortColumns = map[string]string{"updated_at": "updated_at", "created_at": "created_at", "title": "title", "institution_name": "institution_name",
+	"stage_since": "COALESCE(" + stageSinceSQL + ", 'infinity'::timestamptz)"}
 
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
@@ -343,18 +412,11 @@ func escapeLike(s string) string {
 
 // List lista os projetos combinando SEMPRE o filtro de permissão com os filtros do usuário.
 func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error) {
-	var conds []string
-	var args []any
-	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-
-	if !p.Perm.IsTrue() {
-		clause, pargs, err := p.Perm.ToSQL(Schema.Column, 1)
-		if err != nil {
-			return nil, 0, err
-		}
-		args = append(args, pargs...)
-		conds = append(conds, clause)
+	conds, args, member, err := s.scopeConds(ctx, p.Perm, p.Actor, p.Access)
+	if err != nil {
+		return nil, 0, err
 	}
+	arg := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	if p.Status != "" {
 		conds = append(conds, "status = "+arg(p.Status))
 	}
@@ -373,6 +435,9 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 	}
 	if p.Analyst != nil {
 		conds = append(conds, "analyst_id = "+arg(*p.Analyst))
+	}
+	if p.IdleDays > 0 {
+		conds = append(conds, stageSinceSQL+" <= now() - make_interval(days => "+arg(p.IdleDays)+")")
 	}
 	if q := strings.TrimSpace(p.Q); q != "" {
 		like := arg("%" + escapeLike(q) + "%")
@@ -394,26 +459,24 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 		COALESCE(sigcon_number, ''), total_amount_cents, COALESCE(code, ''), submitted_at, COALESCE(stage, ''), COALESCE(archive_reason, ''),
 		(SELECT due_at FROM project_complement_requests c WHERE c.project_id = projects.id AND c.status = 'open'), created_by_id, created_at, updated_at,
 		department_id, (SELECT d.name FROM departments d WHERE d.id = projects.department_id), COALESCE(framing_status, ''),
-		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = projects.analyst_id)
-		FROM projects%s ORDER BY %s, id LIMIT %d OFFSET %d`,
-		where, p.Sort.SQL(), p.Page.PageSize, p.Page.Offset())
+		analyst_id, (SELECT NULLIF(trim(a.first_name || ' ' || a.last_name), '') FROM admins a WHERE a.id = projects.analyst_id),
+		EXTRACT(EPOCH FROM now() - %[1]s)::bigint, late_submission
+		FROM projects%[2]s ORDER BY %[3]s, id LIMIT %[4]d OFFSET %[5]d`,
+		stageSinceSQL, where, p.Sort.SQL(), p.Page.PageSize, p.Page.Offset())
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
-	member, err := s.memberships(ctx, p.Actor)
-	if err != nil {
-		return nil, 0, err
-	}
 	out := []Summary{}
 	for rows.Next() {
 		var x Summary
 		var owner uuid.UUID
 		var depID, anID *uuid.UUID
 		var depName, anName *string
+		var idle *int64
 		if err := rows.Scan(&x.ID, &x.Status, &x.Version, &x.Instrument, &x.Title, &x.InstitutionName, &x.InstitutionCNPJ, &x.SigconNumber, &x.TotalCents, &x.Code, &x.SubmittedAt, &x.Stage, &x.ArchiveReason, &x.ComplementDueAt, &owner, &x.CreatedAt, &x.UpdatedAt,
-			&depID, &depName, &x.FramingStatus, &anID, &anName); err != nil {
+			&depID, &depName, &x.FramingStatus, &anID, &anName, &idle, &x.LateSubmission); err != nil {
 			return nil, 0, err
 		}
 		x.IsOwner = owner == p.Actor.ID
@@ -429,6 +492,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 			if anID != nil {
 				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName)}
 			}
+			x.StageSeconds = idle
 		} else {
 			x.FramingStatus = ""
 		}

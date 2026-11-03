@@ -3,6 +3,7 @@ package project
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,6 +64,11 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionProfileUpdate)).Put("/admin/proponent-profile", h.putProfile)
 
 	r.With(g(ActionRead)).Get("/admin/projects", h.list)
+	r.With(g(ActionRead)).Get("/admin/projects/overview", h.overview)
+	r.With(g(ActionRead)).Get("/admin/projects/activity", h.activity)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/overview", h.queueOverview)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/activity", h.queueActivity)
+	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/me", h.queueMe)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -93,6 +99,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionShare)).Delete("/admin/projects/{id}/members/{memberId}", h.revokeMember)
 
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/documents", h.checklist)
+	r.With(g(ActionRead)).Get("/admin/projects/{id}/history", h.history)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/declarations/{code}", h.declarationPreview)
 	r.With(g(ActionUpdate), heavy).Post("/admin/projects/{id}/declarations/{code}/accept", h.acceptDeclaration)
 	r.With(g(ActionUpdate)).Delete("/admin/projects/{id}/declarations/{code}", h.cancelDeclaration)
@@ -165,6 +172,14 @@ func parseStaffFilters(q url.Values, p *ListParams) error {
 	default:
 		bad = append(bad, httpapi.FieldError{Field: "framing", Message: "Valores aceitos: pending, confirmed, none."})
 	}
+	if v := q.Get("idleDays"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 3650 {
+			bad = append(bad, httpapi.FieldError{Field: "idleDays", Message: "Informe um número de dias entre 1 e 3650."})
+		} else {
+			p.IdleDays = n
+		}
+	}
 	for _, f := range []struct {
 		name string
 		dst  **uuid.UUID
@@ -202,6 +217,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "status", Message: "Valores aceitos: draft, submitted, archived."}}}))
 		return
 	}
+	if p.Access = q.Get("access"); p.Access != "" && !validAccess(p.Access) {
+		httpapi.Error(w, r, errAccess())
+		return
+	}
 	if err := parseStaffFilters(q, &p); err != nil {
 		httpapi.Error(w, r, err)
 		return
@@ -212,6 +231,103 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.JSON(w, http.StatusOK, list, page.Meta(total))
+}
+
+func (h *Handler) overview(w http.ResponseWriter, r *http.Request) {
+	read, _ := admin.DecisionFrom(r.Context())
+	access := r.URL.Query().Get("access")
+	if access != "" && !validAccess(access) {
+		httpapi.Error(w, r, errAccess())
+		return
+	}
+	v, err := h.svc.Overview(r.Context(), actorOf(r), read.Filter, access)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
+	read, _ := admin.DecisionFrom(r.Context())
+	q := r.URL.Query()
+	access := q.Get("access")
+	if access != "" && !validAccess(access) {
+		httpapi.Error(w, r, errAccess())
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > maxActivityLimit {
+			httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxActivityLimit) + "."}}}))
+			return
+		}
+		limit = n
+	}
+	v, err := h.svc.Activity(r.Context(), actorOf(r), read.Filter, access, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueOverview(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	scope := r.URL.Query().Get("scope")
+	if scope != "" && scope != QueueScopeTeam && scope != QueueScopeMine {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "scope", Message: "Valores aceitos: team, mine."}}}))
+		return
+	}
+	v, err := h.svc.QueueOverview(r.Context(), actorOf(r), dec.Filter, scope)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueActivity(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	q := r.URL.Query()
+	scope := q.Get("scope")
+	if scope != "" && scope != QueueScopeTeam && scope != QueueScopeMine {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "scope", Message: "Valores aceitos: team, mine."}}}))
+		return
+	}
+	limit := 0
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > maxQueueActivityLimit {
+			httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxQueueActivityLimit) + "."}}}))
+			return
+		}
+		limit = n
+	}
+	v, err := h.svc.QueueActivity(r.Context(), actorOf(r), dec.Filter, scope, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) queueMe(w http.ResponseWriter, r *http.Request) {
+	v, err := h.svc.QueueMe(r.Context(), actorOf(r))
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func validAccess(a string) bool {
+	return a == AccessFilterOwner || a == AccessFilterMember || a == AccessFilterAny
+}
+
+func errAccess() error {
+	return httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "access", Message: "Valores aceitos: all, owner, member."}}})
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -386,6 +502,21 @@ func (h *Handler) checklist(w http.ResponseWriter, r *http.Request) {
 	}
 	read, _ := admin.DecisionFrom(r.Context())
 	v, err := h.svc.Checklist(r.Context(), actorOf(r), id, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	read, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.History(r.Context(), actorOf(r), id, read)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

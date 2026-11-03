@@ -98,6 +98,8 @@ type ChecklistItem struct {
 	Status        string    `json:"status"`
 	// DeclarationStale: a declaração assinada deste item ficou desatualizada porque o cadastro mudou; emita de novo.
 	DeclarationStale bool `json:"declarationStale"`
+	// DeclarationAwaiting: a declaração foi emitida e aguarda a assinatura; não há mais nada a fazer pelo proponente.
+	DeclarationAwaiting bool `json:"declarationAwaiting"`
 }
 
 // ExtraDocument é um documento adicional: o proponente dá o título e a descrição e anexa um único arquivo. Não conta no resumo.
@@ -437,7 +439,10 @@ func (s *Service) fileRights(ctx context.Context, id uuid.UUID, f db.GetProjectF
 		return nil
 	}
 	if f.RequirementCode == nil {
-		return rt.canExtra(f.Locked)
+		if err := rt.canExtra(f.ItemID, f.Locked); err != nil {
+			return err
+		}
+		return s.markAnswered(ctx, s.q, id, cur, "extra", f.ItemID.String())
 	}
 	key := docKey(*f.RequirementCode, f.AmendmentID)
 	_, cl, err := s.viewWithChecklist(ctx, s.q, cur, Actor{})
@@ -814,9 +819,10 @@ func cleanExtra(in ExtraInput) (ExtraInput, error) {
 }
 
 // canExtra: no rascunho tudo vale; depois do envio, só durante uma complementação e só no que ainda não fez parte de uma versão
-// enviada (o adicionado agora). Não depende de a equipe ter devolvido o documento: ele é do proponente.
-func (r rights) canExtra(locked bool) error {
-	if r.draft || (r.open != nil && !locked) {
+// enviada (o adicionado agora) ou no que a equipe devolveu (item é o id do documento adicional; uuid.Nil na criação). O que é novo não
+// depende de a equipe ter devolvido algo: o documento é do proponente.
+func (r rights) canExtra(item uuid.UUID, locked bool) error {
+	if r.draft || (r.open != nil && (!locked || r.open.extras[item.String()])) {
 		return nil
 	}
 	if r.open != nil {
@@ -843,7 +849,7 @@ func (s *Service) lockedExtra(ctx context.Context, q *db.Queries, id uuid.UUID, 
 		return db.ProjectDocumentItem{}, cur, errNotEditable()
 	}
 	if itemID == nil {
-		return db.ProjectDocumentItem{}, cur, rt.canExtra(false)
+		return db.ProjectDocumentItem{}, cur, rt.canExtra(uuid.Nil, false)
 	}
 	item, err := q.GetExtraDocumentItem(ctx, db.GetExtraDocumentItemParams{ID: *itemID, ProjectID: id})
 	if err != nil {
@@ -853,7 +859,10 @@ func (s *Service) lockedExtra(ctx context.Context, q *db.Queries, id uuid.UUID, 
 	if err != nil {
 		return db.ProjectDocumentItem{}, cur, err
 	}
-	return item, cur, rt.canExtra(locked > 0)
+	if err := rt.canExtra(item.ID, locked > 0); err != nil {
+		return db.ProjectDocumentItem{}, cur, err
+	}
+	return item, cur, s.markAnswered(ctx, q, id, cur, "extra", item.ID.String())
 }
 
 func (s *Service) checklistOf(ctx context.Context, id uuid.UUID, actor Actor) (*Checklist, error) {
@@ -927,6 +936,14 @@ func (s *Service) DeleteExtraDocument(ctx context.Context, actor Actor, id, item
 		item, _, err := s.lockedExtra(ctx, q, id, &itemID, upd)
 		if err != nil {
 			return err
+		}
+		// O devolvido que já foi numa versão enviada não se exclui (a versão perderia o arquivo): troca-se o arquivo.
+		locked, err := q.CountItemLockedFiles(ctx, item.ID)
+		if err != nil {
+			return err
+		}
+		if locked > 0 {
+			return httpapi.ErrConflict("extra_document_sent", "Este documento já foi enviado e não pode ser excluído. Troque o arquivo.")
 		}
 		if keys, err = q.ListItemFileKeys(ctx, item.ID); err != nil {
 			return err

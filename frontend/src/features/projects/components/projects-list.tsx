@@ -2,9 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useDeferredValue, useState } from 'react';
+import {
+  debounce,
+  parseAsInteger,
+  parseAsString,
+  parseAsStringLiteral,
+  useQueryStates
+} from 'nuqs';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Icons } from '@/components/icons';
+import { Pager } from '@/components/pager';
 import { AlertModal } from '@/components/modal/alert-modal';
 import { QueryError } from '@/components/query-error';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -21,6 +29,8 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { useCan } from '@/features/auth/session-provider';
+import { overviewQueryOptions } from '@/features/proponent-overview/api/queries';
+import { useDebounce } from '@/hooks/use-debounce';
 import { errorMessage } from '@/lib/errors';
 import { profileQueryOptions, projectKeys, projectsQueryOptions } from '../api/queries';
 import { deleteProject } from '../api/service';
@@ -33,6 +43,9 @@ import {
   statusLabels,
   type ProjectSummary
 } from '../api/types';
+import { accessApi, accessKeys } from '../access-filter';
+import { situationByKey, situations } from '../situations';
+import { AccessFilter } from './access-filter';
 import { DuplicateButton } from './project-actions';
 import { formatBrl, formatCnpj } from '../format';
 
@@ -45,10 +58,25 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 export function ProjectsList() {
   const can = useCan();
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const q = useDeferredValue(search.trim());
-  const [page, setPage] = useState(1);
-  const list = useQuery({ ...projectsQueryOptions({ q, page }), placeholderData: (prev) => prev });
+  const [filters, setFilters] = useQueryStates(
+    {
+      acesso: parseAsStringLiteral(accessKeys).withDefault('todos'),
+      situacao: parseAsString.withDefault(''),
+      q: parseAsString.withDefault(''),
+      page: parseAsInteger.withDefault(1)
+    },
+    { clearOnDefault: true, limitUrlUpdates: debounce(300) }
+  );
+  const q = useDebounce(filters.q.trim(), 300);
+  const access = accessApi(filters.acesso);
+  const situation = situationByKey(filters.situacao);
+  const list = useQuery({
+    ...projectsQueryOptions({ ...situation?.params, access, q, page: filters.page }),
+    placeholderData: (prev) => prev
+  });
+  // Os números do seletor e das situações vêm do resumo (o mesmo da visão geral), não de uma consulta por botão.
+  const overview = useQuery(overviewQueryOptions(access));
+  const totals = useQuery({ ...overviewQueryOptions(), select: (o) => o.byAccess });
   const profile = useQuery({ ...profileQueryOptions(), enabled: can(projectActions.profileRead) });
   const [toDelete, setToDelete] = useState<ProjectSummary | null>(null);
 
@@ -87,12 +115,40 @@ export function ProjectsList() {
           </AlertDescription>
         </Alert>
       )}
+      <AccessFilter
+        value={filters.acesso}
+        onChange={(acesso) => void setFilters({ acesso, page: 1 })}
+        totals={totals.data}
+      />
+      <div className='flex flex-wrap items-center gap-2'>
+        <Button
+          size='sm'
+          variant={situation ? 'outline' : 'secondary'}
+          aria-pressed={!situation}
+          onClick={() => void setFilters({ situacao: '', page: 1 })}
+        >
+          Todas as situações
+        </Button>
+        {situations.map((sit) => (
+          <Button
+            key={sit.key}
+            size='sm'
+            variant={situation?.key === sit.key ? 'secondary' : 'outline'}
+            aria-pressed={situation?.key === sit.key}
+            onClick={() => void setFilters({ situacao: sit.key, page: 1 })}
+          >
+            {sit.label}
+            {overview.data && (
+              <Badge variant='secondary' className='ml-1 tabular-nums'>
+                {sit.count(overview.data.counts)}
+              </Badge>
+            )}
+          </Button>
+        ))}
+      </div>
       <Input
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(1);
-        }}
+        value={filters.q}
+        onChange={(e) => void setFilters({ q: e.target.value, page: 1 })}
         placeholder='Buscar por título, instituição, CNPJ ou nº do SIGCon'
         aria-label='Buscar projetos'
         className='max-w-md'
@@ -113,8 +169,8 @@ export function ProjectsList() {
           {rows.length === 0 && (
             <TableRow>
               <TableCell colSpan={7} className='text-muted-foreground text-center'>
-                {q
-                  ? 'Nenhum projeto encontrado.'
+                {q || situation || filters.acesso !== 'todos'
+                  ? 'Nenhum projeto encontrado com estes filtros.'
                   : 'Você ainda não tem projetos. Use "Novo projeto" para começar.'}
               </TableCell>
             </TableRow>
@@ -203,29 +259,7 @@ export function ProjectsList() {
           ))}
         </TableBody>
       </Table>
-      {meta && meta.pageCount > 1 && (
-        <div className='flex items-center justify-end gap-2 text-sm'>
-          <span className='text-muted-foreground'>
-            Página {meta.page} de {meta.pageCount}
-          </span>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Anterior
-          </Button>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={page >= meta.pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Próxima
-          </Button>
-        </div>
-      )}
+      <Pager meta={meta} onPage={(page) => void setFilters({ page })} />
       <AlertModal
         isOpen={toDelete !== null}
         onClose={() => setToDelete(null)}

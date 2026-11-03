@@ -170,7 +170,7 @@ func (s *Service) Submit(ctx context.Context, actor Actor, id uuid.UUID, in Subm
 			SubmittedByID: &actor.ID, SubmissionIp: actor.IP, Snapshot: raw}); err != nil {
 			return err
 		}
-		if err := s.audit.Record(ctx, q, actor.entry("project.submit", id, map[string]any{"code": code, "late": late, "version": 1})); err != nil {
+		if err := s.transition(ctx, q, row, actor.entry("project.submit", id, map[string]any{"code": code, "late": late, "version": 1})); err != nil {
 			return err
 		}
 		if err := s.notifySubmitted(ctx, q, final); err != nil {

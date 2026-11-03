@@ -19,7 +19,17 @@ const (
 	KeyElectoralDeadline  = "electoral_deadline"
 	KeyLei12082           = "lei_12082"
 	KeyIndirectCostTiers  = "indirect_costs_tiers"
+	KeyStalledAfterDays   = "stalled_after_days"
 )
+
+// StalledAfterDays são os dias, por etapa de trabalho, a partir dos quais um projeto parado aparece na visão geral do Analista.
+// Contam horas corridas com o responsável atual. "Aguardando proponente" não tem limite: já tem o prazo de complementação.
+type StalledAfterDays struct {
+	AwaitingChecklist int `json:"awaiting_checklist"` // fila de entrada, com a equipe
+	InAnalysis        int `json:"in_analysis"`        // com o Analista
+	Framing           int `json:"framing"`            // enquadramento pendente, com o departamento
+	AwaitingOpinion   int `json:"awaiting_opinion"`   // enquadrado, aguardando parecer
+}
 
 // Lei12082 são os limites da Lei Estadual 12.082/2023 (shows e eventos musicais).
 type Lei12082 struct {
@@ -88,6 +98,13 @@ func Specs() []Spec {
 			Validate:    validateIndirectTiers,
 			Defaults: []Default{{Value: `[{"up_to_cents":10000000,"max_pct":20,"cap_cents":1500000},{"up_to_cents":50000000,"max_pct":15,"cap_cents":5000000},{"up_to_cents":null,"max_pct":10,"cap_cents":20000000}]`,
 				ValidFrom: "2026-02-24", Note: "IN Conjunta 002/2026, art. 36-A"}},
+		},
+		{
+			Key: KeyStalledAfterDays, Source: "Decisão da equipe (visão geral do Analista)",
+			Description: "Dias, por etapa, a partir dos quais um projeto é considerado parado: aguardando análise (awaiting_checklist), em análise (in_analysis), em enquadramento (framing) e aguardando parecer (awaiting_opinion). Contam dias corridos com o responsável atual; aguardando o proponente não tem limite, pois já tem o prazo de complementação.",
+			Validate:    validateStalledAfterDays,
+			Defaults: []Default{{Value: `{"awaiting_checklist":2,"in_analysis":7,"framing":5,"awaiting_opinion":15}`,
+				ValidFrom: "2026-01-01", Note: "Ponto de partida; o Supervisor ajusta conforme a rotina da equipe"}},
 		},
 	}
 }
@@ -175,6 +192,22 @@ func validateIndirectTiers(raw json.RawMessage) error {
 		}
 		if t.UpToCents != nil {
 			prev = *t.UpToCents
+		}
+	}
+	return nil
+}
+
+func validateStalledAfterDays(raw json.RawMessage) error {
+	var v StalledAfterDays
+	if err := strictUnmarshal(raw, &v); err != nil {
+		return errors.New("informe awaiting_checklist, in_analysis, framing e awaiting_opinion, em dias")
+	}
+	for _, c := range []struct {
+		name string
+		v    int
+	}{{"awaiting_checklist", v.AwaitingChecklist}, {"in_analysis", v.InAnalysis}, {"framing", v.Framing}, {"awaiting_opinion", v.AwaitingOpinion}} {
+		if c.v < 1 || c.v > 365 {
+			return fmt.Errorf("%s deve ser um número inteiro de dias entre 1 e 365", c.name)
 		}
 	}
 	return nil

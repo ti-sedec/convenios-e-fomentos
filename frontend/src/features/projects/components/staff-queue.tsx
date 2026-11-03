@@ -8,7 +8,7 @@ import { Icons } from '@/components/icons';
 import { Pager } from '@/components/pager';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -30,7 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { departmentsQueryOptions } from '@/features/departments/api/queries';
 import { departmentActions } from '@/features/departments/api/types';
-import { useCan } from '@/features/auth/session-provider';
+import { useCan, useSession } from '@/features/auth/session-provider';
 import { useDebounce } from '@/hooks/use-debounce';
 import { projectsQueryOptions } from '../api/queries';
 import {
@@ -41,10 +41,24 @@ import {
   statusLabels,
   type ProjectSummary
 } from '../api/types';
-import { formatBrl, formatCnpj, formatDateTimeCuiaba } from '../format';
+import { formatBrl, formatCnpj, formatDateTimeCuiaba, formatDuration } from '../format';
 import { queueTabsFor } from '../queues';
 
 const ALL = 'all';
+
+/** "Parado há": o mínimo de dias corridos na etapa atual. Vazio = sem filtro. */
+const idleOptions = [
+  { value: ALL, label: 'Qualquer tempo na etapa' },
+  { value: '3', label: 'Na etapa há 3 dias ou mais' },
+  { value: '7', label: 'Na etapa há 7 dias ou mais' },
+  { value: '15', label: 'Na etapa há 15 dias ou mais' },
+  { value: '30', label: 'Na etapa há 30 dias ou mais' }
+];
+
+const orderOptions = [
+  { value: 'recentes', label: 'Atualizados há menos tempo' },
+  { value: 'parados', label: 'Há mais tempo na etapa' }
+];
 
 /** A situação do projeto na fila: etapa e, quando há, enquadramento e departamento. Sempre em texto, nunca só cor. */
 function Situation({ p }: { p: ProjectSummary }) {
@@ -79,24 +93,33 @@ function Situation({ p }: { p: ProjectSummary }) {
 /** Fila de trabalho da equipe: uma aba por situação, conforme o perfil. */
 export function StaffQueue() {
   const can = useCan();
+  const session = useSession();
   const tabs = useMemo(() => queueTabsFor(can), [can]);
   const [filters, setFilters] = useQueryStates(
     {
       aba: parseAsString.withDefault(''),
+      analista: parseAsString.withDefault(''),
       q: parseAsString.withDefault(''),
       departamento: parseAsString.withDefault(''),
+      parado: parseAsString.withDefault(''),
+      ordem: parseAsString.withDefault('recentes'),
       page: parseAsInteger.withDefault(1)
     },
     { clearOnDefault: true, limitUrlUpdates: debounce(300) }
   );
   const current = tabs.find((t) => t.key === filters.aba) ?? tabs[0];
   const search = useDebounce(filters.q, 300);
+  // "Só os que assumi": é o `?analista=eu` que a visão geral usa nos cartões de "só os meus".
+  const mine = filters.analista === 'eu';
 
   const list = useQuery({
     ...projectsQueryOptions({
       ...current.params,
       q: search,
       department: filters.departamento || undefined,
+      analyst: mine ? session.id : undefined,
+      idleDays: filters.parado ? Number(filters.parado) : undefined,
+      sort: filters.ordem === 'parados' ? 'stage_since:asc' : undefined,
       page: filters.page
     }),
     placeholderData: (prev) => prev
@@ -104,7 +127,7 @@ export function StaffQueue() {
   // Tamanho de cada fila (sem a busca nem o filtro de departamento): uma consulta pequena por aba.
   const counts = useQueries({
     queries: tabs.map((t) => ({
-      ...projectsQueryOptions({ ...t.params, pageSize: 1 }),
+      ...projectsQueryOptions({ ...t.params, analyst: mine ? session.id : undefined, pageSize: 1 }),
       select: (r: { meta?: { total: number } }) => r.meta?.total ?? 0
     }))
   });
@@ -128,6 +151,14 @@ export function StaffQueue() {
           aria-label='Buscar projetos'
           className='max-w-md'
         />
+        <Button
+          size='sm'
+          variant={mine ? 'secondary' : 'outline'}
+          aria-pressed={mine}
+          onClick={() => void setFilters({ analista: mine ? '' : 'eu', page: 1 })}
+        >
+          Só os que assumi
+        </Button>
         {canFilterByDepartment && departmentItems.length > 1 && (
           <Select
             items={departmentItems}
@@ -150,6 +181,42 @@ export function StaffQueue() {
             </SelectContent>
           </Select>
         )}
+        <Select
+          items={idleOptions}
+          value={filters.parado || ALL}
+          onValueChange={(v) => void setFilters({ parado: v === ALL ? '' : (v ?? ''), page: 1 })}
+        >
+          <SelectTrigger aria-label='Filtrar por tempo na etapa'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {idleOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select
+          items={orderOptions}
+          value={filters.ordem}
+          onValueChange={(v) => void setFilters({ ordem: v ?? 'recentes', page: 1 })}
+        >
+          <SelectTrigger aria-label='Ordenar a fila'>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {orderOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <Tabs value={current.key} onValueChange={(v) => void setFilters({ aba: v, page: 1 })}>
@@ -181,6 +248,7 @@ export function StaffQueue() {
                     <TableHead>Valor solicitado</TableHead>
                     <TableHead>Situação</TableHead>
                     <TableHead>Analista</TableHead>
+                    <TableHead>Na etapa há</TableHead>
                     <TableHead>Atualizado em</TableHead>
                     <TableHead className='w-px' />
                   </TableRow>
@@ -188,8 +256,8 @@ export function StaffQueue() {
                 <TableBody>
                   {rows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className='text-muted-foreground text-center'>
-                        {search || filters.departamento
+                      <TableCell colSpan={9} className='text-muted-foreground text-center'>
+                        {search || filters.departamento || filters.parado
                           ? 'Nenhum projeto encontrado com estes filtros.'
                           : 'Nenhum projeto nesta fila.'}
                       </TableCell>
@@ -206,6 +274,11 @@ export function StaffQueue() {
                         </Link>
                         {p.code && (
                           <div className='text-muted-foreground font-mono text-xs'>{p.code}</div>
+                        )}
+                        {p.lateSubmission && (
+                          <Badge variant='outline' className='mt-1'>
+                            Fora do prazo
+                          </Badge>
                         )}
                         {p.sigconNumber && (
                           <div className='text-muted-foreground text-xs'>
@@ -240,6 +313,13 @@ export function StaffQueue() {
                       </TableCell>
                       <TableCell>
                         {p.analyst?.name ?? <span className='text-muted-foreground'>—</span>}
+                      </TableCell>
+                      <TableCell className='tabular-nums'>
+                        {p.stageSeconds === undefined ? (
+                          <span className='text-muted-foreground'>—</span>
+                        ) : (
+                          formatDuration(p.stageSeconds)
+                        )}
                       </TableCell>
                       <TableCell className='tabular-nums'>
                         {formatDateTimeCuiaba(p.updatedAt)}

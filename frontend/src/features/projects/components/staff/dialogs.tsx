@@ -163,16 +163,14 @@ const MAX_MESSAGE = 2000;
 const key = (i: ReviewItem) => `${i.kind}:${i.target}`;
 const MAX_ITEM_NOTE = 500;
 
-/** Devolve ao proponente os itens escolhidos (seções e documentos), com uma observação por item. */
+/** Devolve ao proponente os itens escolhidos (seções, documentos e documentos adicionais), com uma observação por item. */
 export function ComplementDialog({ project, button }: { project: Project; button: OpenButton }) {
   const after = useAfterAction(project);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   // alvo -> observação; presença = item escolhido
   const [chosen, setChosen] = useState<Record<string, string>>({});
-  const candidates = (project.review?.items ?? []).filter(
-    (i): i is ReviewItem & { kind: 'section' | 'document' } => i.kind !== 'extra'
-  );
+  const candidates = project.review?.items ?? [];
   const selected = candidates.filter((i) => key(i) in chosen);
   // Os itens reprovados na conferência já vêm marcados, com a justificativa como observação ao proponente.
   const openDialog = () => {

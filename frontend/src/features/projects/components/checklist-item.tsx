@@ -23,8 +23,16 @@ import {
   requestFileUpload,
   saveJustification
 } from '../api/service';
-import { GENERATED_DECLARATIONS, type ChecklistItem, type DocFile } from '../api/types';
+import {
+  GENERATED_DECLARATIONS,
+  type ChecklistItem,
+  type ComplementItem,
+  type DocFile,
+  type Project
+} from '../api/types';
 import { DeclarationPanel } from './declaration-panel';
+import { ProjectFileViewer, ViewFileButton, useFileViewer } from './project-file-viewer';
+import { ReturnedNote } from './returned-note';
 
 const MAX_FILES = 10;
 
@@ -49,14 +57,19 @@ interface Transfer {
 
 /** Uma exigência do checklist: arquivos anexados, envio de novos arquivos e justificativa de não envio. */
 export function ChecklistItemCard({
-  projectId,
+  project,
   item,
-  editable
+  editable,
+  returned
 }: {
-  projectId: string;
+  project: Project;
   item: ChecklistItem;
   editable: boolean;
+  /** O pedido de complementação aberto devolveu este documento. */
+  returned?: ComplementItem;
 }) {
+  const projectId = project.id;
+  const viewer = useFileViewer();
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
@@ -171,6 +184,7 @@ export function ChecklistItemCard({
           <Badge variant={status.variant}>{status.label}</Badge>
         </div>
       </div>
+      {returned && <ReturnedNote item={returned} />}
       {item.description && <p className='text-muted-foreground text-sm'>{item.description}</p>}
       {item.template && (
         <a
@@ -207,14 +221,17 @@ export function ChecklistItemCard({
               </span>
               <span className='flex shrink-0 gap-1'>
                 {f.status === 'confirmed' && (
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    onClick={() => download.mutate(f)}
-                    aria-label={`Baixar ${f.filename}`}
-                  >
-                    Baixar
-                  </Button>
+                  <>
+                    <ViewFileButton file={f} onClick={() => viewer.show(f.id)} />
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      onClick={() => download.mutate(f)}
+                      aria-label={`Baixar ${f.filename}`}
+                    >
+                      Baixar
+                    </Button>
+                  </>
                 )}
                 {editable && (
                   <Button
@@ -353,6 +370,18 @@ export function ChecklistItemCard({
         confirmLabel='Remover'
         cancelLabel='Cancelar'
       />
+      {item.files.length > 0 && (
+        <ProjectFileViewer
+          project={project}
+          kind='document'
+          target={item.amendmentId ? `${item.code}@${item.amendmentId}` : item.code}
+          label={item.name}
+          files={item.files}
+          fileId={viewer.fileId}
+          open={viewer.open}
+          onOpenChange={viewer.setOpen}
+        />
+      )}
     </li>
   );
 }

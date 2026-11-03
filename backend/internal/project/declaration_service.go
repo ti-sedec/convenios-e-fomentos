@@ -422,10 +422,17 @@ func (s *Service) markStaleDeclarations(ctx context.Context, q *db.Queries, r db
 	if err != nil {
 		return err
 	}
+	awaiting := map[string]bool{}
 	for _, rec := range recs {
-		if rec.Status == DeclSigned {
+		switch rec.Status {
+		case DeclSigned:
 			signed[rec.RequirementCode] = rec
+		case DeclAwaiting:
+			awaiting[rec.RequirementCode] = true
 		}
+	}
+	for i := range cl.Items {
+		cl.Items[i].DeclarationAwaiting = awaiting[cl.Items[i].Code]
 	}
 	if len(signed) == 0 {
 		return nil

@@ -227,6 +227,8 @@ export interface ChecklistItem {
   status: 'missing' | 'done' | 'justified';
   /** A declaração assinada deste item ficou desatualizada porque o cadastro mudou: emita de novo. */
   declarationStale: boolean;
+  /** A declaração foi emitida e aguarda a assinatura: nada a fazer pelo proponente. */
+  declarationAwaiting: boolean;
 }
 
 /** Documento adicional do proponente: título, descrição opcional e um único arquivo. Não conta nos obrigatórios. */
@@ -317,6 +319,8 @@ export interface ProjectSummary {
   status: ProjectStatus;
   code: string;
   submittedAt: string | null;
+  /** O envio passou da data-limite eleitoral. */
+  lateSubmission: boolean;
   stage: ProjectStage | '';
   archiveReason: ArchiveReason | '';
   complementDueAt: string | null;
@@ -335,6 +339,8 @@ export interface ProjectSummary {
   department?: DepartmentRef;
   framingStatus?: FramingStatus;
   analyst?: AnalystInfo;
+  /** Há quanto tempo (horas corridas) o projeto enviado está na etapa atual. */
+  stageSeconds?: number;
 }
 
 export const instrumentLabels: Record<Instrument, string> = {
@@ -354,6 +360,49 @@ export const stageLabels: Record<ProjectStage, string> = {
   awaiting_proponent: 'Aguardando correções do proponente',
   awaiting_opinion: 'Aguardando parecer'
 };
+
+// ---- Histórico de etapas (equipe) ----
+
+/** Com quem o projeto estava num trecho do histórico. */
+export type HistoryHolder = 'team' | 'analyst' | 'department' | 'proponent' | 'none';
+
+export const historyHolderLabels: Record<HistoryHolder, string> = {
+  team: 'Equipe (sem analista)',
+  analyst: 'Analista',
+  department: 'Departamento',
+  proponent: 'Proponente',
+  none: 'Arquivado'
+};
+
+export interface HistorySegment {
+  seq: number;
+  status: ProjectStatus;
+  stage: ProjectStage;
+  holder: HistoryHolder;
+  framingStatus?: FramingStatus;
+  analyst?: { id: string; name: string };
+  department?: { id: string; name: string };
+  enteredAt: string;
+  /** Nulo no trecho atual. */
+  leftAt: string | null;
+  durationSeconds: number;
+  enteredBy?: { type: string; name?: string };
+  /** Ação que abriu o trecho, igual à do registro de auditoria (project.submit, project.resubmit…). */
+  transition: string;
+  auditLogId?: string;
+  /** Trecho criado pela migração para um projeto que já existia: a entrada é aproximada. */
+  estimated: boolean;
+}
+
+export interface StageHistory {
+  segments: HistorySegment[];
+  summary: {
+    sinceSubmissionSeconds: number;
+    currentStageSeconds: number;
+    byHolder: Partial<Record<HistoryHolder, number>>;
+    byStage: Partial<Record<ProjectStage, number>>;
+  };
+}
 
 // ---- Conferência e enquadramento (equipe) ----
 
@@ -463,10 +512,10 @@ export const archiveReasonLabels: Record<ArchiveReason, string> = {
   other: 'Decisão da equipe'
 };
 
-/** Item devolvido pela equipe: uma seção ou um documento do checklist. */
+/** Item devolvido pela equipe: uma seção, um documento do checklist ou um documento adicional. */
 export interface ComplementItem {
-  kind: 'section' | 'document';
-  /** Seção: proponent, institution, proposal, funding ou document-options. Documento: código, ou código@id-da-emenda. */
+  kind: 'section' | 'document' | 'extra';
+  /** Seção: proponent, institution, proposal, funding ou document-options. Documento: código, ou código@id-da-emenda. Adicional: id. */
   target: string;
   label: string;
   note: string;

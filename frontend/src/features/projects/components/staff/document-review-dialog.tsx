@@ -52,19 +52,23 @@ export function DocumentReviewDialog({
   project,
   item,
   canReview,
+  initialFileId,
   open,
   onOpenChange
 }: {
   project: Project;
   item: ReviewItem;
   canReview: boolean;
+  /** Arquivo a abrir primeiro (quem chega pelo botão de um arquivo); sem ele abre o primeiro ainda não visto. */
+  initialFileId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const qc = useQueryClient();
   const firstPending = item.files.find((f) => !f.opened) ?? item.files[0];
   const [chosen, setChosen] = useState<string | undefined>();
-  const fileId = item.files.some((f) => f.id === chosen) ? chosen : firstPending?.id;
+  const wanted = [chosen, initialFileId].find((id) => item.files.some((f) => f.id === id));
+  const fileId = wanted ?? firstPending?.id;
   const file = item.files.find((f) => f.id === fileId);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');

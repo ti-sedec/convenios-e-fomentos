@@ -686,11 +686,27 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/admin/catalog/zip-codes/{cep}:
+    get:
+      tags: [Catálogos de referência]
+      summary: Consulta o endereço de um CEP
+      description: "Consulta o ViaCEP (gratuito) pela API, com cache em memória, para preencher rua, bairro, município e UF. `cep` aceita 8 dígitos com ou sem hífen. `ibgeCode` é o mesmo código de `GET /admin/catalog/municipalities`. Limitada por IP (`RATE_LIMIT_CEP_PER_MINUTE`). Permissão: `admin::catalog.municipalities.read` (concedida ao proponente). Resposta: `{zip, street, district, city, uf, ibgeCode}`; `street` e `district` vêm vazios em CEPs gerais de município. Erros: `bad_request` (400), `cep_not_found` (404) e `cep_unavailable` (502, o ViaCEP não respondeu: o usuário preenche à mão)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: cep, in: path, required: true, schema: {type: string, maxLength: 12}}
+      responses:
+        "200": {description: OK}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
   /api/admin/catalog/parliamentarians:
     get:
       tags: [Catálogos de referência]
       summary: Lista os parlamentares que destinam emendas
-      description: "Filtros: `chamber` (`state` ou `federal`), `active=true` e `q` (parte do nome). Permissão: `admin::catalog.parliamentarians.read` (concedida ao proponente). Resposta: `[{id, name, chamber, active, createdAt, updatedAt}]`."
+      description: "Filtros: `chamber` (`state` ou `federal`), `active=true` e `q` (parte do nome). Permissão: `admin::catalog.parliamentarians.read` (concedida ao proponente). Resposta: `[{id, name, chamber, active, inUse, createdAt, updatedAt}]`; `inUse` (omitido quando falso) indica que alguma emenda de projeto cita o parlamentar, que então só pode ser desativado."
       security: [{adminBearer: []}]
       parameters:
         - {name: chamber, in: query, schema: {type: string, enum: [state, federal]}}
@@ -727,7 +743,7 @@ paths:
     get:
       tags: [Catálogos de referência]
       summary: Detalha um parlamentar
-      description: "Permissão: `admin::catalog.parliamentarians.read`."
+      description: "Traz `inUse` (omitido quando falso) como na listagem. Permissão: `admin::catalog.parliamentarians.read`."
       security: [{adminBearer: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -939,16 +955,18 @@ paths:
     get:
       tags: [Projetos]
       summary: Lista projetos
-      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (com ou sem pontuação). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`) e `analyst {id, name}` (ausentes quando não se aplicam); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
+      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (com ou sem pontuação). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, lateSubmission (o envio passou da data-limite eleitoral), stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`), `analyst {id, name}` (ausentes quando não se aplicam) e `stageSeconds` (há quanto tempo, em segundos corridos, o projeto enviado está na etapa atual); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst`, `idleDays` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
       security: [{adminBearer: []}]
       parameters:
         - {name: q, in: query, schema: {type: string}}
         - {name: status, in: query, schema: {type: string, enum: [draft, submitted, archived]}}
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}, description: "Restringe ao que é da própria pessoa: `owner` (titular), `member` (convidada por CPF, com acesso ativo, sem ser titular) ou `all` (um dos dois). Sem o parâmetro, vale só a permissão de leitura. Soma-se a ela, nunca a amplia: quem tem leitura ampla (equipe) recebe, com `access`, só o que é dela, em geral nada."}
         - {name: stage, in: query, schema: {type: string}, description: "Uma ou mais etapas separadas por vírgula: `awaiting_checklist`, `in_analysis`, `awaiting_proponent`, `awaiting_opinion`."}
         - {name: framing, in: query, schema: {type: string, enum: [pending, confirmed, none]}, description: "Situação do enquadramento. `none` = sem enquadramento em andamento."}
         - {name: department, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo departamento atual é este."}
         - {name: analyst, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo analista responsável é este."}
-        - {name: sort, in: query, schema: {type: string, enum: [updated_at, created_at, title, institution_name]}, description: "Prefixo `-` para decrescente. Padrão: `-updated_at`."}
+        - {name: idleDays, in: query, schema: {type: integer, minimum: 1, maximum: 3650}, description: "Só projetos enviados que estão na etapa atual há pelo menos este número de dias corridos (pelo histórico de etapas; o enquadramento pendente continua na etapa de análise)."}
+        - {name: sort, in: query, schema: {type: string, enum: [updated_at, created_at, title, institution_name, stage_since]}, description: "Formato `campo:direção` (ex.: `stage_since:asc`). Padrão: `updated_at:desc`. `stage_since` ordena por quando o projeto entrou na etapa atual: ascendente põe primeiro quem está há mais tempo e, por último, o que não é projeto enviado."}
         - {name: page, in: query, schema: {type: integer, minimum: 1}}
         - {name: pageSize, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
       responses:
@@ -965,13 +983,77 @@ paths:
         "201": {description: Criado}
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/overview:
+    get:
+      tags: [Projetos]
+      summary: Resumo dos projetos do proponente (visão geral)
+      description: "Resume o que é **da própria pessoa** (titular ou membro ativo), mesmo para quem tem leitura ampla: soma-se ao filtro da permissão de leitura, nunca o amplia. Permissão: `admin::projects.read`. `access` (`all` padrão, `owner`, `member`) filtra tudo, menos `byAccess`. Resposta: `counts {draft, awaiting_checklist, in_analysis, awaiting_proponent, awaiting_opinion, archived}` (um projeto conta em uma só; enquadramento pendente conta em `in_analysis`; arquivado só em `archived`), `byAccess {owner, member}` (sem o filtro de acesso, para o seletor), `activeCents {total, convenio, fomento}` (projetos enviados e ativos, sem rascunho nem arquivado) e `attention` (até 20 itens, por urgência): `complement_open` (`dueAt`, `overdue`, `items`; o resumo não arquiva o projeto vencido), `signature_pending` (`declaration`), `draft` (`updatedAt`; `blocking` só nos 5 mais recentes) e `shared_new` (`level`, `invitedBy`; convite ainda não aberto, vale para qualquer nível). Os três primeiros só para quem pode agir (titular ou membro com edição). Todo item traz `projectId`, `title` e, se enviado, `code`."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/activity:
+    get:
+      tags: [Projetos]
+      summary: Atividade recente dos projetos do proponente
+      description: "Marcos dos projetos **da própria pessoa** (titular ou membro ativo, mesma regra de `/admin/projects/overview`), do mais novo ao mais antigo, escritos para o proponente. Permissão: `admin::projects.read`. Só entram os marcos de uma lista permitida; o que é interno da equipe (departamento, enquadramento recusado, conferência, abertura de arquivos) nunca aparece. O titular vê tudo desde a criação do projeto; o membro, só o que aconteceu depois de receber o acesso, e o convite aparece só para ele. Resposta: `[{id, at, kind, by, projectId, title, code, data}]`. `kind`: `submitted` (`data.late`), `analysis_started`, `complement_requested` (`data.items`, `data.dueAt`), `resubmitted` (`data.version`), `awaiting_opinion`, `archived` (`data.reason`: `complement_deadline`, `withdrawn`, `denied`, `missing_documents` ou `other`) e `shared_with_you` (`data.level`). `by`: `you`, `member` (titular ou outro membro), `team` ou `system`, sem nomes. Sem paginação."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 30, default: 10}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/overview:
+    get:
+      tags: [Projetos]
+      summary: Resumo da fila do Analista (visão geral)
+      description: "Contagens por etapa e os blocos do que pede a ação do Analista. Permissão: `admin::projects.start-analysis`. O alcance é a condição dessa permissão somada a projeto enviado ou arquivado (rascunho nunca). `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); o bloco `entry` ignora `mine`, pois projeto não assumido não tem dono. Resposta: `counts {awaiting_checklist, in_analysis, framing_pending, awaiting_proponent, awaiting_opinion, archived_30d}` (enquadramento pendente conta só em `framing_pending`); `limits {awaiting_checklist, in_analysis, framing, awaiting_opinion}` (dias vigentes do parâmetro `stalled_after_days`; zero = sem regra, nada é marcado como parado); `blocks {refused, resubmitted, entry, ready, stalled, deadlines}`, cada um `{total, items}` com até 15 itens do mais urgente para o menos. Item: `projectId`, `title`, `code`, `institution`, `sinceSeconds` (tempo com o responsável atual, do trecho aberto do histórico), `stage` (etapa de trabalho: `awaiting_checklist`, `in_analysis`, `framing`, `awaiting_opinion`), `late`, `analyst`; `entry` traz `overLimit`; `stalled` traz `holder` (`team`, `analyst`, `department`) e `limitDays`, e **não** inclui \"aguardando proponente\" (tem prazo próprio); `refused` traz `department` e `refusedAt` (projeto em análise, sem departamento, cuja última rodada de enquadramento foi recusada); `ready` são os em análise, sem departamento, com **todos** os itens da conferência aprovados (falta indicar o departamento); a conferência é calculada só para os 30 candidatos mais antigos, então `total` conta os prontos entre eles e `capped: true` avisa que havia mais candidatos (a tela mostra \"N ou mais\"); `resubmitted` são os em análise cujo último trecho veio do reenvio do proponente e sem nenhuma conferência depois dele; `deadlines` traz `dueAt` e `overdue` (complementação que vence em até 48 horas). Nenhum dado pessoal do proponente (CPF, e-mail, telefone)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [team, mine]}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/activity:
+    get:
+      tags: [Projetos]
+      summary: Atividade recente da fila (equipe)
+      description: "Marcos dos projetos que o Analista enxerga (a condição da permissão somada a projeto enviado ou arquivado), do mais novo ao mais antigo, escritos para a equipe. Permissão: `admin::projects.start-analysis`. `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); `limit` de 1 a 30 (padrão 15), sem paginação. Só entram os marcos de uma lista permitida própria da equipe (diferente da do proponente): `submitted` (`data.late`), `resubmitted` (`data.version`), `analysis_started`, `complement_requested` (`data.items`, `data.dueAt`), `department_assigned`, `framing_confirmed` e `framing_refused` (`data.department`) e `archived` (`data.reason`: `complement_deadline`, `withdrawn`, `denied`, `missing_documents` ou `other`). Fora: conferência de itens, abertura de arquivos, edições e compartilhamento. Resposta: `[{id, at, kind, by {type: admin|proponent|system, name, self}, projectId, title, code, data}]`. `by.name` só existe para a equipe (`admin`); o proponente (titular ou membro) aparece só como tipo, sem nome nem CPF; `self` marca a própria pessoa. A justificativa da recusa do enquadramento **não** vai no feed (fica no detalhe do projeto)."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [team, mine]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 30, default: 15}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/queue/me:
+    get:
+      tags: [Projetos]
+      summary: Meu resumo (o que eu fiz nos últimos 7 e 30 dias)
+      description: "Quantas análises a pessoa assumiu, quantos pedidos de complementação fez, quantos departamentos indicou e quantos projetos arquivou, nos últimos 7 e 30 dias, pela auditoria. Permissão: `admin::projects.start-analysis`. **Devolve sempre e somente os números de quem chama**: a rota não aceita parâmetro de pessoa, e nenhum perfil consulta os números de outra. Desistência (do proponente) e arquivamento pelo sistema não contam como arquivamento. Resposta: `{last7: {assumed, complements, indicated, archived}, last30: {...}}`."
+      security: [{adminBearer: []}]
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]
       summary: Detalha um projeto
       description: |
         Permissão: `admin::projects.read`. Um projeto fora do alcance da permissão responde 404.
-        Resposta: `{id, status, version, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt, proponent, institution, proposal, funding, documentOptions, documents {total, done, justified, missing, requiredTotal, requiredMissing}, code, stage, submittedAt, lateSubmission, complement, archive, originProjectId, originCode, issues}`. `code`, `stage` (`awaiting_checklist|in_analysis|awaiting_proponent`) e `submittedAt` só existem depois do envio; `complement` é o pedido de complementação aberto ou o mais recente `{number, status (open|answered|expired|cancelled), requestedAt, dueAt, overdue, message, items [{kind, target, label, note, answered}]}`; `archive` (`{at, reason (complement_deadline|withdrawn|denied|missing_documents|other), note}`) só existe em projeto arquivado. Projeto com o prazo de complementação vencido é arquivado na hora em que é aberto ou alterado (e pela rotina periódica).
+        Resposta: `{id, status, version, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt, proponent, institution, proposal, funding, documentOptions, documents {total, done, justified, missing, requiredTotal, requiredMissing}, code, stage, submittedAt, lateSubmission, complement, archive, originProjectId, originCode, issues}`. `code`, `stage` (`awaiting_checklist|in_analysis|awaiting_proponent`) e `submittedAt` só existem depois do envio; `complement` é o pedido de complementação aberto ou o mais recente `{number, status (open|answered|expired|cancelled), requestedAt, dueAt, overdue, message, items [{kind (section|document|extra), target, label, note, answered}]}`; `archive` (`{at, reason (complement_deadline|withdrawn|denied|missing_documents|other), note}`) só existe em projeto arquivado. Projeto com o prazo de complementação vencido é arquivado na hora em que é aberto ou alterado (e pela rotina periódica).
         `version` deve ser enviada em toda gravação de seção (controle de edição simultânea).
         `issues` lista as pendências: `{section, field, code, severity (block|warn), message}`. O rascunho aceita dados incompletos;
         as pendências `block` são o que o envio (fase seguinte) vai exigir.
@@ -1327,6 +1409,29 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/history:
+    get:
+      tags: [Projetos]
+      summary: Histórico de etapas do projeto (só equipe)
+      description: |
+        Linha do tempo de por onde o projeto passou e com quem estava, com os totais. Interno da equipe: o titular e os membros recebem 404,
+        como nos demais campos internos. Rascunho não tem histórico (`segments` vazio).
+        Resposta: `{segments, summary}`.
+        Cada trecho: `{seq, status, stage, holder (team|analyst|department|proponent|none), framingStatus, analyst {id,name}, department {id,name},
+        enteredAt, leftAt (nulo no trecho atual), durationSeconds, enteredBy {type,name}, transition (ação que abriu o trecho, igual à do
+        registro de auditoria), auditLogId, estimated}`. O trecho atual usa o instante da consulta. `holder: none` é o arquivamento e não
+        conta tempo. `estimated: true` é o trecho criado pela migração para um projeto que já existia (entrada aproximada).
+        `summary`: `{sinceSubmissionSeconds, currentStageSeconds, byHolder {holder: segundos}, byStage {etapa: segundos}}`, em horas corridas;
+        depois do arquivamento o tempo para de contar. `currentStageSeconds` soma os trechos seguidos da etapa atual.
+        Permissão: `admin::projects.read` (404 em projeto fora do alcance).
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}/declarations/{code}:
     get:
       tags: [Projetos]
@@ -1340,7 +1445,7 @@ paths:
         `ready: false` quando faltam dados (`issues` com `section: declaration`); `paramsSha256` resume o conteúdo e muda se o cadastro mudar.
         `current` é a última emissão (nulo se nunca houve): `{id, status (awaiting_signature|signed|rejected|expired|cancelled|superseded), acceptedAt,
         requestedBySigner, signerCpf (mascarado), signedAt, fileId, stale}`. `stale: true` quando o cadastro mudou depois da emissão: a declaração
-        deixa de valer e o item do checklist volta a faltar (`declarationStale`). Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o
+        deixa de valer e o item do checklist volta a faltar (`declarationStale`). `declarationAwaiting: true` no item enquanto a emissão aguarda a assinatura. Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o
         signatário já assinou, traz o arquivo assinado para o checklist.
         Código sem modelo ou projeto fora do alcance: 404. Declaração que não se aplica ao projeto: 409 `document_not_applicable`.
         Permissão: `admin::projects.read`.
@@ -1732,8 +1837,9 @@ paths:
       description: |
         Devolve itens ao proponente: o projeto vai de `awaiting_checklist` ou `in_analysis` para `awaiting_proponent` e o prazo começa a correr:
         `complement_days` dias corridos (padrão 3), até 23:59:59 de Cuiabá do último dia. Cada item é uma seção (`kind: section`; `target`:
-        `proponent|institution|proposal|funding|document-options`) ou um documento do checklist (`kind: document`; `target`: `codigo` ou `codigo@id-da-emenda`),
-        com uma nota opcional. Enquanto o pedido está aberto o proponente só altera o que foi devolvido (e documentos que ficarem pendentes);
+        `proponent|institution|proposal|funding|document-options`) um documento do checklist (`kind: document`; `target`: `codigo` ou `codigo@id-da-emenda`) ou um documento adicional (`kind: extra`; `target`: id do documento),
+        com uma nota opcional. Enquanto o pedido está aberto o proponente só altera o que foi devolvido (e documentos que ficarem pendentes;
+        num documento adicional devolvido ele troca o arquivo e edita título e descrição, mas não o exclui: 409 `extra_document_sent`);
         o resto responde 409 `not_returned`. O proponente recebe um e-mail com o prazo e os itens.
         Erros: 409 `project_not_submitted` (rascunho ou arquivado), 409 `project_stage_invalid` (já aguardando o proponente), 422 (itens inválidos).
         Permissão: `admin::projects.request-complement`. Responde o projeto completo (`complement` traz o pedido).
@@ -1757,7 +1863,7 @@ paths:
                     type: object
                     required: [kind, target]
                     properties:
-                      kind: {type: string, enum: [section, document]}
+                      kind: {type: string, enum: [section, document, extra]}
                       target: {type: string}
                       note: {type: string, maxLength: 500}
       responses:

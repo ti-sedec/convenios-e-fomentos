@@ -405,6 +405,42 @@ func (q *Queries) ListParliamentarians(ctx context.Context, arg ListParliamentar
 	return items, nil
 }
 
+const listParliamentariansInUse = `-- name: ListParliamentariansInUse :many
+SELECT p.id FROM parliamentarians p
+WHERE EXISTS (SELECT 1 FROM project_amendments a WHERE a.parliamentarian_id = p.id)
+`
+
+func (q *Queries) ListParliamentariansInUse(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listParliamentariansInUse)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const parliamentarianInUse = `-- name: ParliamentarianInUse :one
+SELECT EXISTS (SELECT 1 FROM project_amendments WHERE parliamentarian_id = $1)
+`
+
+func (q *Queries) ParliamentarianInUse(ctx context.Context, parliamentarianID *uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, parliamentarianInUse, parliamentarianID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const updateEntityType = `-- name: UpdateEntityType :one
 UPDATE entity_types
 SET name = $2, nature = $3, non_profit = $4, active = $5, sort_order = $6, updated_at = now()

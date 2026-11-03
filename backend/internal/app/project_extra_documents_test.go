@@ -133,3 +133,34 @@ func TestDocumentoAdicionalEnviadoFicaTravado(t *testing.T) {
 	assert.Equal(t, 409, p.do("DELETE", docsPath(fp.id, "/extra/", id), nil, p.maria).Status)
 	assert.Len(t, fp.extras(p.maria), 1)
 }
+
+func TestDocumentoAdicionalDevolvidoPodeTrocarOArquivo(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	analyst := p.analyst()
+	fp := p.completeProject("2500/2026")
+	id, _ := fp.createExtra(p.maria, "Anexo", "")
+	require.Equal(t, 201, fp.uploadExtra(p.maria, id).Status)
+	require.Equal(t, 200, fp.submit(p.maria, true).Status)
+	extra := func(note string) map[string]any { return map[string]any{"kind": "extra", "target": id, "note": note} }
+
+	// A equipe devolve o documento adicional com uma observação; o alvo precisa existir.
+	bad := p.complement(analyst, fp.id, map[string]any{"items": []any{map[string]any{"kind": "extra", "target": "00000000-0000-0000-0000-000000000000"}}})
+	assert.Equal(t, 422, bad.Status, bad.Body)
+	require.Equal(t, 200, p.complement(analyst, fp.id, map[string]any{"items": []any{extra("arquivo ilegível")}}).Status)
+	item := p.project(p.maria, fp.id).data()["complement"].(map[string]any)["items"].([]any)[0].(map[string]any)
+	assert.Equal(t, "Anexo", item["label"])
+	assert.Equal(t, false, item["answered"])
+
+	// Devolvido, o documento já enviado aceita nova descrição e troca de arquivo, mas não é excluído (a versão enviada o guarda).
+	assert.Equal(t, 200, p.do("PUT", docsPath(fp.id, "/extra/", id), map[string]any{"title": "Anexo", "description": "legível"}, p.maria).Status)
+	old := fp.extras(p.maria)[0].(map[string]any)["file"].(map[string]any)["id"].(string)
+	require.Equal(t, 204, p.do("DELETE", docsPath(fp.id, "/files/", old), nil, p.maria).Status)
+	require.Equal(t, 201, fp.uploadExtra(p.maria, id).Status)
+	assert.NotEqual(t, old, fp.extras(p.maria)[0].(map[string]any)["file"].(map[string]any)["id"])
+	assert.Equal(t, "extra_document_sent", p.do("DELETE", docsPath(fp.id, "/extra/", id), nil, p.maria).errCode())
+
+	// A gravação marcou o item como respondido, e o reenvio é aceito.
+	item = p.project(p.maria, fp.id).data()["complement"].(map[string]any)["items"].([]any)[0].(map[string]any)
+	assert.Equal(t, true, item["answered"])
+}

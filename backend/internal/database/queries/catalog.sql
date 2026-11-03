@@ -63,6 +63,13 @@ ORDER BY lower(name), chamber;
 -- name: GetParliamentarian :one
 SELECT * FROM parliamentarians WHERE id = $1;
 
+-- name: ListParliamentariansInUse :many
+SELECT p.id FROM parliamentarians p
+WHERE EXISTS (SELECT 1 FROM project_amendments a WHERE a.parliamentarian_id = p.id);
+
+-- name: ParliamentarianInUse :one
+SELECT EXISTS (SELECT 1 FROM project_amendments WHERE parliamentarian_id = $1);
+
 -- name: GetParliamentarianForUpdate :one
 SELECT * FROM parliamentarians WHERE id = $1 FOR UPDATE;
 

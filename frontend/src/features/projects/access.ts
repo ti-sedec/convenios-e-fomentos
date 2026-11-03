@@ -1,5 +1,5 @@
 import { projectActions } from './api/types';
-import type { ChecklistItem, Complement, Project, SectionKey } from './api/types';
+import type { ChecklistItem, Complement, ComplementItem, Project, SectionKey } from './api/types';
 
 /**
  * O que o proponente pode alterar agora (espelho da regra do servidor, que é a autoridade): no rascunho, tudo; depois do envio, só o que a
@@ -14,8 +14,19 @@ export interface Access {
   step: (s: SectionKey) => boolean;
   /** O documento do checklist pode ser alterado. */
   document: (item: ChecklistItem) => boolean;
-  /** Documentos adicionais: criar (locked = false) ou alterar um existente. Não dependem de a equipe ter devolvido algo. */
-  extra: (locked: boolean) => boolean;
+  /**
+   * Documentos adicionais: criar (sem id), alterar um que ainda não foi enviado ou, com o id, alterar um enviado que a equipe devolveu.
+   * O que é novo não depende de a equipe ter devolvido algo.
+   */
+  extra: (locked: boolean, id?: string) => boolean;
+  /** O item que a equipe devolveu (com a observação), se houver pedido aberto. */
+  returned: (kind: ComplementItem['kind'], target: string) => ComplementItem | undefined;
+  /** O pedido aberto devolveu este documento do checklist. */
+  returnedDocument: (
+    item: Pick<ChecklistItem, 'code' | 'amendmentId'>
+  ) => ComplementItem | undefined;
+  /** Itens devolvidos que pertencem a esta etapa. */
+  returnedIn: (s: SectionKey) => ComplementItem[];
 }
 
 const sectionTarget: Partial<Record<SectionKey, string>> = {
@@ -25,6 +36,20 @@ const sectionTarget: Partial<Record<SectionKey, string>> = {
   funding: 'funding',
   documents: 'document-options'
 };
+
+/** A etapa do cadastro onde se corrige o item devolvido. */
+export function stepOfItem(item: Pick<ComplementItem, 'kind' | 'target'>): SectionKey {
+  if (item.kind !== 'section') return 'documents';
+  const step = Object.entries(sectionTarget).find(([, target]) => target === item.target)?.[0];
+  return (step as SectionKey | undefined) ?? 'proponent';
+}
+
+/** O id do elemento da aba Documentos onde está o item devolvido (para levar a pessoa até ele); seção não tem. */
+export function focusIdOf(item: Pick<ComplementItem, 'kind' | 'target'>): string | undefined {
+  if (item.kind === 'extra') return `extra-${item.target}`;
+  if (item.kind === 'document') return `doc-${item.target.replace('@', '-')}`;
+  return undefined;
+}
 
 export function documentKey(item: Pick<ChecklistItem, 'code' | 'amendmentId'>) {
   return item.amendmentId ? `${item.code}@${item.amendmentId}` : item.code;
@@ -41,7 +66,10 @@ export function accessOf(project: Project, base: boolean, now: number): Access {
     new Date(c.dueAt).getTime() > now
       ? c
       : null;
-  const returned = new Set(open?.items.map((i) => `${i.kind}:${i.target}`));
+  const items = open?.items ?? [];
+  const returned = new Set(items.map((i) => `${i.kind}:${i.target}`));
+  const find = (kind: ComplementItem['kind'], target: string) =>
+    items.find((i) => i.kind === kind && i.target === target);
   const draft = base && project.status === 'draft';
   return {
     draft,
@@ -52,7 +80,7 @@ export function accessOf(project: Project, base: boolean, now: number): Access {
       if (s === 'documents') {
         return (
           returned.has('section:document-options') ||
-          [...returned].some((k) => k.startsWith('document:')) ||
+          [...returned].some((k) => k.startsWith('document:') || k.startsWith('extra:')) ||
           project.documents.missing > 0
         );
       }
@@ -63,7 +91,11 @@ export function accessOf(project: Project, base: boolean, now: number): Access {
     document: (item) =>
       draft ||
       (!!open && (returned.has(`document:${documentKey(item)}`) || item.status === 'missing')),
-    extra: (locked) => draft || (!!open && !locked)
+    extra: (locked, id) =>
+      draft || (!!open && (!locked || (id !== undefined && returned.has(`extra:${id}`)))),
+    returned: find,
+    returnedDocument: (item) => find('document', documentKey(item)),
+    returnedIn: (s) => items.filter((i) => stepOfItem(i) === s)
   };
 }
 

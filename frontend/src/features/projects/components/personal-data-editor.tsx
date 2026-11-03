@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { UFS } from '@/features/municipalities/api/queries';
+import { useZipLookup } from '@/features/zip-codes/use-zip-lookup';
 import { formatZip } from '../format';
 import type { MaritalStatus, PersonalData } from '../api/types';
 import { MunicipalitySelect } from './municipality-select';
@@ -43,6 +46,20 @@ export function PersonalDataEditor({
   onChange: (next: PersonalData) => void;
 }) {
   const patch = (p: Partial<PersonalData>) => onChange({ ...value, ...p });
+  // A consulta demora: aplica sobre o valor mais recente, para não desfazer o que a pessoa digitou enquanto esperava.
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  });
+  const zipLookup = useZipLookup((a) =>
+    onChange({
+      ...latest.current,
+      street: a.street || latest.current.street,
+      district: a.district || latest.current.district,
+      uf: a.uf || latest.current.uf,
+      municipalityIbge: a.ibgeCode || latest.current.municipalityIbge
+    })
+  );
   return (
     <FieldGroup>
       <div className='grid gap-4 sm:grid-cols-2'>
@@ -83,8 +100,17 @@ export function PersonalDataEditor({
             placeholder='00000-000'
             value={value.zip}
             onChange={(e) => patch({ zip: e.target.value })}
-            onBlur={(e) => patch({ zip: formatZip(e.target.value) })}
+            onBlur={(e) => {
+              patch({ zip: formatZip(e.target.value) });
+              void zipLookup.lookup(e.target.value);
+            }}
           />
+          {zipLookup.loading && (
+            <FieldDescription className='flex items-center gap-1'>
+              <Spinner className='size-3' /> Buscando…
+            </FieldDescription>
+          )}
+          {zipLookup.message && <FieldDescription>{zipLookup.message}</FieldDescription>}
         </Field>
         <Field>
           <FieldLabel htmlFor={`${id}-street`}>Rua, avenida…</FieldLabel>

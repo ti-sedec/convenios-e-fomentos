@@ -402,3 +402,52 @@ func TestConvitesTemLimiteDeTaxaPorUsuario(t *testing.T) {
 	other, _ := p.create(p.joao)
 	assert.Equal(t, 201, p.do("POST", membersPath(other), map[string]any{"cpf": cpfFor("x@exemplo.com"), "level": "read"}, p.joao).Status)
 }
+
+// access restringe a listagem ao que é da pessoa: titular, membro, ou um dos dois. Soma-se à permissão, nunca a amplia.
+func TestFiltroDeAcessoDaListagem(t *testing.T) {
+	p := newProjEnv(t)
+	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
+	mariaOwn, _ := p.create(p.maria)
+	shared, _ := p.create(p.maria)
+	mid := p.mustInvite(shared, "carla@exemplo.com", "read")
+	carla := p.login("carla@exemplo.com")
+	carlaOwn, _ := p.create(carla)
+
+	ids := func(tok, query string) []string {
+		r := p.do("GET", "/api/admin/projects"+query, nil, tok)
+		require.Equal(t, 200, r.Status, r.Body)
+		out := []string{}
+		for _, it := range r.list() {
+			out = append(out, it.(map[string]any)["id"].(string))
+		}
+		return out
+	}
+
+	assert.ElementsMatch(t, []string{shared, carlaOwn}, ids(carla, ""))
+	assert.ElementsMatch(t, []string{shared, carlaOwn}, ids(carla, "?access=all"))
+	assert.Equal(t, []string{carlaOwn}, ids(carla, "?access=owner"))
+	assert.Equal(t, []string{shared}, ids(carla, "?access=member"))
+	assert.ElementsMatch(t, []string{mariaOwn, shared}, ids(p.maria, "?access=owner"))
+	assert.Empty(t, ids(p.maria, "?access=member"), "o titular não é membro dos próprios projetos")
+	// Combina com os outros filtros e com o total da paginação.
+	assert.Empty(t, ids(carla, "?access=member&status=submitted"))
+	assert.EqualValues(t, 1, p.do("GET", "/api/admin/projects?access=member", nil, carla).meta()["total"])
+
+	// Revogar o acesso tira o projeto de "membro" na hora.
+	require.Equal(t, 204, p.do("DELETE", membersPath(shared, "/", mid), nil, p.maria).Status)
+	assert.Empty(t, ids(carla, "?access=member"))
+	assert.Equal(t, []string{carlaOwn}, ids(carla, "?access=all"))
+
+	for _, bad := range []string{"mine", "OWNER", "owner,member"} {
+		r := p.do("GET", "/api/admin/projects?access="+bad, nil, carla)
+		assert.Equal(t, 422, r.Status, bad)
+	}
+
+	// A equipe enxerga os projetos enviados de todo mundo, mas com access só o que é dela (nada).
+	sent := p.submitted("7101/2026")
+	tok, _ := p.newAdmin(p.boss, "analista-acesso@exemplo.com", "analyst")
+	assert.Contains(t, ids(tok, ""), sent.id)
+	for _, a := range []string{"owner", "member", "all"} {
+		assert.Empty(t, ids(tok, "?access="+a), "analista com access=%s", a)
+	}
+}

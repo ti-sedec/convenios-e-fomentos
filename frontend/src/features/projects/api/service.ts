@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import { apiErrorFromResponse } from '@/lib/api/errors';
 import type { ApiResponse } from '@/lib/api/types';
+import type { AccessFilter } from '@/features/proponent-overview/api/types';
 import type {
   Checklist,
   Contact,
@@ -22,7 +23,8 @@ import type {
   ProposalInput,
   FilePreview,
   ReviewDecision,
-  ReviewKind
+  ReviewKind,
+  StageHistory
 } from './types';
 
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
@@ -45,11 +47,17 @@ export interface ListProjectsParams {
   page?: number;
   pageSize?: number;
   status?: ProjectStatus;
+  /** Só o que é da própria pessoa: titular (`owner`), membro (`member`) ou um dos dois (`all`). Sem o parâmetro vale só a permissão. */
+  access?: AccessFilter;
   /** Filtros das filas da equipe. */
   stage?: ProjectStage[];
   framing?: 'pending' | 'confirmed' | 'none';
   department?: string;
   analyst?: string;
+  /** Só projetos enviados na etapa atual há pelo menos tantos dias. */
+  idleDays?: number;
+  /** Ex.: 'stage_since:asc' (há mais tempo na etapa primeiro). */
+  sort?: string;
 }
 
 export async function listProjects({
@@ -57,18 +65,24 @@ export async function listProjects({
   page = 1,
   pageSize = 25,
   status,
+  access,
   stage,
   framing,
   department,
-  analyst
+  analyst,
+  idleDays,
+  sort
 }: ListProjectsParams = {}) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (q) params.set('q', q);
   if (status) params.set('status', status);
+  if (access) params.set('access', access);
   if (stage?.length) params.set('stage', stage.join(','));
   if (framing) params.set('framing', framing);
   if (department) params.set('department', department);
   if (analyst) params.set('analyst', analyst);
+  if (idleDays) params.set('idleDays', String(idleDays));
+  if (sort) params.set('sort', sort);
   return await apiClient<ApiResponse<ProjectSummary[]>>(`/admin/projects?${params}`);
 }
 
@@ -120,6 +134,10 @@ const docs = (id: string) => `/admin/projects/${id}/documents`;
 
 export async function getChecklist(id: string) {
   return (await apiClient<ApiResponse<Checklist>>(docs(id))).data;
+}
+
+export async function getStageHistory(id: string) {
+  return (await apiClient<ApiResponse<StageHistory>>(`/admin/projects/${id}/history`)).data;
 }
 
 /** Passo 1 do envio: registra o arquivo e obtém a autorização para enviá-lo ao armazenamento. */
@@ -351,12 +369,12 @@ export async function reviewItem(
   ).data;
 }
 
-/** Devolve itens (seções e documentos do checklist) ao proponente, com prazo. */
+/** Devolve itens (seções, documentos do checklist e documentos adicionais) ao proponente, com prazo. */
 export const requestComplement = (
   id: string,
   input: {
     message: string;
-    items: { kind: 'section' | 'document'; target: string; note: string }[];
+    items: { kind: 'section' | 'document' | 'extra'; target: string; note: string }[];
   }
 ) => post(id, 'complement-requests', input);
 

@@ -305,6 +305,15 @@ func TestEnvioForaDoPrazoEleitoral(t *testing.T) {
 	ok := p.completeProject("801/2026")
 	assert.NotContains(t, issueFields(p.do("GET", "/api/admin/projects/"+ok.id, nil, p.maria)), "submission.electoralDeadline")
 	assert.Equal(t, false, ok.submit(p.maria, true).data()["lateSubmission"])
+
+	// A listagem traz a marca (para o selo "Fora do prazo" da fila da equipe).
+	late := map[string]any{}
+	for _, it := range p.do("GET", "/api/admin/projects", nil, p.maria).list() {
+		m := it.(map[string]any)
+		late[m["id"].(string)] = m["lateSubmission"]
+	}
+	assert.Equal(t, true, late[fp.id])
+	assert.Equal(t, false, late[ok.id])
 }
 
 func TestEnviosSimultaneosGeramUmSoEnvio(t *testing.T) {
