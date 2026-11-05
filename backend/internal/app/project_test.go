@@ -519,6 +519,31 @@ func TestProponenteSoEnxergaEEditaOsProprios(t *testing.T) {
 	assert.Equal(t, 403, p.do("PUT", "/api/admin/projects/"+theirs+"/proposal", proposalBody(1), staff).Status, "ler não dá editar")
 }
 
+func TestCnpjAlfanumerico(t *testing.T) {
+	p := newProjEnv(t)
+	id, v := p.create(p.maria)
+	ib := institutionBody(v, p.typeID("municipal_government"))
+	ib["cnpj"] = "12.abc.345/01de-35" // exemplo da Receita; minúsculas e pontuação são normalizadas
+	r := p.do("PUT", "/api/admin/projects/"+id+"/institution", ib, p.maria)
+	require.Equal(t, 200, r.Status, r.Body)
+	assert.Equal(t, "12ABC34501DE35", r.data()["institution"].(map[string]any)["cnpj"])
+
+	ids := func(q string) []string {
+		var out []string
+		for _, it := range p.do("GET", "/api/admin/projects?q="+q, nil, p.maria).list() {
+			out = append(out, it.(map[string]any)["id"].(string))
+		}
+		return out
+	}
+	assert.Equal(t, []string{id}, ids("12.ABC.345"), "busca com pontuação")
+	assert.Equal(t, []string{id}, ids("12abc345"), "busca sem pontuação e em minúsculas")
+	assert.Empty(t, ids("12ABD"))
+
+	ib["cnpj"] = "12.ABC.345/01DE-36" // dígito verificador errado
+	ib["version"] = r.data()["version"]
+	assert.Equal(t, 422, p.do("PUT", "/api/admin/projects/"+id+"/institution", ib, p.maria).Status)
+}
+
 func TestListagemDeProjetos(t *testing.T) {
 	p := newProjEnv(t)
 	a, av := p.create(p.maria)

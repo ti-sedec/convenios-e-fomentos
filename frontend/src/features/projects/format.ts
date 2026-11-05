@@ -6,13 +6,7 @@ export function formatCpf(v: string) {
   return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : v;
 }
 
-/** 11222333000181 → 11.222.333/0001-81. */
-export function formatCnpj(v: string) {
-  const d = onlyDigits(v);
-  return d.length === 14
-    ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-    : v;
-}
+export { formatCnpj } from '@/lib/cnpj';
 
 /** 65999998888 → (65) 99999-8888; 6533334444 → (65) 3333-4444. */
 export function formatPhone(v: string) {

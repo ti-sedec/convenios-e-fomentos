@@ -9,6 +9,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { entityTypesQueryOptions } from '@/features/entity-types/api/queries';
 import { UFS } from '@/features/municipalities/api/queries';
 import { useZipLookup } from '@/features/zip-codes/use-zip-lookup';
+import { cnpjValidators } from '@/components/forms/fields/cnpj-field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
 import { projectKeys } from '../api/queries';
@@ -141,12 +142,12 @@ export function InstitutionStep({
           />
           <form.AppField
             name='cnpj'
+            validators={cnpjValidators}
             children={(f) => (
-              <f.TextField
+              <f.CnpjField
                 label='CNPJ'
                 required
-                inputMode='numeric'
-                placeholder='00.000.000/0000-00'
+                description='Aceita o CNPJ numérico e o alfanumérico (com letras).'
               />
             )}
           />

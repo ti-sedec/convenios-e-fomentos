@@ -295,7 +295,7 @@ func (s *Service) framingSummary(ctx context.Context, q *db.Queries, p *Project)
 	if len(munis) > 0 {
 		fmt.Fprintf(&b, "Municípios de execução: %s\n", strings.Join(munis, ", "))
 	}
-	fmt.Fprintf(&b, "\nInstituição: %s\nCNPJ: %s\n", p.Institution.Name, p.Institution.CNPJ)
+	fmt.Fprintf(&b, "\nInstituição: %s\nCNPJ: %s\n", p.Institution.Name, formatCNPJ(p.Institution.CNPJ))
 	if entityType != "" {
 		fmt.Fprintf(&b, "Tipo de entidade: %s\n", entityType)
 	}

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-pdf/fpdf"
+
+	"github.com/wagner/convenios-e-fomentos/backend/internal/cnpj"
 )
 
 // renderReceipt gera o comprovante de recebimento em PDF (A4). Não é o protocolo oficial: atesta o que a SEDEC recebeu.
@@ -139,12 +141,7 @@ func renderReceipt(snap VersionSnapshot) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func formatCNPJ(d string) string {
-	if len(d) != 14 {
-		return d
-	}
-	return d[:2] + "." + d[2:5] + "." + d[5:8] + "/" + d[8:12] + "-" + d[12:]
-}
+func formatCNPJ(d string) string { return cnpj.Format(d) }
 
 func brlIf(c int64) string {
 	if c == 0 {

@@ -955,7 +955,7 @@ paths:
     get:
       tags: [Projetos]
       summary: Lista projetos
-      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (com ou sem pontuação). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, lateSubmission (o envio passou da data-limite eleitoral), stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`), `analyst {id, name}` (ausentes quando não se aplicam) e `stageSeconds` (há quanto tempo, em segundos corridos, o projeto enviado está na etapa atual); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst`, `idleDays` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
+      description: "Cada pessoa vê os projetos permitidos pela condição de sua permissão de leitura (o proponente, os que criou e os em que foi convidado por CPF). `q` busca em título, nome da instituição, número do SIGCon e CNPJ (numérico ou alfanumérico, com ou sem pontuação, em maiúsculas ou minúsculas; casa pelo início do CNPJ). Permissão: `admin::projects.read`. Resposta: `[{id, status, version, instrument, title, institutionName, institutionCnpj, sigconNumber, totalCents, code, submittedAt, lateSubmission (o envio passou da data-limite eleitoral), stage, archiveReason, complementDueAt, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt}]`. A equipe recebe também `department {id, name}`, `framingStatus` (`pending`|`confirmed`), `analyst {id, name}` (ausentes quando não se aplicam) e `stageSeconds` (há quanto tempo, em segundos corridos, o projeto enviado está na etapa atual); o titular e os membros não. Filtros das filas da equipe: `stage`, `framing`, `department`, `analyst`, `idleDays` (combinam-se com a permissão de leitura: o Revisor só enxerga o que é do departamento dele, mesmo sem filtro)."
       security: [{adminBearer: []}]
       parameters:
         - {name: q, in: query, schema: {type: string}}
@@ -1123,7 +1123,7 @@ paths:
       summary: Grava a seção Instituição
       description: |
         Grava a seção inteira, com a `version` lida (409 `project_version_conflict` se desatualizada).
-        CNPJ validado (dígitos verificadores) e guardado só com dígitos. `entityTypeId` vem de `GET /admin/catalog/entity-types`:
+        CNPJ validado (dígitos verificadores), numérico ou alfanumérico (IN RFB 2.229/2024: 12 posições de 0-9 e A-Z + 2 dígitos verificadores), aceito com ou sem pontuação e em maiúsculas ou minúsculas; guardado sem pontuação e em maiúsculas (14 caracteres). `entityTypeId` vem de `GET /admin/catalog/entity-types`:
         nos tipos comuns, `nature` e `nonProfit` são derivados do tipo; no tipo "Outro" (`entityTypeIsOther`), o proponente informa
         `entityTypeOther`, `nature` (`public|private`) e `nonProfit` (só privada). O Termo de Fomento (`instrument: fomento`) só é aceito
         para entidade privada sem fins lucrativos (422 em `instrument`); o Convênio vale para qualquer natureza.

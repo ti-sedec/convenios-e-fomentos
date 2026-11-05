@@ -161,7 +161,7 @@ Duas dimensões separadas, mais o parecer:
 
 | ID | Regra | Fonte | Sev. |
 |---|---|---|---|
-| RN-01 | CNPJ com dígitos verificadores válidos. | — | B |
+| RN-01 | CNPJ com dígitos verificadores válidos. Vale o formato numérico e o alfanumérico (IN RFB 2.229/2024: 12 posições de 0-9 e A-Z + 2 dígitos verificadores numéricos; cálculo módulo 11 com o valor de cada caractere igual ao código ASCII − 48). | — | B |
 | RN-02 | **Fomento** só para entidade privada sem fins lucrativos. | Lei 13.019 | B |
 | RN-03 | **Convênio** vale para qualquer natureza, com o checklist de prefeituras. | IN 001/2015 | — |
 | RN-04 | Todos os municípios de **execução** são de MT. A sede pode ser de qualquer UF. | Decisão #12 | B |

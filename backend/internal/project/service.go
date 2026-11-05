@@ -442,8 +442,14 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 	if q := strings.TrimSpace(p.Q); q != "" {
 		like := arg("%" + escapeLike(q) + "%")
 		cond := fmt.Sprintf("(title ILIKE %[1]s OR institution_name ILIKE %[1]s OR sigcon_number ILIKE %[1]s", like)
-		if d := digits(q); d != "" {
-			cond += " OR institution_cnpj LIKE " + arg(escapeLike(d)+"%")
+		// O termo, sem pontuação e em maiúsculas, é prefixo do CNPJ (numérico ou alfanumérico). Se tiver algum caractere que não cabe
+		// num CNPJ, o prefixo vem só dos dígitos.
+		k, ok := cnpj.Key(q)
+		if !ok {
+			k = digits(q)
+		}
+		if k != "" {
+			cond += " OR institution_cnpj LIKE " + arg(escapeLike(k)+"%")
 		}
 		conds = append(conds, cond+")")
 	}
