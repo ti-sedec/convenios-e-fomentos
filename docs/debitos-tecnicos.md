@@ -39,7 +39,8 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 | T26 | Cada aba da fila faz uma consulta só para o contador | Baixa | F5 (Fase 5) |
 | T31 | Rascunho abandonado some sem aviso na visão geral do proponente | Baixa | Visão geral do proponente (D8) |
 | T32 | Resumo do proponente: só 5 rascunhos com pendências contadas; feed sem paginação | Baixa | Visão geral do proponente (D5) |
-| T33 | Visão geral do Analista: Revisor, Secretário e Supervisor sem a sua; duas medidas de tempo; limite de 30 no "pronto para indicar" | Baixa | Visão geral do Analista |
+| T33 | Visão geral do Analista: Secretário e Supervisor sem a sua; duas medidas de tempo; limite de 30 no "pronto para indicar" | Baixa | Visão geral do Analista |
+| T34 | O Revisor não é avisado por e-mail quando recebe um projeto | Média | Visão geral do Revisor |
 | T29 | Painel de prazos entre projetos (médias e filas por responsável) | Baixa | Fase 6 do histórico de etapas |
 | T30 | Exportação em CSV do painel de prazos | Baixa | Fase 6 do histórico de etapas |
 | T23 | Etapas depois de "Aguardando parecer" ainda não existem | Fora do escopo | D1 |
@@ -144,12 +145,16 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 - No resumo do proponente, só os 5 rascunhos mais recentes trazem o número de pendências que bloqueiam o envio (`blocking`), porque o cálculo roda a validação inteira (D5). O feed não tem paginação (máximo 30) e mostra só 7 tipos de marco; eventos novos (declaração assinada, troca de analista) só entram incluindo a ação em `activityKinds` de propósito. **Saída:** índice `(entity, entity_id, created_at DESC)` em `audit_logs` e cursor no feed se a medição pedir.
 
 ### T33. Visão geral do Analista: o que ficou de fora
-- **Revisor, Secretário e Supervisor** seguem com o texto de boas-vindas. Cada um teria os seus blocos (o Revisor, "pendentes de decisão"; o Secretário e o Supervisor, o panorama geral, que se aproxima do T29). Os blocos e as rotas do Analista (`/admin/projects/queue/*`) são só dele (permissão `start-analysis`); o Revisor lê só o próprio departamento e precisaria de rotas com outro alcance. **Saída:** planejar por perfil, reaproveitando `QueueCounts`, o feed e o componente de blocos.
+- **Secretário e Supervisor** seguem com o texto de boas-vindas (o Revisor já tem a sua, ver o [planejamento](planejamento-visao-geral-revisor.md)). Cada um teria os seus blocos (o Secretário e o Supervisor, o panorama geral, que se aproxima do T29). Os blocos e as rotas do Analista (`/admin/projects/queue/*`) são só dele (permissão `start-analysis`); o Revisor lê só o próprio departamento e precisaria de rotas com outro alcance. **Saída:** planejar por perfil, reaproveitando `QueueCounts`, o feed e o componente de blocos.
 - **Duas medidas de tempo.** A visão geral usa o tempo com o **responsável atual** (trecho aberto do histórico); a fila mostra o tempo na **etapa** ("Na etapa há", que soma análise e enquadramento). Estão documentadas na tela, mas podem confundir. **Saída:** unificar a fila, se a equipe reclamar.
 - **"Tudo aprovado, falta indicar" calcula só os 30 candidatos mais antigos** (cada um roda a conferência inteira); passando disso, a tela mostra "N+". **Saída:** gravar um indicador de "tudo aprovado" atualizado a cada conferência (escrita nova em um ponto crítico), ou subir o limite se a medição permitir (`SetReadyCandidates`).
 - **Quem ajusta os limites de "parado"** (`stalled_after_days`): hoje só o Super Admin tem `settings.rule-parameters.update`. Se o Supervisor deve ajustar, é decisão de perfil. Os valores iniciais (2, 7, 5 e 15 dias) são suposição; revisar com a equipe.
-- **Sem os avisos por e-mail.** A visão geral é consulta: T11 (projeto novo) e T14 (recusa do Revisor) continuam sem e-mail.
-- **Tela do Analista ainda não vista no navegador** (relaciona-se com T24). Percorrer: tela cheia e vazia, "Só os meus", links dos cartões para a fila (`?aba=` e `?analista=eu`), selo "Fora do prazo", tema claro e celular.
+- **Sem os avisos por e-mail.** A visão geral é consulta: T11 (projeto novo), T14 (recusa do Revisor) e T34 (projeto indicado ao Revisor) continuam sem e-mail.
+- **Telas do Analista e do Revisor ainda não vistas no navegador** (relaciona-se com T24). Percorrer: tela cheia e vazia, "Só os meus", links dos cartões para a fila (`?aba=` e `?analista=eu`), selo "Fora do prazo", tema claro e celular.
+
+### T34. O Revisor não é avisado por e-mail quando recebe um projeto
+- **O que ficou:** `notifyFramingIndicated` envia o aviso de "encaminhado ao departamento" só aos **Supervisores** (`toSupervisors`). O Revisor só recebe e-mail de **arquivamento**; para saber que há enquadramento a decidir, ele precisa abrir a [visão geral](planejamento-visao-geral-revisor.md) ou a fila. Se não abrir, o projeto fica parado (o selo "acima do limite" ajuda quem abre, não quem não abre).
+- **Saída:** acrescentar os Revisores ativos do departamento indicado como destinatários (`ListStaffEmailsByRoleAndDepartment`, como no arquivamento), com a mesma chave de deduplicação por rodada (`framing-indicated:<projeto>:<rodada>`) e um texto próprio para o Revisor. Irmão do T11 e do T14.
 
 ### T29. Painel de prazos entre projetos (melhoria futura)
 - O [histórico de etapas](planejamento-historico-etapas.md) já guarda, por projeto, em que etapa e com quem ele esteve e por quanto tempo, mas só se enxerga um projeto por vez e, na fila de análise, "há quanto tempo na etapa atual" (opção A da fase 6, feita). Falta olhar entre projetos. **Saída:** uma página nova em Análise com o tempo médio e o pior caso por etapa, a fila e o trecho mais antigo por analista e por departamento, e a lista dos parados. Os índices `(stage, entered_at)` e `(holder_admin_id, entered_at)` já existem para isso; falta a rota de agregação (por exemplo `GET /admin/projects/stats/stage-times`), a tela e os testes.
