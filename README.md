@@ -159,6 +159,7 @@ Tudo isso é feito no painel, em **Administração → Usuários** (`/dashboard/
 
 - A **Visão geral** do Proponente mostra o que pede ação dele (correções com prazo, rascunhos, convites), os projetos por situação, os recentes e a atividade, com o filtro "Todos / Meus / Compartilhados comigo" ([planejamento](docs/planejamento-visao-geral-proponente.md)).
 - A **Visão geral** do Analista prioriza o trabalho (recusados pelo Revisor, reenviados, aguardando assumir, tudo aprovado sem departamento, parados além do limite por etapa e prazos a vencer), mostra a fila por etapa, a atividade da equipe e o resumo pessoal dele, com o filtro "Toda a equipe / Só os meus" ([planejamento](docs/planejamento-visao-geral-analista.md)).
+- A **Visão geral** do Revisor do Departamento mostra os enquadramentos que esperam a decisão dele (os mais antigos primeiro, com o limite de "parado"), os números do departamento, a atividade do departamento e as decisões da própria pessoa; sem departamento no cadastro, a tela explica o motivo ([planejamento](docs/planejamento-visao-geral-revisor.md)).
 - Também no painel: **Departamentos**, **Auditoria** (com o antes/depois de cada alteração), **Tokens de API** e o grupo **Portal público**
   (usuários finais, perfis públicos, configurações e templates de e-mail).
 - O seed ainda cria, **só em desenvolvimento**, um administrador de exemplo por role (`super@`, `editor@`, `author@`,

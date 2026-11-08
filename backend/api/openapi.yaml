@@ -1047,6 +1047,39 @@ paths:
         "200": {description: OK}
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/department/overview:
+    get:
+      tags: [Projetos]
+      summary: Resumo do departamento do Revisor (visão geral)
+      description: "Os enquadramentos que esperam a decisão do Revisor e os números do departamento dele. Permissão: `admin::projects.review-framing`. O alcance é a condição dessa permissão somada a projeto enviado ou arquivado e ao departamento do cadastro da pessoa; **não há `scope`** (o trabalho é do departamento: vale a primeira decisão de qualquer Revisor dele). O Revisor sem departamento no cadastro recebe 403 (a condição do perfil nega tudo sem departamento); só quem passa por qualquer permissão e não tem departamento (Super Admin) recebe `department: null` e tudo zerado. Resposta: `department {id, name}`; `limits {framing, awaiting_opinion}` (dias vigentes do parâmetro `stalled_after_days`; zero = sem regra); `counts {framing_pending, awaiting_opinion, archived_30d, decided_30d {confirmed, refused}}` (`awaiting_opinion` são os enquadramentos confirmados; `archived_30d` os arquivados nos últimos 30 dias; `decided_30d` vem das rodadas de enquadramento do departamento, inclusive as recusadas, que tiram o projeto do alcance do Revisor); `pending {total, items}` com até 15 itens, do que está há mais tempo com o departamento para o mais novo. Item: `projectId`, `title`, `code`, `institution`, `round`, `indicatedAt`, `indicatedBy` (nome do Analista que indicou o departamento), `sinceSeconds` (tempo com o departamento, do trecho aberto do histórico), `late`, `overLimit` (passou do limite `framing`). Nenhum dado pessoal do proponente (CPF, e-mail, telefone) nem justificativa de recusa."
+      security: [{adminBearer: []}]
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/department/activity:
+    get:
+      tags: [Projetos]
+      summary: Atividade recente do departamento (Revisor)
+      description: "Marcos do departamento do Revisor, do mais novo ao mais antigo, escritos para ele. Permissão: `admin::projects.review-framing`. Sem `scope`; `limit` de 1 a 30 (padrão 15), sem paginação. Vêm das **rodadas de enquadramento** do departamento (que sobrevivem à recusa) e do arquivamento dos projetos do departamento: `framing_indicated` (o Analista indicou o projeto), `framing_confirmed`, `framing_refused` (todos com `data.round`) e `archived` (`data.reason`: `complement_deadline`, `withdrawn`, `denied`, `missing_documents` ou `other`). Fora: conferência de itens, arquivos, reenvio, complementação e edições. Resposta: `[{id, at, kind, by {type: admin|proponent|system, name, self}, projectId, title, code, linkable, data}]`. `by.name` só existe para a equipe (`admin`), com os colegas do departamento identificados; o proponente aparece só como tipo; `self` marca a própria pessoa. `linkable: false` avisa que o Revisor não abre mais o projeto (depois da recusa ele sai do departamento): a tela mostra código e título sem link. A justificativa da recusa **não** vai no feed. Quem não tem departamento no cadastro recebe 403; o Super Admin sem departamento recebe a lista vazia."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 30, default: 15}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/department/me:
+    get:
+      tags: [Projetos]
+      summary: Minhas decisões (enquadramentos que eu confirmei e recusei)
+      description: "Quantos enquadramentos a pessoa confirmou e recusou nos últimos 7 e 30 dias, pelas rodadas de enquadramento (`decided_by_id`). Permissão: `admin::projects.review-framing`. **Devolve sempre e somente os números de quem chama**: a rota não aceita parâmetro de pessoa, e nenhum perfil consulta os números de outra. Resposta: `{last7: {confirmed, refused}, last30: {...}}`."
+      security: [{adminBearer: []}]
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}:
     get:
       tags: [Projetos]

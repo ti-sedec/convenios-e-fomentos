@@ -69,6 +69,9 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/overview", h.queueOverview)
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/activity", h.queueActivity)
 	r.With(g(ActionStartAnalysis)).Get("/admin/projects/queue/me", h.queueMe)
+	r.With(g(ActionReviewFraming)).Get("/admin/projects/department/overview", h.reviewerOverview)
+	r.With(g(ActionReviewFraming)).Get("/admin/projects/department/activity", h.reviewerActivity)
+	r.With(g(ActionReviewFraming)).Get("/admin/projects/department/me", h.reviewerMe)
 	r.With(g(ActionCreate)).Post("/admin/projects", h.create)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}", h.get)
 	r.With(g(ActionDelete)).Delete("/admin/projects/{id}", h.delete)
@@ -296,16 +299,58 @@ func (h *Handler) queueActivity(w http.ResponseWriter, r *http.Request) {
 		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "scope", Message: "Valores aceitos: team, mine."}}}))
 		return
 	}
-	limit := 0
-	if v := q.Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 || n > maxQueueActivityLimit {
-			httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxQueueActivityLimit) + "."}}}))
-			return
-		}
-		limit = n
+	limit, ok := activityLimit(w, r)
+	if !ok {
+		return
 	}
 	v, err := h.svc.QueueActivity(r.Context(), actorOf(r), dec.Filter, scope, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+// activityLimit lê o ?limit= dos feeds da equipe (0 = padrão). Valor inválido já responde 422 e devolve ok falso.
+func activityLimit(w http.ResponseWriter, r *http.Request) (limit int, ok bool) {
+	v := r.URL.Query().Get("limit")
+	if v == "" {
+		return 0, true
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 || n > maxQueueActivityLimit {
+		httpapi.Error(w, r, httpapi.ErrValidation(map[string]any{"fields": []httpapi.FieldError{{Field: "limit", Message: "Informe um número entre 1 e " + strconv.Itoa(maxQueueActivityLimit) + "."}}}))
+		return 0, false
+	}
+	return n, true
+}
+
+func (h *Handler) reviewerOverview(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.ReviewerOverview(r.Context(), actorOf(r), dec.Filter)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) reviewerActivity(w http.ResponseWriter, r *http.Request) {
+	dec, _ := admin.DecisionFrom(r.Context())
+	limit, ok := activityLimit(w, r)
+	if !ok {
+		return
+	}
+	v, err := h.svc.ReviewerActivity(r.Context(), actorOf(r), dec.Filter, limit)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) reviewerMe(w http.ResponseWriter, r *http.Request) {
+	v, err := h.svc.ReviewerMe(r.Context(), actorOf(r))
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

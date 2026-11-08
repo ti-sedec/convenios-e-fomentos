@@ -54,6 +54,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body
+        // Extensões do navegador (ColorZilla, gerenciadores de senha etc.) acrescentam atributos ao <body> antes da hidratação.
+        suppressHydrationWarning
         className={cn(
           'bg-background overflow-x-hidden overscroll-none font-sans antialiased',
           fontVariables
