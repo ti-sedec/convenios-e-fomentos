@@ -98,6 +98,8 @@ type ChecklistItem struct {
 	Status        string    `json:"status"`
 	// DeclarationStale: a declaração assinada deste item ficou desatualizada porque o cadastro mudou; emita de novo.
 	DeclarationStale bool `json:"declarationStale"`
+	// DeclarationStaleReasons diz o que mudou (ver DeclarationRecord.StaleReasons); vazio se a declaração não está desatualizada.
+	DeclarationStaleReasons []string `json:"declarationStaleReasons"`
 	// DeclarationAwaiting: a declaração foi emitida e aguarda a assinatura; não há mais nada a fazer pelo proponente.
 	DeclarationAwaiting bool `json:"declarationAwaiting"`
 }
@@ -311,6 +313,7 @@ func (s *Service) Checklist(ctx context.Context, actor Actor, id uuid.UUID, read
 	if !read.AllowsRecord(refOf(r).Getter()) {
 		return nil, httpapi.ErrNotFound()
 	}
+	s.settleDeclarations(ctx, id)
 	_, cl, err := s.viewWithChecklist(ctx, s.q, r, actor)
 	return cl, err
 }

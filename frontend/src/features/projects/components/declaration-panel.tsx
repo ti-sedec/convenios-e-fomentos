@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Icons } from '@/components/icons';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,9 +19,10 @@ import {
 import { LoadingButton } from '@/components/ui/loading-button';
 import { ApiError } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/errors';
-import { declarationQueryOptions, projectKeys } from '../api/queries';
+import { declarationQueryOptions, invalidateAfterSignature, projectKeys } from '../api/queries';
 import { acceptDeclaration, cancelDeclaration } from '../api/service';
-import type { ChecklistItem, Declaration } from '../api/types';
+import { sectionLabels, type ChecklistItem, type Declaration, type SectionKey } from '../api/types';
+import { staleMessage, stepOfIssue } from '../declaration-hints';
 
 const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', {
@@ -40,17 +41,31 @@ const AWARE =
 export function DeclarationPanel({
   projectId,
   item,
-  editable
+  editable,
+  onGoStep
 }: {
   projectId: string;
   item: ChecklistItem;
   editable: boolean;
+  /** Leva a pessoa à etapa do cadastro onde se corrige uma pendência da declaração. */
+  onGoStep?: (step: SectionKey) => void;
 }) {
   const qc = useQueryClient();
   const query = useQuery(declarationQueryOptions(projectId, item.code));
   const [open, setOpen] = useState(false);
   const decl = query.data;
   const current = decl?.current ?? null;
+
+  // A assinatura terminou (ou o pedido mudou de situação) enquanto a tela estava aberta: o checklist, o resumo de documentos e as
+  // pendências do projeto dependem disso, e só o painel sabe. Sem isto o painel diria "Assinada" e o item continuaria pendente.
+  const status = current?.status;
+  const lastStatus = useRef(status);
+  useEffect(() => {
+    if (lastStatus.current !== undefined && status !== lastStatus.current) {
+      void invalidateAfterSignature(qc, projectId);
+    }
+    lastStatus.current = status;
+  }, [status, qc, projectId]);
 
   const refresh = async () => {
     await Promise.all([
@@ -70,6 +85,12 @@ export function DeclarationPanel({
 
   // Falha ao carregar a prévia (ex.: 409 se deixou de se aplicar): o anexo manual continua valendo.
   if (!decl) return null;
+
+  // Ao abrir o diálogo o texto e as pendências são lidos de novo: o cadastro pode ter mudado em outra etapa.
+  const openDialog = () => {
+    setOpen(true);
+    void query.refetch();
+  };
 
   const waiting = current?.status === 'awaiting_signature';
   const signed = current?.status === 'signed';
@@ -119,28 +140,22 @@ export function DeclarationPanel({
       {signed && current.stale && (
         <Alert variant='destructive'>
           <Icons.alertCircle aria-hidden />
-          <AlertDescription>
-            O cadastro mudou depois da assinatura e a declaração assinada deixou de valer. Gere e
-            assine de novo.
-          </AlertDescription>
+          <AlertDescription>{staleMessage(current.staleReasons, true)}</AlertDescription>
         </Alert>
       )}
       {waiting && current.stale && (
-        <p className='text-muted-foreground'>
-          O cadastro mudou depois deste pedido. Gere a declaração de novo para assinar o texto
-          atualizado.
-        </p>
+        <p className='text-muted-foreground'>{staleMessage(current.staleReasons, false)}</p>
       )}
 
       {editable && (
         <div className='flex flex-wrap gap-2'>
           {canIssue && (
-            <Button size='sm' onClick={() => setOpen(true)}>
+            <Button size='sm' onClick={openDialog}>
               {current ? 'Gerar declaração de novo' : 'Conferir e gerar declaração'}
             </Button>
           )}
           {waiting && current.stale && (
-            <Button size='sm' onClick={() => setOpen(true)}>
+            <Button size='sm' onClick={openDialog}>
               Gerar de novo com o texto atualizado
             </Button>
           )}
@@ -162,7 +177,9 @@ export function DeclarationPanel({
         projectId={projectId}
         decl={decl}
         open={open}
+        loading={query.isFetching}
         onOpenChange={setOpen}
+        onGoStep={onGoStep}
         onDone={refresh}
       />
     </div>
@@ -173,13 +190,18 @@ function DeclarationDialog({
   projectId,
   decl,
   open,
+  loading,
   onOpenChange,
+  onGoStep,
   onDone
 }: {
   projectId: string;
   decl: Declaration;
   open: boolean;
+  /** O texto está sendo lido de novo: não dá para confirmar o que ainda pode mudar. */
+  loading: boolean;
   onOpenChange: (open: boolean) => void;
+  onGoStep?: (step: SectionKey) => void;
   onDone: () => Promise<void>;
 }) {
   const [aware, setAware] = useState(false);
@@ -234,18 +256,42 @@ function DeclarationDialog({
               <p className='mb-1 font-medium'>Complete o cadastro para gerar a declaração:</p>
               <ul className='list-disc pl-4'>
                 {decl.issues.map((i) => (
-                  <li key={i.code}>{i.message}</li>
+                  <li key={`${i.code}-${i.field}`}>{i.message}</li>
                 ))}
               </ul>
+              {onGoStep && (
+                <div className='mt-3 flex flex-wrap gap-2'>
+                  {Array.from(new Set(decl.issues.map((i) => stepOfIssue(i.field)))).map((step) => (
+                    <Button
+                      key={step}
+                      type='button'
+                      size='sm'
+                      variant='outline'
+                      onClick={() => {
+                        onOpenChange(false);
+                        onGoStep(step);
+                      }}
+                    >
+                      Corrigir em {sectionLabels[step]}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </AlertDescription>
           </Alert>
+        )}
+
+        {loading && (
+          <p className='text-muted-foreground text-xs' role='status'>
+            Atualizando o texto com o cadastro…
+          </p>
         )}
 
         <label className='flex items-start gap-2 text-sm'>
           <Checkbox
             checked={aware}
             onCheckedChange={(on) => setAware(!!on)}
-            disabled={blocked}
+            disabled={blocked || loading}
             className='mt-0.5'
           />
           <span>{AWARE}</span>
@@ -261,7 +307,7 @@ function DeclarationDialog({
           </Button>
           <LoadingButton
             loading={accept.isPending}
-            disabled={blocked || !aware}
+            disabled={blocked || loading || !aware}
             onClick={() => accept.mutate()}
           >
             Confirmar e gerar declaração

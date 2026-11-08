@@ -14,10 +14,10 @@ import { Switch } from '@/components/ui/switch';
 import { QueryError } from '@/components/query-error';
 import { FieldGroup } from '@/components/ui/field';
 import { useAppForm } from '@/lib/form';
-import { checklistQueryOptions, projectKeys } from '../api/queries';
+import { checklistQueryOptions, invalidateAfterSave, projectKeys } from '../api/queries';
 import { saveDocumentOptions } from '../api/service';
 import type { Access } from '../access';
-import type { ChecklistItem, Project } from '../api/types';
+import type { ChecklistItem, Project, SectionKey } from '../api/types';
 import { ChecklistItemCard, itemDomId } from './checklist-item';
 import { ExtraDocuments } from './extra-documents';
 import { ServerErrors } from './server-errors';
@@ -32,7 +32,7 @@ function OptionsForm({ project, readOnly }: { project: Project; readOnly: boolea
       saveDocumentOptions(project.id, { version: project.version, ...v }),
     onSuccess: async (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
-      await qc.invalidateQueries({ queryKey: projectKeys.checklist(project.id) });
+      await invalidateAfterSave(qc, project.id);
       toast.success('Situações salvas. O checklist foi atualizado.');
     }
   });
@@ -107,10 +107,13 @@ export function DocumentsStep({
   project,
   access,
   focus,
-  onContinue
+  onContinue,
+  onGoStep
 }: {
   project: Project;
   access: Access;
+  /** Leva a pessoa a outra etapa do cadastro (as pendências das declarações apontam para onde corrigir). */
+  onGoStep?: (step: SectionKey) => void;
   /** Id do elemento a levar para o centro da tela quando a lista aparecer (vindo do aviso de correções). */
   focus?: string;
   onContinue?: () => void;
@@ -220,6 +223,7 @@ export function DocumentsStep({
                     item={item}
                     editable={access.document(item)}
                     returned={access.returnedDocument(item)}
+                    onGoStep={onGoStep}
                   />
                 ))}
               </ul>

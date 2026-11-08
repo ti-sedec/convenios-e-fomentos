@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/wagner/convenios-e-fomentos/backend/internal/database/db"
 )
 
 const testCPF = "12345678909"
@@ -224,7 +226,7 @@ func TestDadosPessoaisFaltandoBloqueiamGratuidadeEPublicidade(t *testing.T) {
 	for _, code := range []string{"declaracao_gratuidade", "declaracao_publicidade"} {
 		d := buildDeclaration(declarationSpecs[code], p, e)
 		assert.False(t, d.Ready, code)
-		assert.ElementsMatch(t, []string{"decl_personal_nationality", "decl_personal_marital", "decl_personal_address"}, issueCodes(d), code)
+		assert.ElementsMatch(t, []string{"decl_personal_nationality", "decl_personal_marital", "decl_personal_street", "decl_personal_number", "decl_personal_district", "decl_personal_city"}, issueCodes(d), code)
 		assert.Contains(t, d.Issues[0].Message, "de quem assina")
 	}
 
@@ -239,6 +241,25 @@ func TestDadosPessoaisFaltandoBloqueiamGratuidadeEPublicidade(t *testing.T) {
 	d = buildDeclaration(declarationSpecs["declaracao_publicidade"], p, e)
 	assert.True(t, d.Ready, d.Issues)
 	assert.Contains(t, d.Paragraphs[0], "Eu, João Souza, brasileiro, solteiro(a),")
+}
+
+// Rua, bairro e município preenchidos e só o número faltando: a pendência aponta o número, no campo certo.
+func TestPendenciaDoEnderecoApontaSoOQueFalta(t *testing.T) {
+	p, e := signerWithPersonalData()
+	p.Proponent.Personal.Number = "  "
+	d := buildDeclaration(declarationSpecs["declaracao_gratuidade"], p, e)
+	assert.Equal(t, []string{"decl_personal_number"}, issueCodes(d))
+	assert.Equal(t, "personal.number", d.Issues[0].Field)
+	assert.Contains(t, d.Issues[0].Message, "S/N")
+
+	p, e = signerWithPersonalData()
+	p.Proponent.IsLegalRepresentative = ptrFalse()
+	p.Proponent.LegalRepName, p.Proponent.LegalRepJobTitle = "João Souza", "Prefeito"
+	p.Proponent.LegalRepPersonal = PersonalData{Nationality: "brasileiro", MaritalStatus: MaritalSingle, Street: "Av. Brasil", District: "Centro", MunicipalityIBGE: "5107925"}
+	d = buildDeclaration(declarationSpecs["declaracao_publicidade"], p, e)
+	assert.Equal(t, []string{"decl_personal_number"}, issueCodes(d))
+	assert.Equal(t, "legalRepPersonal.number", d.Issues[0].Field, "os dados do representante legal são outro campo")
+	assert.Contains(t, d.Issues[0].Message, "do representante legal")
 }
 
 func TestGratuidadeExigeProjetoEInstituicaoCompletos(t *testing.T) {
@@ -286,4 +307,43 @@ func TestEquipeVeOCPFMascaradoNoTextoMasOResumoENoMesmo(t *testing.T) {
 	other := buildDeclaration(declarationSpecs["declaracao_publicidade"], p, e)
 	assert.Equal(t, hash, other.ParamsSHA256)
 	assert.Contains(t, other.Paragraphs[0], "123.456.789-09", "quem edita vê o texto completo")
+}
+
+func TestStaleReasonsDizOQueMudou(t *testing.T) {
+	p, e := signerWithPersonalData()
+	spec := declarationSpecs["declaracao_gratuidade"]
+	issued := buildDeclaration(spec, p, e)
+	rec := db.ProjectDeclaration{
+		RequirementCode: spec.code, TemplateVersion: spec.version, ParamsSha256: issued.ParamsSHA256, SignerName: issued.SignerName,
+		SignerRole: issued.SignerRole, SignerCpf: issued.signerCPF, RenderedText: strings.Join(issued.Paragraphs, "\n\n"),
+	}
+	assert.Empty(t, staleReasons(rec, spec, issued), "nada mudou")
+
+	cases := map[string]struct {
+		change func(*Project, *declEnv)
+		want   []string
+	}{
+		"cargo":    {func(p *Project, _ *declEnv) { p.Proponent.JobTitle = "Prefeito" }, []string{StaleSignerRole}},
+		"nome":     {func(p *Project, _ *declEnv) { p.Proponent.Name = "Maria de Souza" }, []string{StaleSignerName, StaleText}},
+		"texto":    {func(p *Project, _ *declEnv) { p.Proposal.Title = "Festival de Verão" }, []string{StaleText}},
+		"endereço": {func(p *Project, e *declEnv) { p.Proponent.Personal.Number = "200" }, []string{StaleText}},
+		"local":    {func(_ *Project, e *declEnv) { e.Place = "Cuiabá/MT" }, []string{StalePlace}},
+		"cpf":      {func(_ *Project, e *declEnv) { e.SignerCPF = "98765432100" }, []string{StaleSignerCPF, StaleText}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			p2, e2 := signerWithPersonalData()
+			c.change(&p2, &e2)
+			now := buildDeclaration(spec, p2, e2)
+			require.NotEqual(t, issued.ParamsSHA256, now.ParamsSHA256)
+			assert.ElementsMatch(t, c.want, staleReasons(rec, spec, now))
+		})
+	}
+
+	t.Run("modelo atualizado", func(t *testing.T) {
+		old := rec
+		old.TemplateVersion = "2020-01"
+		old.ParamsSha256 = "outro"
+		assert.Contains(t, staleReasons(old, spec, issued), StaleTemplate)
+	})
 }

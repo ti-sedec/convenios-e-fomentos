@@ -11,11 +11,13 @@ import {
   confirmFraming,
   denyProject,
   refuseFraming,
-  startAnalysis
+  startAnalysis,
+  takeOverAnalysis
 } from '../../api/service';
 import { projectActions, type Project } from '../../api/types';
 import { AssignDepartmentDialog, ComplementDialog, ConfirmDialog, NoteDialog } from './dialogs';
 import { reportStaffError } from './errors';
+import { isResponsible } from './review-panel';
 
 function StartAnalysisButton({ project }: { project: Project }) {
   const qc = useQueryClient();
@@ -46,9 +48,19 @@ function AnalystActions({ project }: { project: Project }) {
   const framingPending = project.framing?.decision === 'pending';
   const working = stage === 'awaiting_checklist' || stage === 'in_analysis';
   const review = project.review;
+  // Só o responsável devolve, arquiva e indica o departamento; os outros Analistas assumem o projeto para continuar.
+  const responsible = isResponsible(project);
+  const canTakeOver =
+    can(projectActions.startAnalysis) &&
+    !responsible &&
+    (stage === 'in_analysis' || stage === 'awaiting_proponent') &&
+    !framingPending;
 
   const showAssign =
-    can(projectActions.assignDepartment) && stage === 'in_analysis' && !framingPending;
+    responsible &&
+    can(projectActions.assignDepartment) &&
+    stage === 'in_analysis' &&
+    !framingPending;
   const readyToAssign = !!review?.allApproved;
   const missing = review
     ? `${review.summary.pending} pendente(s) e ${review.summary.blockers} impedimento(s)`
@@ -58,6 +70,17 @@ function AnalystActions({ project }: { project: Project }) {
     <>
       {can(projectActions.startAnalysis) && stage === 'awaiting_checklist' && (
         <StartAnalysisButton project={project} />
+      )}
+      {canTakeOver && (
+        <ConfirmDialog
+          project={project}
+          button={{ label: 'Assumir projeto' }}
+          title='Assumir este projeto?'
+          description={`O projeto está com ${project.analyst?.name}. Ao assumir, ele passa a ser seu: só você continua a análise, e ${project.analyst?.name} deixa de poder conferir, devolver ou arquivar (continua podendo visualizar) e será avisado por e-mail. A conferência já feita é mantida.`}
+          confirmLabel='Assumir projeto'
+          success='Você assumiu o projeto e passou a ser o analista responsável.'
+          submit={() => takeOverAnalysis(project.id)}
+        />
       )}
       {showAssign && (
         <AssignDepartmentDialog
@@ -70,13 +93,13 @@ function AnalystActions({ project }: { project: Project }) {
           Para indicar o departamento, aprove todos os itens da conferência ({missing}).
         </p>
       )}
-      {can(projectActions.requestComplement) && working && !framingPending && (
+      {responsible && can(projectActions.requestComplement) && working && !framingPending && (
         <ComplementDialog
           project={project}
           button={{ label: 'Devolver para complementação', variant: 'outline' }}
         />
       )}
-      {can(projectActions.archive) && working && !framingPending && (
+      {responsible && can(projectActions.archive) && working && !framingPending && (
         <NoteDialog
           project={project}
           title='Arquivar por falta de documentos obrigatórios'

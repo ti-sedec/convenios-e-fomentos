@@ -7,7 +7,7 @@ import { useStore } from '@tanstack/react-form';
 import { FieldGroup } from '@/components/ui/field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
-import { projectKeys } from '../api/queries';
+import { invalidateAfterSave, projectKeys } from '../api/queries';
 import { saveProponent } from '../api/service';
 import type { Contact, Project } from '../api/types';
 import { formatCpf, formatPhone } from '../format';
@@ -61,8 +61,7 @@ export function ProponentStep({
       }),
     onSuccess: (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
-      void qc.invalidateQueries({ queryKey: projectKeys.checklist(project.id) });
-      void qc.invalidateQueries({ queryKey: projectKeys.lists() });
+      void invalidateAfterSave(qc, project.id);
       toast.success('Dados do proponente salvos.');
       onSaved(saved, advance.current);
     }

@@ -41,6 +41,7 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 | T32 | Resumo do proponente: só 5 rascunhos com pendências contadas; feed sem paginação | Baixa | Visão geral do proponente (D5) |
 | T33 | Visão geral do Analista: Secretário e Supervisor sem a sua; duas medidas de tempo; limite de 30 no "pronto para indicar" | Baixa | Visão geral do Analista |
 | T34 | O Revisor não é avisado por e-mail quando recebe um projeto | Média | Visão geral do Revisor |
+| T35 | O município do endereço de quem assina entra no resumo de todas as declarações, e mudá-lo invalida também as que não o usam | Baixa | Declarações assinadas (B/C) |
 | T29 | Painel de prazos entre projetos (médias e filas por responsável) | Baixa | Fase 6 do histórico de etapas |
 | T30 | Exportação em CSV do painel de prazos | Baixa | Fase 6 do histórico de etapas |
 | T23 | Etapas depois de "Aguardando parecer" ainda não existem | Fora do escopo | D1 |
@@ -189,6 +190,9 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 
 ### T22. Listagem de projetos com subconsultas por linha
 - A listagem busca nome do departamento e do analista por subconsulta. Para o volume previsto serve; sem índice em `analyst_id`. **Saída:** índice e junção se a medição pedir.
+
+### T35. Município do endereço residencial no resumo de todas as declarações
+- `buildDeclaration` coloca `HomePlace` (município do endereço de quem assina) no resumo (`ParamsSHA256`) de **todas** as declarações, embora só a gratuidade e a publicidade o usem no texto (e nelas o endereço já está nos parágrafos, que também entram no resumo). Mudar o município residencial invalida, sem necessidade, a não duplicidade, a compatibilidade de preços e a contrapartida já assinadas. **Saída:** tirar `HomePlace` do resumo aceitando, na conferência de "desatualizada", o resumo antigo **ou** o novo, para não marcar como obsoletas as declarações já assinadas.
 
 ---
 

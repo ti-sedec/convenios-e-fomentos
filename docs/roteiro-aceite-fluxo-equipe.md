@@ -75,6 +75,17 @@ Marque cada item ao concluir. Em qualquer divergência, anote a tela, o perfil e
 ### F. Concorrência
 - [ ] Dois Revisores do mesmo departamento, em dois navegadores, decidem ao mesmo tempo: um vence; o outro vê "Outra pessoa já decidiu" e a página recarrega.
 
+### F2. Analista responsável (precisa de dois Analistas, A e B)
+- [ ] A inicia a análise. B abre o mesmo projeto: vê a faixa *"Este projeto está com A"*, a conferência **sem** botões de aprovar/reprovar, e **não** vê Devolver, Arquivar nem Indicar departamento. Vê o botão **Assumir projeto**.
+- [ ] B consegue abrir e ler os arquivos (visualização), mas não decide nenhum item.
+- [ ] Na fila, A vê "Você" na coluna *Analista* e o botão **Meus projetos** lista só os dele; B vê "A" e o projeto não aparece em *Meus projetos* dele.
+- [ ] B clica em **Assumir projeto** e confirma: o projeto passa a ser de B; as aprovações já feitas por A continuam (com o nome de A). A passa a ver a faixa "está com B" e perde as ações.
+- [ ] A recebe o e-mail (log) *"sua análise foi assumida por outro analista"*, sem CPF, telefone nem e-mail do proponente. B e o Proponente não recebem.
+- [ ] Na aba *Histórico*, o trecho de A termina e o de B começa. Na Visão geral, o feed mostra "assumiu o projeto de outro analista" e B ganha +1 em "Análises assumidas".
+- [ ] Com o projeto **devolvido ao proponente**, B assume; o proponente reenvia e o projeto volta para B.
+- [ ] Com enquadramento pendente ou aguardando parecer, **Assumir projeto** não aparece.
+- [ ] O Super Admin também não age sobre o projeto de A sem antes assumi-lo.
+
 ### G. Saídas
 - [ ] **Secretário nega** um projeto: o diálogo exige o motivo e avisa que arquiva na hora. Proponente, Analista, Supervisores (e o Revisor do departamento, se já havia) recebem o e-mail (log), uma vez cada.
 - [ ] O Proponente **desiste** de outro projeto: todos são avisados.

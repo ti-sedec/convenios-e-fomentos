@@ -14,7 +14,7 @@ Complementa o [planejamento da visão geral do proponente](planejamento-visao-ge
 |---|---|---|
 | O que a tela mostra? | Um parágrafo de boas-vindas (a equipe não tem visão geral) | Nada de dados |
 | Como o Analista trabalha? | `/dashboard/analise`: 7 abas por situação, filtro "na etapa há N dias ou mais" e ordenação por tempo parado | Nada **prioriza** o que fazer primeiro; cada aba faz uma consulta só para o contador (T26) |
-| Quem enxerga o quê? | Todos os projetos **enviados ou arquivados**, de qualquer proponente; rascunho não. Qualquer Analista age em qualquer projeto (D13) | "Meu" só existe como `analyst_id` (quem assumiu a análise) |
+| Quem enxerga o quê? | Todos os projetos **enviados ou arquivados**, de qualquer proponente; rascunho não. Qualquer Analista **vê** qualquer projeto (D13); só o responsável age, e os outros assumem o projeto para continuar ([planejamento-responsavel-pela-analise.md](planejamento-responsavel-pela-analise.md)) | "Meu" só existe como `analyst_id` (quem assumiu a análise) |
 | Quanto tempo parado? | Histórico de etapas (`project_stage_history`): cada trecho tem entrada, saída e quem estava com o projeto | A fila mostra o tempo na **etapa**; o tempo com o **responsável atual** (analista, departamento) não aparece |
 | O projeto voltou por recusa do Revisor? | `project_framings` guarda cada rodada, com decisão e justificativa | A listagem só diz `pending` ou `confirmed`; recusado vira "sem enquadramento" e some do radar (T14: o Analista nem é avisado) |
 | O proponente reenviou? | O trecho aberto do histórico guarda a transição (`project.resubmit`) | Continua assim mesmo depois de o Analista conferir, então não serve sozinho |
@@ -97,6 +97,7 @@ Os 15 marcos mais novos dos projetos que o Analista enxerga. **Diferente do feed
 | `project.submit` | "Novo projeto enviado" (selo de fora do prazo) |
 | `project.resubmit` | "O proponente reenviou as correções" |
 | `project.start-analysis` | "<nome> assumiu a análise" |
+| `project.take-over` | "<nome> assumiu o projeto de outro analista" (`analysis_taken_over`); também conta em "assumi" |
 | `project.complement-request` | "<nome> devolveu para correção (N itens)" |
 | `project.assign-department` | "<nome> indicou o departamento <X>" |
 | `project.framing-confirm` | "O Revisor confirmou o enquadramento" |

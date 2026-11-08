@@ -173,12 +173,16 @@ func (s *Service) QueueOverview(ctx context.Context, actor Actor, perm authz.Fil
 	}, nil); err != nil {
 		return nil, err
 	}
-	// Reenviados pelo proponente: em análise, com o trecho aberto vindo do reenvio e nenhuma conferência depois dele.
+	// Reenviados pelo proponente: em análise, com o último reenvio sem nenhuma conferência depois dele. O trecho aberto vem do reenvio
+	// ou de um analista que assumiu o projeto depois dele (a troca de responsável abre outro trecho, mas o reenvio segue sem conferir).
 	if err := s.queueBlock(ctx, scoped(), &out.Blocks.Resubmitted, false, func(*queueQuery) (string, string) {
 		return `work = '` + workInAnalysis + `' AND EXISTS (SELECT 1 FROM project_stage_history h
-			WHERE h.project_id = w.id AND h.left_at IS NULL AND h.transition = 'project.resubmit'
-			AND NOT EXISTS (SELECT 1 FROM audit_logs l WHERE l.entity = 'project' AND l.entity_id = w.id::text
-				AND l.action = 'project.review-item' AND l.created_at >= h.entered_at))`, `since DESC`
+			WHERE h.project_id = w.id AND h.left_at IS NULL AND h.transition IN ('project.resubmit', 'project.take-over')
+			AND EXISTS (SELECT 1 FROM project_stage_history r WHERE r.project_id = w.id AND r.transition = 'project.resubmit'
+				AND r.entered_at = (SELECT max(r2.entered_at) FROM project_stage_history r2 WHERE r2.project_id = w.id AND r2.transition = 'project.resubmit')
+				AND r.entered_at <= h.entered_at
+				AND NOT EXISTS (SELECT 1 FROM audit_logs l WHERE l.entity = 'project' AND l.entity_id = w.id::text
+					AND l.action = 'project.review-item' AND l.created_at >= r.entered_at)))`, `since DESC`
 	}, nil); err != nil {
 		return nil, err
 	}

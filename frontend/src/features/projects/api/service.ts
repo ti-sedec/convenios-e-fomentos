@@ -353,6 +353,9 @@ const post = async (id: string, path: string, body?: unknown) =>
 /** O Analista assume a análise ("Aguardando análise de checklist" passa a "Em análise"). */
 export const startAnalysis = (id: string) => post(id, 'start-analysis');
 
+/** O Analista assume ativamente o projeto que está com outro analista: passa a ser o responsável pela análise. */
+export const takeOverAnalysis = (id: string) => post(id, 'take-over');
+
 /**
  * Aprova, reprova (com justificativa) ou desfaz a decisão sobre um item. Decidir sobre documento com arquivo exige ter visto cada
  * arquivo no visualizador.

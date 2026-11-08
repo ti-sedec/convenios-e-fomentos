@@ -12,7 +12,7 @@ import { useZipLookup } from '@/features/zip-codes/use-zip-lookup';
 import { cnpjValidators } from '@/components/forms/fields/cnpj-field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
-import { projectKeys } from '../api/queries';
+import { invalidateAfterSave, projectKeys } from '../api/queries';
 import { saveInstitution } from '../api/service';
 import type { Project } from '../api/types';
 import { formatCnpj, formatPhone, formatZip } from '../format';
@@ -61,8 +61,7 @@ export function InstitutionStep({
       }),
     onSuccess: (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
-      void qc.invalidateQueries({ queryKey: projectKeys.checklist(project.id) });
-      void qc.invalidateQueries({ queryKey: projectKeys.lists() });
+      void invalidateAfterSave(qc, project.id);
       toast.success('Dados da instituição salvos.');
       onSaved(saved, advance.current);
     }
@@ -256,11 +255,9 @@ export function InstitutionStep({
               <form.AppField
                 name='zip'
                 children={(f) => (
-                  <f.TextField
+                  <f.ZipField
                     label='CEP'
                     required
-                    inputMode='numeric'
-                    placeholder='00000-000'
                     description={zipLookup.loading ? 'Buscando…' : zipLookup.message || undefined}
                   />
                 )}
@@ -292,14 +289,7 @@ export function InstitutionStep({
             />
             <form.AppField
               name='phone'
-              children={(f) => (
-                <f.TextField
-                  label='Telefone institucional'
-                  required
-                  inputMode='tel'
-                  placeholder='(65) 3333-4444'
-                />
-              )}
+              children={(f) => <f.PhoneField label='Telefone institucional' required />}
             />
           </div>
 

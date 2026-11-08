@@ -23,10 +23,15 @@ type MySummary struct {
 // outro perfil consulta os números de alguém. Comparar pessoas seria outra decisão (painel de prazos, T29).
 func (s *Service) QueueMe(ctx context.Context, actor Actor) (*MySummary, error) {
 	var out MySummary
-	// start-analysis só é gravado quando a análise muda de mãos (é idempotente), então cada evento é uma análise assumida de verdade.
+	// start-analysis e take-over só são gravados quando a análise muda de mãos (são idempotentes), então cada evento é uma análise
+	// assumida de verdade (iniciada ou tomada de outro analista).
 	// Arquivar com o motivo "desistência" é do proponente (e, se for a mesma pessoa, não é trabalho de Analista).
 	count := func(action string, days int, extra string) string {
-		return `count(*) FILTER (WHERE action = '` + action + `' AND created_at >= now() - make_interval(days => ` + strconv.Itoa(days) + `)` + extra + `)`
+		cond := `action = '` + action + `'`
+		if action == actionStartAnalysis {
+			cond = `action IN ('` + actionStartAnalysis + `', '` + actionTakeOver + `')`
+		}
+		return `count(*) FILTER (WHERE ` + cond + ` AND created_at >= now() - make_interval(days => ` + strconv.Itoa(days) + `)` + extra + `)`
 	}
 	cols := []struct {
 		dst    *int

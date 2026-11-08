@@ -40,3 +40,7 @@ LIMIT 1;
 -- Quem remove o arquivo assinado do checklist cancela a declaração, para ela poder ser emitida de novo.
 -- name: CancelProjectDeclarationOfFile :execrows
 UPDATE project_declarations SET status = 'cancelled', updated_at = now() WHERE file_id = $1 AND status = 'signed';
+
+-- Declarações do projeto que aguardam a assinatura: a leitura do projeto ou do checklist consulta o MT-ID sobre elas.
+-- name: ListAwaitingProjectDeclarations :many
+SELECT * FROM project_declarations WHERE project_id = $1 AND status = 'awaiting_signature' ORDER BY created_at, id;

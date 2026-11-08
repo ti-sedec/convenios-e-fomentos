@@ -247,6 +247,8 @@ export interface ChecklistItem {
   status: 'missing' | 'done' | 'justified';
   /** A declaração assinada deste item ficou desatualizada porque o cadastro mudou: emita de novo. */
   declarationStale: boolean;
+  /** O que mudou na declaração assinada desatualizada (ver `DeclarationRecord.staleReasons`). */
+  declarationStaleReasons: string[];
   /** A declaração foi emitida e aguarda a assinatura: nada a fazer pelo proponente. */
   declarationAwaiting: boolean;
 }
@@ -429,6 +431,8 @@ export interface StageHistory {
 export interface AnalystInfo {
   id: string;
   name: string;
+  /** O analista responsável é quem consulta: só ele continua a análise. */
+  isMe: boolean;
 }
 
 /** O id some se o departamento foi excluído; o nome é o da data da indicação. */
@@ -635,6 +639,8 @@ export interface DeclarationRecord {
   fileId: string | null;
   /** O cadastro mudou depois da emissão: a declaração deixou de valer. */
   stale: boolean;
+  /** O que mudou (com `stale`): signer_role, signer_name, signer_cpf, text, place ou template. */
+  staleReasons: string[];
 }
 
 export interface DeclarationIssue {

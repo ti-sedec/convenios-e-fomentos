@@ -34,10 +34,19 @@ const sectionTab: Record<string, string> = {
   'document-options': 'documentos'
 };
 
-/** O Analista pode aprovar e desfazer quando o projeto está em análise e nenhum enquadramento aguarda decisão. */
+/** Só o analista responsável continua a análise; sem responsável (caso raro), qualquer Analista. */
+export function isResponsible(project: Project): boolean {
+  return !project.analyst || project.analyst.isMe;
+}
+
+/**
+ * O Analista pode aprovar e desfazer quando é o responsável, o projeto está em análise e nenhum enquadramento aguarda decisão.
+ * Os outros Analistas só visualizam: para continuar, assumem o projeto.
+ */
 export function canReviewNow(project: Project, can: (action: string) => boolean): boolean {
   return (
     can(projectActions.reviewItem) &&
+    isResponsible(project) &&
     project.status === 'submitted' &&
     project.stage === 'in_analysis' &&
     project.framing?.decision !== 'pending'

@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FieldGroup } from '@/components/ui/field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
-import { projectKeys } from '../api/queries';
+import { invalidateAfterSave, projectKeys } from '../api/queries';
 import { saveFunding } from '../api/service';
 import {
   fundingTypeLabels,
@@ -90,8 +90,7 @@ export function FundingStep({
     },
     onSuccess: (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
-      void qc.invalidateQueries({ queryKey: projectKeys.lists() });
-      void qc.invalidateQueries({ queryKey: projectKeys.checklist(project.id) });
+      void invalidateAfterSave(qc, project.id);
       toast.success('Recursos salvos.');
       onSaved(saved, advance.current);
     }

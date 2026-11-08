@@ -265,6 +265,55 @@ func (q *Queries) InsertProjectDeclaration(ctx context.Context, arg InsertProjec
 	return i, err
 }
 
+const listAwaitingProjectDeclarations = `-- name: ListAwaitingProjectDeclarations :many
+SELECT id, project_id, requirement_code, project_version, template_version, params_sha256, rendered_text, signer_name, signer_role, signer_cpf, accepted_by_id, accepted_by_cpf, accepted_at, accepted_ip, status, pdf_object_key, pdf_sha256, mtid_file_id, mtid_order_id, signed_at, file_id, created_at, updated_at FROM project_declarations WHERE project_id = $1 AND status = 'awaiting_signature' ORDER BY created_at, id
+`
+
+// Declarações do projeto que aguardam a assinatura: a leitura do projeto ou do checklist consulta o MT-ID sobre elas.
+func (q *Queries) ListAwaitingProjectDeclarations(ctx context.Context, projectID uuid.UUID) ([]ProjectDeclaration, error) {
+	rows, err := q.db.Query(ctx, listAwaitingProjectDeclarations, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProjectDeclaration{}
+	for rows.Next() {
+		var i ProjectDeclaration
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.RequirementCode,
+			&i.ProjectVersion,
+			&i.TemplateVersion,
+			&i.ParamsSha256,
+			&i.RenderedText,
+			&i.SignerName,
+			&i.SignerRole,
+			&i.SignerCpf,
+			&i.AcceptedByID,
+			&i.AcceptedByCpf,
+			&i.AcceptedAt,
+			&i.AcceptedIp,
+			&i.Status,
+			&i.PdfObjectKey,
+			&i.PdfSha256,
+			&i.MtidFileID,
+			&i.MtidOrderID,
+			&i.SignedAt,
+			&i.FileID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProjectDeclarations = `-- name: ListProjectDeclarations :many
 SELECT id, project_id, requirement_code, project_version, template_version, params_sha256, rendered_text, signer_name, signer_role, signer_cpf, accepted_by_id, accepted_by_cpf, accepted_at, accepted_ip, status, pdf_object_key, pdf_sha256, mtid_file_id, mtid_order_id, signed_at, file_id, created_at, updated_at FROM project_declarations WHERE project_id = $1 ORDER BY created_at, id
 `

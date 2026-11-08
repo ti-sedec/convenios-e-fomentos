@@ -1,3 +1,5 @@
+import { maskPhone, maskZip } from '@/lib/masks';
+
 export const onlyDigits = (s: string) => s.replace(/\D/g, '');
 
 /** 12345678909 → 123.456.789-09 (entradas que não têm 11 dígitos voltam como estão). */
@@ -8,18 +10,15 @@ export function formatCpf(v: string) {
 
 export { formatCnpj } from '@/lib/cnpj';
 
-/** 65999998888 → (65) 99999-8888; 6533334444 → (65) 3333-4444. */
+/** 65999998888 → (65) 9 9999-8888; 6533334444 → (65) 3333-4444 (outras entradas voltam como estão). */
 export function formatPhone(v: string) {
-  const d = onlyDigits(v);
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return v;
+  const n = onlyDigits(v).length;
+  return n === 10 || n === 11 ? maskPhone(v) : v;
 }
 
-/** 78000000 → 78000-000. */
+/** 78000000 → 78000-000 (entradas que não têm 8 dígitos voltam como estão). */
 export function formatZip(v: string) {
-  const d = onlyDigits(v);
-  return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : v;
+  return onlyDigits(v).length === 8 ? maskZip(v) : v;
 }
 
 /** AAAA-MM-DD → DD/MM/AAAA, sem passar por Date (que deslocaria o dia pelo fuso). */

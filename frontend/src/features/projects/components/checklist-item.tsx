@@ -28,8 +28,10 @@ import {
   type ChecklistItem,
   type ComplementItem,
   type DocFile,
-  type Project
+  type Project,
+  type SectionKey
 } from '../api/types';
+import { staleMessage } from '../declaration-hints';
 import { DeclarationPanel } from './declaration-panel';
 import { ProjectFileViewer, ViewFileButton, useFileViewer } from './project-file-viewer';
 import { ReturnedNote } from './returned-note';
@@ -60,11 +62,14 @@ export function ChecklistItemCard({
   project,
   item,
   editable,
-  returned
+  returned,
+  onGoStep
 }: {
   project: Project;
   item: ChecklistItem;
   editable: boolean;
+  /** Leva a pessoa a uma etapa do cadastro (as pendências das declarações apontam para onde corrigir). */
+  onGoStep?: (step: SectionKey) => void;
   /** O pedido de complementação aberto devolveu este documento. */
   returned?: ComplementItem;
 }) {
@@ -200,11 +205,16 @@ export function ChecklistItemCard({
 
       {item.declarationStale && item.status !== 'done' && (
         <p className='text-destructive text-sm'>
-          A declaração assinada ficou desatualizada porque o cadastro mudou. Gere e assine de novo.
+          {staleMessage(item.declarationStaleReasons, true)}
         </p>
       )}
       {GENERATED_DECLARATIONS.includes(item.code) && (
-        <DeclarationPanel projectId={projectId} item={item} editable={editable} />
+        <DeclarationPanel
+          projectId={projectId}
+          item={item}
+          editable={editable}
+          onGoStep={onGoStep}
+        />
       )}
 
       {item.files.length > 0 && (

@@ -49,7 +49,7 @@ A permissão de leitura de projeto do Analista e do Supervisor não tem condiç�
 8. Nomes do sistema nas etapas: "Aguardando análise de checklist", "Em análise", "Aguardando proponente". "Devolver para complementação".
 9. Reenvio cria nova versão e volta direto para "Em análise". Itens já aprovados e não alterados continuam aprovados.
 10. **D1:** depois de "Projeto enquadrado" a etapa passa a ser `awaiting_opinion` ("Aguardando parecer").
-11. **D2:** o e-mail ao "Analista" vai ao analista responsável (quem assumiu a análise); sem responsável, a todos os Analistas ativos.
+11. **D2:** o e-mail ao "Analista" vai ao analista responsável (quem assumiu a análise); sem responsável, a todos os Analistas ativos. **Atualização:** só o responsável continua a análise; outro Analista visualiza e precisa assumir o projeto (`take-over`). Ver [planejamento-responsavel-pela-analise.md](planejamento-responsavel-pela-analise.md).
 12. **D3:** a indicação é bloqueada se o departamento não tiver nenhum Revisor ativo.
 13. **D4:** o departamento ganha o marcador `is_finalistic`; só departamento finalístico pode ser indicado.
 14. **D5:** o papel "Finalística" do planejamento antigo é o "Revisor do Departamento" (já renomeado em `planejamento-cadastro-projeto.md`).
@@ -91,7 +91,8 @@ Três dimensões, como já era o desenho original (etapa, situação, parecer), 
 | De → Para | Quem | Rota | Regras e efeitos |
 |---|---|---|---|
 | Rascunho → `awaiting_checklist` | Proponente | `POST /submit` (existe) | Código, versão 1, comprovante. E-mail ao Proponente |
-| `awaiting_checklist` → `in_analysis` | Analista | `POST /start-analysis` (**novo**) | Grava `analyst_id`. Idempotente para o mesmo Analista; outro Analista recebe 409 |
+| `awaiting_checklist` → `in_analysis` | Analista | `POST /start-analysis` (**novo**) | Grava `analyst_id`. Idempotente para o mesmo Analista; outro Analista recebe 409 `not_responsible_analyst` (ver [planejamento-responsavel-pela-analise.md](planejamento-responsavel-pela-analise.md)) |
+| `in_analysis` / `awaiting_proponent`, com outro responsável | Analista | `POST /take-over` (**novo**) | Troca o `analyst_id`; só o responsável conferir, devolver, arquivar e indicar. Avisa o anterior por e-mail. Não vale com enquadramento pendente nem em `awaiting_opinion` |
 | `in_analysis` → `awaiting_proponent` | Analista | `POST /complement-requests` (existe) | Itens devolvidos voltam a `pending` na conferência. Prazo de 3 dias. E-mail ao Proponente. Bloqueado com enquadramento pendente (D11) |
 | `awaiting_proponent` → `in_analysis` | Proponente | `POST /resubmit` (existe) | Nova versão. Só itens devolvidos mudam; os demais conservam a aprovação |
 | `awaiting_proponent` → `archived` | Sistema | job (existe) | Motivo `complement_deadline`. E-mail aos 4 perfis (**ajustar**) |

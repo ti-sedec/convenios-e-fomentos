@@ -312,6 +312,7 @@ func (s *Service) Get(ctx context.Context, actor Actor, id uuid.UUID, read authz
 	if !read.AllowsRecord(refOf(r).Getter()) {
 		return nil, httpapi.ErrNotFound()
 	}
+	s.settleDeclarations(ctx, id) // só depois de conferir o acesso: quem não vê o projeto não dispara consulta ao MT-ID
 	v, err := s.view(ctx, s.q, r, actor)
 	if err == nil && v.Access != "" && v.Access != AccessOwner {
 		s.markAccepted(ctx, id, actor)
@@ -493,7 +494,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 				x.Department = &DepartmentRef{ID: depID, Name: str(depName)}
 			}
 			if anID != nil {
-				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName)}
+				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName), IsMe: *anID == p.Actor.ID}
 			}
 			x.StageSeconds = idle
 		} else {

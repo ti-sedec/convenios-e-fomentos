@@ -280,7 +280,7 @@ func (s *Service) DeclarationPreview(ctx context.Context, actor Actor, id uuid.U
 		if rec.Status == DeclAwaiting {
 			rec = s.refreshDeclaration(ctx, rec)
 		}
-		v := recordView(rec, d.ParamsSHA256)
+		v := recordView(rec, d)
 		d.Current = &v
 	}
 	d.redact()

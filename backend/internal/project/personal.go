@@ -102,8 +102,19 @@ func personalIssues(d PersonalData, who, field string) []Issue {
 	if d.MaritalStatus == "" {
 		add("maritalStatus", "marital", "o estado civil")
 	}
-	if strings.TrimSpace(d.Street) == "" || strings.TrimSpace(d.Number) == "" || strings.TrimSpace(d.District) == "" || d.MunicipalityIBGE == "" {
-		add("street", "address", "o endereço residencial (rua, número, bairro e município)")
+	// Uma pendência por parte do endereço: quem vê rua, bairro e cidade preenchidos precisa saber que só o número falta.
+	if strings.TrimSpace(d.Street) == "" {
+		add("street", "street", "a rua do endereço residencial")
+	}
+	if strings.TrimSpace(d.Number) == "" {
+		out = append(out, declIssue(field+".number", "decl_personal_number",
+			fmt.Sprintf("Informe o número do endereço residencial %s em Proponente (use S/N se não houver).", who)))
+	}
+	if strings.TrimSpace(d.District) == "" {
+		add("district", "district", "o bairro do endereço residencial")
+	}
+	if d.MunicipalityIBGE == "" {
+		add("municipalityIbge", "city", "o município do endereço residencial")
 	}
 	return out
 }

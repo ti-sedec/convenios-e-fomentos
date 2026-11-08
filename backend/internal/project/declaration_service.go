@@ -64,14 +64,60 @@ type DeclarationRecord struct {
 	FileID            *uuid.UUID `json:"fileId"`
 	// Stale: o cadastro mudou depois da emissão (o resumo do conteúdo não é mais o mesmo). Aguardando ou assinada, ela deixa de valer.
 	Stale bool `json:"stale"`
+	// StaleReasons diz o que mudou (códigos estáveis, só com Stale): signer_name, signer_role, signer_cpf, text, place, template.
+	StaleReasons []string `json:"staleReasons"`
 }
 
-func recordView(r db.ProjectDeclaration, currentHash string) DeclarationRecord {
-	active := r.Status == DeclAwaiting || r.Status == DeclSigned
-	return DeclarationRecord{
-		ID: r.ID, Status: r.Status, AcceptedAt: r.AcceptedAt, RequestedBySigner: r.AcceptedByCpf == r.SignerCpf,
-		SignerCPF: cpf.Mask(r.SignerCpf), SignedAt: r.SignedAt, FileID: r.FileID, Stale: active && r.ParamsSha256 != currentHash,
+// Motivos pelos quais uma declaração emitida deixou de refletir o cadastro (DeclarationRecord.StaleReasons).
+const (
+	StaleSignerName = "signer_name" // nome de quem assina
+	StaleSignerRole = "signer_role" // cargo de quem assina (vai impresso no PDF)
+	StaleSignerCPF  = "signer_cpf"  // CPF de quem assina (por exemplo, passou a assinar outro representante)
+	StaleText       = "text"        // o texto da declaração mudou (dados do projeto, da instituição ou da pessoa que entram nele)
+	StalePlace      = "place"       // município, nome da instituição ou município do endereço de quem assina
+	StaleTemplate   = "template"    // o modelo oficial foi atualizado
+)
+
+// staleReasons compara o que foi emitido com a declaração montada hoje e diz o que mudou. Só usa o que a emissão guardou (nome, cargo e
+// CPF de quem assina, texto e versão do modelo); o que sobrar de diferença no resumo é local ou instituição. Vazio se nada mudou.
+func staleReasons(r db.ProjectDeclaration, spec declSpec, d GeneratedDeclaration) []string {
+	if r.ParamsSha256 == d.ParamsSHA256 {
+		return []string{}
 	}
+	out := []string{}
+	if r.TemplateVersion != spec.version {
+		out = append(out, StaleTemplate)
+	}
+	if r.SignerName != d.SignerName {
+		out = append(out, StaleSignerName)
+	}
+	if r.SignerRole != d.SignerRole {
+		out = append(out, StaleSignerRole)
+	}
+	if r.SignerCpf != d.signerCPF {
+		out = append(out, StaleSignerCPF)
+	}
+	if r.RenderedText != strings.Join(d.Paragraphs, "\n\n") {
+		out = append(out, StaleText)
+	}
+	if len(out) == 0 {
+		out = append(out, StalePlace)
+	}
+	return out
+}
+
+// recordView é a situação da declaração emitida frente à declaração montada agora (d, com o texto ainda completo, sem a máscara do CPF).
+func recordView(r db.ProjectDeclaration, d GeneratedDeclaration) DeclarationRecord {
+	active := r.Status == DeclAwaiting || r.Status == DeclSigned
+	v := DeclarationRecord{
+		ID: r.ID, Status: r.Status, AcceptedAt: r.AcceptedAt, RequestedBySigner: r.AcceptedByCpf == r.SignerCpf,
+		SignerCPF: cpf.Mask(r.SignerCpf), SignedAt: r.SignedAt, FileID: r.FileID, Stale: active && r.ParamsSha256 != d.ParamsSHA256,
+		StaleReasons: []string{},
+	}
+	if v.Stale {
+		v.StaleReasons = staleReasons(r, declarationSpecs[r.RequirementCode], d)
+	}
+	return v
 }
 
 // AcceptDeclarationInput é o aceite: o resumo do texto que a pessoa leu e a confirmação de que quer emitir.
@@ -143,7 +189,7 @@ func (s *Service) AcceptDeclaration(ctx context.Context, actor Actor, id uuid.UU
 		return nil, err
 	}
 	if current != nil {
-		v := recordView(*current, d.ParamsSHA256)
+		v := recordView(*current, d)
 		d.Current = &v
 		d.redact()
 		return &d, nil
@@ -233,7 +279,7 @@ func (s *Service) AcceptDeclaration(ctx context.Context, actor Actor, id uuid.UU
 			s.log.WarnContext(ctx, "cancelando pedido de assinatura substituído", "project", id, "order", toCancel, "error", err)
 		}
 	}
-	v := recordView(rec, d.ParamsSHA256)
+	v := recordView(rec, d)
 	d.Current = &v
 	d.redact()
 	return &d, nil
@@ -317,6 +363,35 @@ func (s *Service) refreshDeclaration(ctx context.Context, rec db.ProjectDeclarat
 		return rec
 	}
 	return fresh
+}
+
+// settleDeclarations conclui as assinaturas pendentes do projeto: consulta o MT-ID sobre cada declaração que aguarda assinatura e, se
+// já foi assinada (ou recusada, ou venceu), registra o resultado e põe o arquivo no checklist. Quem lê o projeto, o checklist ou
+// envia o projeto vê o que o signatário já assinou sem precisar abrir a declaração. Chamada fora de transação (fala com a rede); a
+// falha do MT-ID não é erro de quem lê: o pedido segue pendente e vale a próxima leitura.
+func (s *Service) settleDeclarations(ctx context.Context, id uuid.UUID) {
+	if s.mtid == nil || s.store == nil {
+		return
+	}
+	recs, err := s.q.ListAwaitingProjectDeclarations(ctx, id)
+	if err != nil {
+		if s.log != nil {
+			s.log.WarnContext(ctx, "listando assinaturas pendentes", "project", id, "error", err)
+		}
+		return
+	}
+	for _, rec := range recs {
+		s.refreshDeclaration(ctx, rec)
+	}
+}
+
+// settleDeclarationsFor é settleDeclarations para as ações de gravação: só consulta o MT-ID se a decisão cobre o projeto.
+func (s *Service) settleDeclarationsFor(ctx context.Context, id uuid.UUID, dec authz.Decision) {
+	r, err := s.q.GetProject(ctx, id)
+	if err != nil || !dec.AllowsRecord(refOf(r).Getter()) {
+		return
+	}
+	s.settleDeclarations(ctx, id)
 }
 
 func (s *Service) warn(ctx context.Context, msg string, rec db.ProjectDeclaration, err error) {
@@ -433,6 +508,7 @@ func (s *Service) markStaleDeclarations(ctx context.Context, q *db.Queries, r db
 	}
 	for i := range cl.Items {
 		cl.Items[i].DeclarationAwaiting = awaiting[cl.Items[i].Code]
+		cl.Items[i].DeclarationStaleReasons = []string{}
 	}
 	if len(signed) == 0 {
 		return nil
@@ -445,10 +521,15 @@ func (s *Service) markStaleDeclarations(ctx context.Context, q *db.Queries, r db
 		it := &cl.Items[i]
 		rec, ok := signed[it.Code]
 		spec, hasSpec := declarationSpecs[it.Code]
-		if !ok || !hasSpec || buildDeclaration(spec, *p, env).ParamsSHA256 == rec.ParamsSha256 {
+		if !ok || !hasSpec {
+			continue
+		}
+		now := buildDeclaration(spec, *p, env)
+		if now.ParamsSHA256 == rec.ParamsSha256 {
 			continue
 		}
 		it.DeclarationStale = true
+		it.DeclarationStaleReasons = staleReasons(rec, spec, now)
 		if it.Status != ItemDone || hasOtherConfirmedFile(*it, rec) {
 			continue
 		}
