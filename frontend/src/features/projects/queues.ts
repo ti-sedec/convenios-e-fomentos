@@ -39,7 +39,8 @@ const analystTabs: QueueTab[] = [
 
 const reviewerTabs: QueueTab[] = [
   { key: 'pendentes', label: 'Pendentes de decisão', params: { ...active, framing: 'pending' } },
-  { key: 'confirmados', label: 'Confirmados', params: { ...active, framing: 'confirmed' } }
+  { key: 'confirmados', label: 'Confirmados', params: { ...active, framing: 'confirmed' } },
+  { key: 'arquivados', label: 'Arquivados', params: { status: 'archived' } }
 ];
 
 const generalTabs: QueueTab[] = [
