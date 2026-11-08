@@ -1,0 +1,445 @@
+# Stack de PRODUÇÃO (Portainer: Stacks > Add stack > Repository). Planejamento: docs/planejamento-deploy-producao.md;
+# passo a passo e operação: docs/deploy-producao.md. Variáveis: .env.prod.example (cole no campo "Environment variables").
+#
+#   Internet --TLS--> proxy do servidor --(rede externa "proxy")--> convenios-proxy (HAProxy, sem TLS)
+#                                                                     |- /api/*     -> convenios-api   (Go, binário)
+#                                                                     |- /storage/* -> convenios-minio (S3, URLs pré-assinadas)
+#                                                                     '- /          -> convenios-web   (Next.js, build de produção)
+#
+# Redes:  app     interna (sem saída para a internet), sub-rede FIXA: db, minio, gotenberg, clamav, api, web, jobs, haproxy
+#         egress  com saída: só quem precisa (api: MT Login/SMTP/ViaCEP; web: MT Login; clamav: atualização das assinaturas)
+#         proxy   externa, já existente no servidor: só o HAProxy entra nela
+#
+# Pré-requisito (uma vez): a rede externa do proxy do servidor precisa existir:  docker network create proxy
+# Nada aqui usa bind mount de arquivo do repositório (o Portainer clona o Git dentro do contêiner dele): configurações
+# vão dentro das imagens (build:) e os dados ficam em volumes nomeados.
+#
+# Os valores ${VAR:?...} são obrigatórios: sem eles o deploy falha com a mensagem indicada, em vez de subir quebrado.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+
+# Os três serviços abaixo usam a MESMA imagem; declarar o build em cada um (idêntico) evita que o Compose tente baixar
+# "convenios-api:prod" de um registry antes de construí-la. O BuildKit reaproveita o resultado.
+x-api-build: &api-build
+  context: ./backend
+  dockerfile: Dockerfile
+  target: api
+
+x-api-env: &api-env
+  APP_ENV: production
+  HTTP_PORT: "8080"
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # Limite de memória do runtime Go um pouco abaixo do limite do contêiner: o coletor age antes do OOM kill.
+  GOMEMLIMIT: ${API_GOMEMLIMIT:-400MiB}
+  DATABASE_URL: postgres://${POSTGRES_USER:-convenios}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD (use hexadecimal, gerada com openssl rand -hex 24)}@db:5432/${POSTGRES_DB:-convenios}?sslmode=disable
+  # Origem pública (https, sem barra final). Os links de e-mail abrem o frontend; o CORS vale só para esta origem.
+  PUBLIC_URL: ${APP_URL:?Defina APP_URL, por exemplo https://convenios.exemplo.gov.br}
+  CORS_ALLOWED_ORIGINS: ${APP_URL}
+  # Só a rede interna fixa da stack é proxy confiável (HAProxy e Next): é dela que o X-Forwarded-For é aceito.
+  TRUSTED_PROXIES: ${APP_SUBNET:-10.231.0.0/24}
+  # Login dos administradores (MT Login / Keycloak): a API só valida o access token.
+  JWKS_URI: ${JWKS_URI:?Defina JWKS_URI}
+  OIDC_ISSUER: ${OIDC_ISSUER:?Defina OIDC_ISSUER}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-${MTLOGIN_CLIENT_ID:?Defina MTLOGIN_CLIENT_ID}}
+  OIDC_CPF_CLAIM: ${OIDC_CPF_CLAIM:-preferred_username}
+  SEED_SUPER_ADMIN_CPF: ${SEED_SUPER_ADMIN_CPF:?Defina SEED_SUPER_ADMIN_CPF (CPFs dos Super Admins, separados por vírgula)}
+  # Segredos: a API recusa subir em produção com valor ausente, curto (< 32) ou de desenvolvimento.
+  JWT_API_SECRET: ${JWT_API_SECRET:?Defina JWT_API_SECRET (openssl rand -hex 32)}
+  API_TOKEN_SALT: ${API_TOKEN_SALT:?Defina API_TOKEN_SALT (openssl rand -hex 32)}
+  ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
+  REFRESH_TOKEN_MAX_TTL: ${REFRESH_TOKEN_MAX_TTL:-720h}
+  REFRESH_TOKEN_IDLE_TTL: ${REFRESH_TOKEN_IDLE_TTL:-168h}
+  RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-10}
+  RATE_LIMIT_GLOBAL_PER_MINUTE: ${RATE_LIMIT_GLOBAL_PER_MINUTE:-600}
+  RATE_LIMIT_UPLOAD_PER_MINUTE: ${RATE_LIMIT_UPLOAD_PER_MINUTE:-120}
+  RATE_LIMIT_CEP_PER_MINUTE: ${RATE_LIMIT_CEP_PER_MINUTE:-60}
+  CEP_API_BASE_URL: ${CEP_API_BASE_URL:-https://viacep.com.br/ws}
+  CEP_TIMEOUT: ${CEP_TIMEOUT:-3s}
+  # E-mail obrigatório: sem SMTP os avisos seriam descartados e ficariam como "enviados" (débito T2).
+  SMTP_HOST: ${SMTP_HOST:?Defina SMTP_HOST (sem SMTP nenhum aviso por e-mail sai)}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:?Defina SMTP_USER}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:?Defina SMTP_PASSWORD}
+  SMTP_FROM: ${SMTP_FROM:?Defina SMTP_FROM}
+  # Documentos no MinIO. A API fala com ele pela rede interna; o navegador usa as URLs pré-assinadas sobre
+  # STORAGE_PUBLIC_URL (mesmo domínio, prefixo /storage no HAProxy).
+  STORAGE_ENDPOINT: convenios-minio:9000
+  STORAGE_USE_SSL: "false"
+  STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-convenios-minio}
+  STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Defina MINIO_ROOT_PASSWORD (openssl rand -hex 24)}
+  STORAGE_BUCKET: ${MINIO_BUCKET:-documentos}
+  STORAGE_PUBLIC_URL: ${APP_URL}/storage
+  # Conversão de Word em PDF (visualizador) e antivírus, ambos só na rede interna.
+  PREVIEW_CONVERTER_URL: http://gotenberg:3000
+  CLAMAV_ADDR: clamav:3310
+  # O MT-ID real ainda não existe (docs/debito-tecnico-mt-id.md) e a API recusa o simulado em produção.
+  MTID_SIMULATE: "false"
+
+services:
+  # ---------------------------------------------------------------------------------------------------------------
+  # Dados
+  # ---------------------------------------------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-convenios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-convenios}
+      # Só vale na primeira criação do volume: detecta corrupção silenciosa de páginas.
+      POSTGRES_INITDB_ARGS: --data-checksums
+    # Sem porta publicada: só a rede interna alcança o banco.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 60s
+    shm_size: 256mb
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEM_LIMIT:-1g}
+    networks: [app]
+
+  # Armazenamento S3 dos documentos. As imagens oficiais minio/* deixaram de ser publicadas: usa-se a da Chainguard
+  # (a única tag gratuita é "latest"; depois do primeiro deploy a imagem fica no cache local, não rode "prune -a").
+  # O console web fica desligado (MINIO_BROWSER=off) e não tem rota no HAProxy.
+  convenios-minio:
+    image: ${MINIO_IMAGE:-chainguard/minio:latest}
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-convenios-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Defina MINIO_ROOT_PASSWORD}
+      MINIO_BROWSER: "off"
+    volumes:
+      - minio-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: ${MINIO_MEM_LIMIT:-1g}
+    networks: [app]
+
+  # Cria o bucket (privado por padrão). Se o MinIO ainda não estiver pronto o contêiner falha e é reiniciado até conseguir.
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-chainguard/minio-client:latest}
+    restart: on-failure
+    logging: *logging
+    <<: *hardening
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:-convenios-minio}:${MINIO_ROOT_PASSWORD}@convenios-minio:9000
+    command: ["mb", "--ignore-existing", "local/${MINIO_BUCKET:-documentos}"]
+    depends_on:
+      - convenios-minio
+    networks: [app]
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # Passos de uma execução (migrações e dados iniciais)
+  # ---------------------------------------------------------------------------------------------------------------
+  # A API NÃO aplica migrações sozinha: este serviço roda a cada deploy e a API só sobe depois que ele conclui.
+  migrate:
+    build: *api-build
+    image: convenios-api:prod
+    restart: "no"
+    logging: *logging
+    <<: *hardening
+    entrypoint: ["/cli", "migrate:up"]
+    read_only: true
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app]
+
+  # Roles e permissões padrão e os Super Admins de SEED_SUPER_ADMIN_CPF. Idempotente e não destrutivo (não desfaz o
+  # que os administradores alteraram); em produção não cria usuários de exemplo.
+  seed:
+    build: *api-build
+    image: convenios-api:prod
+    restart: "no"
+    logging: *logging
+    <<: *hardening
+    entrypoint: ["/cli", "seed"]
+    read_only: true
+    environment: *api-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Com saída: o app.New() carrega as chaves do JWKS do MT Login (sem elas só registra um erro, mas sujaria o log).
+    networks: [app, egress]
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # Aplicação
+  # ---------------------------------------------------------------------------------------------------------------
+  convenios-api:
+    build: *api-build
+    image: convenios-api:prod
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    read_only: true
+    cap_drop: [ALL]
+    environment: *api-env
+    # O encerramento da API leva até ~35 s (15 s de requisições + 20 s do envio de e-mail em andamento).
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      gotenberg:
+        condition: service_started
+      # service_started (e não healthy): a primeira subida do ClamAV baixa as assinaturas e leva minutos; a API não
+      # deve ficar de fora por isso. Sem o clamd a varredura falha fechada (o envio é recusado), nunca aprova sem olhar.
+      clamav:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEM_LIMIT:-512m}
+    networks: [app, egress]
+
+  convenios-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Embutida no build do Next (metadataBase): mudar o domínio exige reconstruir esta imagem.
+        NEXT_PUBLIC_APP_URL: ${APP_URL}
+    image: convenios-web:prod
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    environment:
+      # O servidor do Next fala com a API pela rede interna; o navegador só fala com o Next (cookies httpOnly).
+      API_URL: http://convenios-api:8080
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+      MTLOGIN_AUTHORIZATION_URI: ${MTLOGIN_AUTHORIZATION_URI:?Defina MTLOGIN_AUTHORIZATION_URI}
+      MTLOGIN_TOKEN_URI: ${MTLOGIN_TOKEN_URI:?Defina MTLOGIN_TOKEN_URI}
+      MTLOGIN_END_SESSION_URI: ${MTLOGIN_END_SESSION_URI:?Defina MTLOGIN_END_SESSION_URI}
+      MTLOGIN_CLIENT_ID: ${MTLOGIN_CLIENT_ID:?Defina MTLOGIN_CLIENT_ID}
+      # Só para client confidencial; client público (PKCE) deixa vazio.
+      MTLOGIN_CLIENT_SECRET: ${MTLOGIN_CLIENT_SECRET:-}
+      # Precisa estar cadastrada no client do Keycloak, assim como a de pós-logout (<APP_URL>/auth/sign-in).
+      MTLOGIN_REDIRECT_URI: ${APP_URL}/auth/callback
+      NEXT_TELEMETRY_DISABLED: "1"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/auth/sign-in').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      convenios-api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${WEB_MEM_LIMIT:-768m}
+    networks: [app, egress]
+
+  # Converte Word em PDF (LibreOffice) para o visualizador da análise. Só a API o alcança; sem saída para a internet.
+  gotenberg:
+    image: ${GOTENBERG_IMAGE:-gotenberg/gotenberg:8}
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    command:
+      - gotenberg
+      - --api-timeout=90s
+      - --chromium-disable-javascript=true
+      - --api-disable-health-check-logging=true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: ${GOTENBERG_MEM_LIMIT:-2g}
+    networks: [app]
+
+  # Antivírus dos arquivos enviados. A primeira subida baixa as assinaturas (alguns minutos, precisa de saída para a
+  # internet); depois elas ficam no volume. StreamMaxLength e MaxFileSize cobrem o maior arquivo aceito (200 MB): acima
+  # do limite o clamd recusa ou ignora o arquivo.
+  clamav:
+    image: ${CLAMAV_IMAGE:-clamav/clamav:1.4}
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    environment:
+      CLAMD_CONF_StreamMaxLength: 250M
+      CLAMD_CONF_MaxFileSize: 250M
+      CLAMD_CONF_MaxScanSize: 500M
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
+    deploy:
+      resources:
+        limits:
+          memory: ${CLAMAV_MEM_LIMIT:-3g}
+    networks: [app, egress]
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # Rotinas
+  # ---------------------------------------------------------------------------------------------------------------
+  # Limpeza diária: sessões e tokens vencidos, e-mails já enviados, envios de arquivo nunca confirmados (débito T1).
+  # CLEANUP_DRAFT_DAYS > 0 também apaga rascunhos de projeto sem alteração há mais de N dias (padrão 0 = não apaga).
+  cleanup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+    image: convenios-tools:prod
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          /usr/local/bin/cli cleanup --days "$${CLEANUP_DAYS}" --draft-days "$${CLEANUP_DRAFT_DAYS}" || echo "cleanup falhou; tenta de novo no próximo ciclo"
+          sleep 86400 &
+          wait $$!
+        done
+    environment:
+      <<: *api-env
+      CLEANUP_DAYS: ${CLEANUP_DAYS:-7}
+      CLEANUP_DRAFT_DAYS: ${CLEANUP_DRAFT_DAYS:-0}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    # Com saída pelo mesmo motivo do seed (JWKS do MT Login).
+    networks: [app, egress]
+
+  # pg_dump diário (BACKUP_HOUR_UTC) com retenção de BACKUP_RETENTION_DAYS, no volume "backups". O dump fica no MESMO
+  # servidor: copie o volume para fora dele (ver docs/deploy-producao.md). Os documentos do MinIO não entram aqui.
+  backup:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    image: convenios-backup:prod
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    init: true
+    cap_drop: [ALL]
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-convenios}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-convenios}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-6}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_ON_START: ${BACKUP_ON_START:-false}
+    volumes:
+      - backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks: [app]
+
+  # ---------------------------------------------------------------------------------------------------------------
+  # Entrada
+  # ---------------------------------------------------------------------------------------------------------------
+  # Roteador interno. O proxy do servidor aponta para "convenios-proxy:80" pela rede "proxy" ou, se ele roda no
+  # próprio host, para 127.0.0.1:${HAPROXY_PORT} (a porta só escuta no loopback, nunca na internet).
+  convenios-proxy:
+    build:
+      context: ./haproxy
+      dockerfile: Dockerfile
+    image: convenios-proxy:prod
+    restart: unless-stopped
+    logging: *logging
+    <<: *hardening
+    cap_drop: [ALL]
+    read_only: true
+    ports:
+      - "127.0.0.1:${HAPROXY_PORT:-8090}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      convenios-api:
+        condition: service_healthy
+      convenios-web:
+        condition: service_healthy
+      convenios-minio:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    networks:
+      app:
+      proxy:
+
+networks:
+  # Interna: sem saída para a internet. A sub-rede é fixa para que TRUSTED_PROXIES (ver acima) não dependa do que o
+  # Docker sortear. Se der "Pool overlaps", escolha outra faixa livre em APP_SUBNET.
+  app:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${APP_SUBNET:-10.231.0.0/24}
+  egress:
+  # Rede do proxy do servidor (criada fora desta stack).
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-proxy}
+
+volumes:
+  pgdata:
+  minio-data:
+  clamav-db:
+  backups:
