@@ -429,6 +429,8 @@ export interface StageHistory {
 export interface AnalystInfo {
   id: string;
   name: string;
+  /** O analista responsável é quem consulta: só ele continua a análise. */
+  isMe: boolean;
 }
 
 /** O id some se o departamento foi excluído; o nome é o da data da indicação. */

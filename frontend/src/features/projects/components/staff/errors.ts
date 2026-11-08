@@ -7,6 +7,7 @@ const staleCodes = new Set([
   'framing_already_decided',
   'framing_round_stale',
   'framing_pending',
+  'not_responsible_analyst',
   'analysis_not_started',
   'project_stage_invalid',
   'project_not_submitted',

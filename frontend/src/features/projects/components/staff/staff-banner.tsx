@@ -2,8 +2,31 @@
 
 import { Icons } from '@/components/icons';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { archiveReasonLabels, type Project } from '../../api/types';
+import { useCan } from '@/features/auth/session-provider';
+import { archiveReasonLabels, projectActions, type Project } from '../../api/types';
 import { formatDateTimeCuiaba } from '../../format';
+
+/**
+ * Aviso ao Analista que não é o responsável: vê o projeto, mas não continua a análise sem assumi-lo. Só aparece enquanto a análise
+ * está com a equipe (em análise ou aguardando o proponente).
+ */
+export function ResponsibleNotice({ project }: { project: Project }) {
+  const can = useCan();
+  const analyst = project.analyst;
+  if (!can(projectActions.startAnalysis) || !analyst || analyst.isMe) return null;
+  if (project.status !== 'submitted') return null;
+  if (project.stage !== 'in_analysis' && project.stage !== 'awaiting_proponent') return null;
+  return (
+    <Alert>
+      <Icons.eye aria-hidden />
+      <AlertTitle>Este projeto está com {analyst.name}</AlertTitle>
+      <AlertDescription>
+        Você pode visualizá-lo, mas não pode conferir itens, devolver, arquivar nem indicar o
+        departamento. Para continuar a análise, assuma o projeto: ele passa a ser seu.
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 /** Faixa de situação do projeto para a equipe: arquivamento, correções com o proponente, decisão do departamento ou parecer. */
 export function StaffBanner({ project }: { project: Project }) {

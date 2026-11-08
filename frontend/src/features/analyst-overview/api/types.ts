@@ -71,6 +71,7 @@ export type QueueActivityKind =
   | 'submitted'
   | 'resubmitted'
   | 'analysis_started'
+  | 'analysis_taken_over'
   | 'complement_requested'
   | 'department_assigned'
   | 'framing_confirmed'

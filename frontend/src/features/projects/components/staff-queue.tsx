@@ -157,7 +157,7 @@ export function StaffQueue() {
           aria-pressed={mine}
           onClick={() => void setFilters({ analista: mine ? '' : 'eu', page: 1 })}
         >
-          Só os que assumi
+          Meus projetos
         </Button>
         {canFilterByDepartment && departmentItems.length > 1 && (
           <Select
@@ -312,7 +312,15 @@ export function StaffQueue() {
                         <Situation p={p} />
                       </TableCell>
                       <TableCell>
-                        {p.analyst?.name ?? <span className='text-muted-foreground'>—</span>}
+                        {p.analyst ? (
+                          p.analyst.isMe ? (
+                            'Você'
+                          ) : (
+                            p.analyst.name
+                          )
+                        ) : (
+                          <span className='text-muted-foreground'>—</span>
+                        )}
                       </TableCell>
                       <TableCell className='tabular-nums'>
                         {p.stageSeconds === undefined ? (

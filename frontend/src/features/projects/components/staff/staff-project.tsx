@@ -19,7 +19,7 @@ import { FramingPanel } from './framing-panel';
 import { HistoryPanel } from './history-panel';
 import { ReviewPanel } from './review-panel';
 import { StaffActions } from './staff-actions';
-import { StaffBanner } from './staff-banner';
+import { ResponsibleNotice, StaffBanner } from './staff-banner';
 
 interface TabSpec {
   key: string;
@@ -89,8 +89,11 @@ export function StaffProjectView({ project }: { project: Project }) {
       <p className='text-muted-foreground text-sm'>
         {project.institution.name || 'Instituição não informada'}
         {project.framing && <> · Departamento: {project.framing.department.name}</>}
-        {project.analyst && <> · Analista: {project.analyst.name}</>}
+        {project.analyst && (
+          <> · Analista: {project.analyst.isMe ? 'você' : project.analyst.name}</>
+        )}
       </p>
+      <ResponsibleNotice project={project} />
       <StaffBanner project={project} />
       <StaffActions project={project} />
 

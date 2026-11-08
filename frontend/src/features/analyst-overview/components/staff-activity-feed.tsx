@@ -18,6 +18,7 @@ const icons: Record<string, keyof typeof Icons> = {
   submitted: 'send',
   resubmitted: 'refresh',
   analysis_started: 'eye',
+  analysis_taken_over: 'eye',
   complement_requested: 'warning',
   department_assigned: 'building',
   framing_confirmed: 'circleCheck',
@@ -48,6 +49,8 @@ function describe(it: QueueActivityItem): string {
         : 'O proponente reenviou as correções.';
     case 'analysis_started':
       return `${by} assumiu a análise.`;
+    case 'analysis_taken_over':
+      return `${by} assumiu o projeto de outro analista.`;
     case 'complement_requested':
       return [
         `${by} devolveu para correção`,
