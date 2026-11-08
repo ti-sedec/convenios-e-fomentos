@@ -31,7 +31,7 @@ Marque cada item ao concluir. Em qualquer divergência, anote a tela, o perfil e
 
 ### B. Envio e início da análise
 - [ ] O Proponente envia um projeto completo. Ele aparece em *Aguardando análise* do Analista (e só então).
-- [ ] O Analista abre o projeto: vê o cabeçalho, as abas do cadastro **sem nenhum botão de edição**, e **Iniciar análise**.
+- [ ] O Analista abre o projeto: vê o cabeçalho, a aba *Projeto completo* (leitura, **sem nenhum botão de edição**), e **Iniciar análise**.
 - [ ] Ao iniciar, o projeto vai para *Em análise*, e o nome do Analista aparece como responsável.
 
 ### C. Conferência
@@ -65,8 +65,9 @@ Marque cada item ao concluir. Em qualquer divergência, anote a tela, o perfil e
 - [ ] Indica o Financeiro. Os Supervisores recebem o e-mail (log) **sem CPF, telefone ou endereço**.
 - [ ] O projeto some das ações do Analista (devolver, arquivar, aprovar) enquanto está pendente.
 - [ ] **Revisor 1** vê o projeto em *Pendentes*; **Revisor 2** não vê o projeto nem na lista nem pelo endereço.
-- [ ] **Revisor 1**, na aba *Documentos* do projeto pendente: cada arquivo (do checklist e dos adicionais) tem **Visualizar** ao lado de **Baixar**. Abre o arquivo no modal, sem decisão (só **Baixar original** e **Fechar**), com a lista lateral quando o documento tem vários arquivos. PDF, imagem e Word (convertido) aparecem; nada é baixado.
-- [ ] **Analista** em análise: o **Visualizar** da aba *Documentos* abre o mesmo modal da Conferência, com **Aprovar** e **Reprovar**. Fora da análise (ou com enquadramento pendente) o modal é só de leitura.
+- [ ] **Revisor 1** abre o projeto direto no **Resumo** (identificação, proposta e recursos; do proponente só nome e cargo, sem CPF, telefone e e-mail) e vê os botões de decisão acima das abas. A aba *Projeto completo* mostra todas as seções e os documentos.
+- [ ] **Revisor 1**, na aba *Projeto completo*, seção *Documentos* do projeto pendente: cada arquivo (do checklist e dos adicionais) tem **Visualizar** ao lado de **Baixar**. Abre o arquivo no modal, sem decisão (só **Baixar original** e **Fechar**), com a lista lateral quando o documento tem vários arquivos. PDF, imagem e Word (convertido) aparecem; nada é baixado.
+- [ ] **Analista** em análise: o **Visualizar** da seção *Documentos* da aba *Projeto completo* abre o mesmo modal da Conferência, com **Aprovar** e **Reprovar**. Fora da análise (ou com enquadramento pendente) o modal é só de leitura.
 - [ ] **Proponente**, nas abas *Documentos* e em projeto devolvido: **Visualizar** abre o próprio arquivo no modal, sem decisão e sem registrar "visto".
 - [ ] Revisor 1 **recusa** com justificativa: o projeto volta ao Analista, aparece no histórico com a justificativa, o Supervisor recebe o e-mail. O Analista **não** recebe e-mail.
 - [ ] O Analista indica o Jurídico (o diálogo lembra a última recusa). Revisor 2 **confirma**: etapa vira *Aguardando parecer*; o Proponente vê "Projeto enquadrado".

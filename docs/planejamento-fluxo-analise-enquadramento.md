@@ -293,7 +293,7 @@ Seguindo as convenções existentes: feature `features/projects` com `api/types.
 | Tela / componente | Quem | Conteúdo |
 |---|---|---|
 | Listas por perfil em `/dashboard/projetos` | Todos | Filtros `stage`/`framing`/`departmentId` e colunas conforme o perfil. Analista: fila "Aguardando análise de checklist" e "Em análise". Revisor: enquadramentos pendentes. Secretário e Supervisor: todos |
-| Detalhe do projeto em modo equipe | Equipe | Leitura das seções (reaproveita o resumo de `review-step.tsx`) com CPF mascarado |
+| Detalhe do projeto em modo equipe | Equipe | Duas visualizações de leitura (não são o formulário do cadastro): **Resumo** enxuto para o Revisor e **Projeto completo** para os demais perfis, com o completo a uma aba de distância do Revisor. Detalhes em `planejamento-visualizacao-projeto.md` |
 | Painel de conferência | Analista | Aprovar por seção e por documento, indicador "abrir o documento para aprovar", progresso |
 | Barra de decisão | Analista | Devolver para complementação, arquivar por falta de documentos, e o campo **Departamento** que só aparece com tudo aprovado |
 | Painel de enquadramento | Revisor | Confirmar ou recusar (justificativa obrigatória); mostra o histórico de rodadas |

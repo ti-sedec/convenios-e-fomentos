@@ -1,11 +1,9 @@
 'use client';
 
 import { parseAsString, useQueryState } from 'nuqs';
-import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCan } from '@/features/auth/session-provider';
-import { accessOf } from '../../access';
 import {
   framingStatusLabels,
   instrumentLabels,
@@ -14,61 +12,53 @@ import {
   statusLabels,
   type Project
 } from '../../api/types';
-import { DocumentsStep } from '../documents-step';
-import { FundingStep } from '../funding-step';
-import { InstitutionStep } from '../institution-step';
-import { ProponentStep } from '../proponent-step';
-import { ProposalStep } from '../proposal-step';
+import { ProjectFull, sectionAnchor } from '../project-view/project-full';
+import { ProjectSummary } from '../project-view/project-summary';
+import { staffViewModeOf } from '../project-view/view-mode';
 import { FramingPanel } from './framing-panel';
 import { HistoryPanel } from './history-panel';
 import { ReviewPanel } from './review-panel';
 import { StaffActions } from './staff-actions';
 import { StaffBanner } from './staff-banner';
 
-// A equipe só lê: os formulários do cadastro abrem em modo somente leitura e nada é salvo.
-const noop = () => undefined;
-
 interface TabSpec {
   key: string;
   label: string;
 }
 
-const registrationTabs: TabSpec[] = [
-  { key: 'proponente', label: 'Proponente' },
-  { key: 'instituicao', label: 'Instituição' },
-  { key: 'proposta', label: 'Proposta' },
-  { key: 'recursos', label: 'Recursos' },
-  { key: 'documentos', label: 'Documentos' }
-];
-
 /**
- * O projeto visto pela equipe (quem não é titular nem membro): cabeçalho com a situação, abas somente leitura do cadastro e dos
- * documentos, e o histórico. As ações e a conferência entram nos painéis ao lado.
+ * O projeto visto pela equipe (quem não é titular nem membro): cabeçalho com a situação, o banner e as ações, e as abas. O Revisor do
+ * Departamento abre no resumo enxuto; os demais perfis, na conferência ou na visualização completa (as duas são de leitura, não são o
+ * formulário do cadastro). A visualização completa fica a uma aba de distância para todos.
  */
 export function StaffProjectView({ project }: { project: Project }) {
   const can = useCan();
   const [tab, setTab] = useQueryState('aba', parseAsString.withDefault(''));
-  // Relógio da tela, fixado na montagem (a leitura da hora não pode acontecer a cada renderização).
-  const [now] = useState(() => Date.now());
-  const access = accessOf(project, false, now);
+  const mode = staffViewModeOf(can);
 
-  // A conferência é a primeira aba de quem confere; os demais perfis começam pelo cadastro.
-  const reviewTab: TabSpec[] = project.review ? [{ key: 'conferencia', label: 'Conferência' }] : [];
-  const framingTab: TabSpec[] =
-    project.status === 'draft' ? [] : [{ key: 'enquadramento', label: 'Enquadramento' }];
   const tabs: TabSpec[] = [
-    ...reviewTab,
-    ...framingTab,
-    ...registrationTabs,
+    ...(mode === 'summary' ? [{ key: 'resumo', label: 'Resumo' }] : []),
+    ...(mode === 'full' && project.review ? [{ key: 'conferencia', label: 'Conferência' }] : []),
+    ...(project.status === 'draft' ? [] : [{ key: 'enquadramento', label: 'Enquadramento' }]),
+    { key: 'completo', label: 'Projeto completo' },
     { key: 'historico', label: 'Histórico' }
   ];
-  // Cada perfil começa onde trabalha: o Analista na conferência, o Revisor no enquadramento.
-  let first = 'proponente';
-  if (project.review && can(projectActions.reviewItem)) first = 'conferencia';
+  // Cada perfil começa onde trabalha: o Revisor no resumo, o Analista na conferência.
+  let first = 'completo';
+  if (mode === 'summary') first = 'resumo';
+  else if (project.review && can(projectActions.reviewItem)) first = 'conferencia';
   else if (project.framing && can(projectActions.reviewFraming)) first = 'enquadramento';
   const current = tabs.find((t) => t.key === tab) ?? tabs.find((t) => t.key === first) ?? tabs[0];
   const pending = project.review?.summary.pending ?? 0;
-  const common = { project, onSaved: noop, onDirty: noop, readOnly: true };
+
+  // "Ver dados" da conferência aponta uma seção do cadastro: abre a visualização completa e rola até ela.
+  const goSection = (section: string) => {
+    void setTab('completo').then(() =>
+      requestAnimationFrame(() =>
+        document.getElementById(sectionAnchor(section))?.scrollIntoView({ block: 'start' })
+      )
+    );
+  };
 
   return (
     <div className='space-y-4'>
@@ -121,26 +111,17 @@ export function StaffProjectView({ project }: { project: Project }) {
             </TabsTrigger>
           ))}
         </TabsList>
+        <TabsContent value='resumo'>
+          <ProjectSummary project={project} />
+        </TabsContent>
         <TabsContent value='conferencia'>
-          <ReviewPanel project={project} onGoTab={(t) => void setTab(t)} />
+          <ReviewPanel project={project} onGoTab={goSection} />
         </TabsContent>
         <TabsContent value='enquadramento'>
           <FramingPanel project={project} />
         </TabsContent>
-        <TabsContent value='proponente' className='max-w-3xl'>
-          <ProponentStep key={project.version} {...common} />
-        </TabsContent>
-        <TabsContent value='instituicao' className='max-w-3xl'>
-          <InstitutionStep key={project.version} {...common} />
-        </TabsContent>
-        <TabsContent value='proposta' className='max-w-3xl'>
-          <ProposalStep key={project.version} {...common} />
-        </TabsContent>
-        <TabsContent value='recursos' className='max-w-3xl'>
-          <FundingStep key={project.version} {...common} />
-        </TabsContent>
-        <TabsContent value='documentos' className='max-w-3xl'>
-          <DocumentsStep project={project} access={access} />
+        <TabsContent value='completo'>
+          <ProjectFull project={project} />
         </TabsContent>
         <TabsContent value='historico'>
           <HistoryPanel project={project} />

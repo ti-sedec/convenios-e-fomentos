@@ -23,7 +23,9 @@ import {
   type Project,
   type SectionKey
 } from '../api/types';
-import { formatBrl, formatCnpj, formatDate } from '../format';
+import { formatBrl, formatCnpj } from '../format';
+import { AmendmentRows, ExecutionRows, documentsLine } from './project-view/parts';
+import { ViewRow as Row } from './project-view/primitives';
 
 /** Mesmo texto que o servidor registra no aceite. */
 const DECLARATION =
@@ -34,16 +36,6 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeStyle: 'short',
   timeZone: 'America/Cuiaba'
 });
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  if (!children) return null;
-  return (
-    <div className='grid gap-1 sm:grid-cols-[11rem_1fr]'>
-      <dt className='text-muted-foreground text-sm'>{label}</dt>
-      <dd className='text-sm'>{children}</dd>
-    </div>
-  );
-}
 
 function Summary({ project }: { project: Project }) {
   const { institution: i, proposal: p, funding: f, documents: d } = project;
@@ -61,56 +53,12 @@ function Summary({ project }: { project: Project }) {
             {i.name}
             {i.cnpj && <span className='text-muted-foreground'> · {formatCnpj(i.cnpj)}</span>}
           </Row>
-          <Row label='Vigência'>
-            {p.executionPeriods.length > 1 && p.startDate && p.endDate
-              ? `${formatDate(p.startDate)} a ${formatDate(p.endDate)}`
-              : ''}
-          </Row>
-          <Row label={p.executionPeriods.length > 1 ? 'Períodos e locais' : 'Execução em'}>
-            {p.executionPeriods.length > 0 && (
-              <ul className='space-y-1'>
-                {p.executionPeriods.map((e, i) => (
-                  <li key={e.id ?? i}>
-                    {[
-                      e.startDate && e.endDate
-                        ? `${formatDate(e.startDate)} a ${formatDate(e.endDate)}`
-                        : '',
-                      e.municipality?.name ?? '',
-                      e.placeDetail
-                    ]
-                      .filter(Boolean)
-                      .join(' — ')}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Row>
+          <ExecutionRows proposal={p} />
           <Row label='Tipo de recurso'>{f.type ? fundingTypeLabels[f.type] : ''}</Row>
-          {f.amendments.map((a, n) => (
-            <Row key={a.id || n} label={`Emenda ${n + 1}`}>
-              <div className='flex flex-wrap items-baseline justify-between gap-x-4'>
-                <span>
-                  {a.parliamentarianName || 'Parlamentar não informado'}
-                  {(a.number || a.year > 0) && (
-                    <span className='text-muted-foreground'>
-                      {' · '}
-                      {[a.number && `nº ${a.number}`, a.year > 0 && a.year]
-                        .filter(Boolean)
-                        .join('/')}
-                    </span>
-                  )}
-                </span>
-                <span className='tabular-nums'>{formatBrl(a.amountCents)}</span>
-              </div>
-            </Row>
-          ))}
+          <AmendmentRows funding={f} />
           <Row label='Total solicitado'>{f.totalCents ? formatBrl(f.totalCents) : ''}</Row>
           <Row label='Contrapartida'>{f.counterpartCents ? formatBrl(f.counterpartCents) : ''}</Row>
-          <Row label='Documentos'>
-            {d.total
-              ? `${d.done} anexados, ${d.justified} justificados, ${d.missing} pendentes (de ${d.total})`
-              : ''}
-          </Row>
+          <Row label='Documentos'>{documentsLine(d)}</Row>
         </dl>
       </CardContent>
     </Card>

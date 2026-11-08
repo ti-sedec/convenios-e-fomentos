@@ -358,13 +358,16 @@ export function ExtraDocuments({
   project,
   docs,
   access,
-  onlyReturned
+  onlyReturned,
+  readOnly = false
 }: {
   project: Project;
   docs: ExtraDocument[];
   access: Access;
   /** Mostra só os devolvidos pela equipe (o filtro "só o que falta" da aba). */
   onlyReturned?: boolean;
+  /** Visualização da equipe: some a orientação de anexar e o limite. */
+  readOnly?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const canAdd = access.extra(false);
@@ -377,11 +380,13 @@ export function ExtraDocuments({
         <h3 id='group-extra' className='text-base font-semibold'>
           Outros documentos
         </h3>
-        <p className='text-muted-foreground text-sm'>
-          Opcional. Anexe documentos que não estão na lista acima: título, descrição (opcional) e um
-          arquivo. Até {MAX_EXTRA_DOCUMENTS} documentos ({docs.length} de {MAX_EXTRA_DOCUMENTS}
-          ).
-        </p>
+        {!readOnly && (
+          <p className='text-muted-foreground text-sm'>
+            Opcional. Anexe documentos que não estão na lista acima: título, descrição (opcional) e
+            um arquivo. Até {MAX_EXTRA_DOCUMENTS} documentos ({docs.length} de {MAX_EXTRA_DOCUMENTS}
+            ).
+          </p>
+        )}
       </div>
       {shown.length > 0 && (
         <ul className='space-y-3'>
