@@ -86,6 +86,24 @@ function Summary({ project }: { project: Project }) {
             )}
           </Row>
           <Row label='Tipo de recurso'>{f.type ? fundingTypeLabels[f.type] : ''}</Row>
+          {f.amendments.map((a, n) => (
+            <Row key={a.id || n} label={`Emenda ${n + 1}`}>
+              <div className='flex flex-wrap items-baseline justify-between gap-x-4'>
+                <span>
+                  {a.parliamentarianName || 'Parlamentar não informado'}
+                  {(a.number || a.year > 0) && (
+                    <span className='text-muted-foreground'>
+                      {' · '}
+                      {[a.number && `nº ${a.number}`, a.year > 0 && a.year]
+                        .filter(Boolean)
+                        .join('/')}
+                    </span>
+                  )}
+                </span>
+                <span className='tabular-nums'>{formatBrl(a.amountCents)}</span>
+              </div>
+            </Row>
+          ))}
           <Row label='Total solicitado'>{f.totalCents ? formatBrl(f.totalCents) : ''}</Row>
           <Row label='Contrapartida'>{f.counterpartCents ? formatBrl(f.counterpartCents) : ''}</Row>
           <Row label='Documentos'>
