@@ -88,6 +88,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionRequestComplement)).Post("/admin/projects/{id}/complement-requests", h.requestComplement)
 	r.With(g(ActionArchive)).Post("/admin/projects/{id}/archive", h.archive)
 	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/start-analysis", h.startAnalysis)
+	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/take-over", h.takeOver)
 	r.With(g(ActionReviewItem)).Put("/admin/projects/{id}/review/items", h.reviewItem)
 	r.With(g(ActionAssignDepartment)).Put("/admin/projects/{id}/department", h.assignDepartment)
 	r.With(g(ActionReviewFraming)).Post("/admin/projects/{id}/framing/confirm", h.confirmFraming)
@@ -188,6 +189,11 @@ func parseStaffFilters(q url.Values, p *ListParams) error {
 		dst  **uuid.UUID
 	}{{"department", &p.Department}, {"analyst", &p.Analyst}} {
 		if v := q.Get(f.name); v != "" {
+			if v == "me" && f.name == "analyst" { // "meus projetos": os que a própria pessoa assumiu
+				id := p.Actor.ID
+				*f.dst = &id
+				continue
+			}
 			id, err := uuid.Parse(v)
 			if err != nil {
 				bad = append(bad, httpapi.FieldError{Field: f.name, Message: "Informe um identificador válido."})
@@ -958,6 +964,17 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 	dec, _ := admin.DecisionFrom(r.Context())
 	v, err := h.svc.StartAnalysis(r.Context(), actorOf(r), id, dec)
+	respond(w, r, v, err)
+}
+
+func (h *Handler) takeOver(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	dec, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.TakeOverAnalysis(r.Context(), actorOf(r), id, dec)
 	respond(w, r, v, err)
 }
 

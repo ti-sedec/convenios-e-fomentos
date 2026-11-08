@@ -57,3 +57,10 @@ SELECT email::text FROM admins WHERE id = $1 AND is_active AND NOT blocked;
 UPDATE projects SET analyst_id = sqlc.arg(analyst_id), updated_at = now(), updated_by_id = sqlc.arg(analyst_id)
 WHERE id = sqlc.arg(id) AND status = 'submitted' AND stage = 'in_analysis' AND analyst_id IS NULL
 RETURNING *;
+
+-- Grava o analista responsável de um projeto enviado e ativo (primeiro responsável ou troca de responsável), sem mexer em etapa nem
+-- versão. Quem chama já travou a linha e conferiu a regra; precisa passar por Service.transition.
+-- name: SetProjectAnalyst :one
+UPDATE projects SET analyst_id = sqlc.arg(analyst_id), updated_at = now(), updated_by_id = sqlc.arg(analyst_id)
+WHERE id = sqlc.arg(id) AND status = 'submitted'
+RETURNING *;

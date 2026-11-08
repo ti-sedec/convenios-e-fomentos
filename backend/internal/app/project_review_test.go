@@ -102,11 +102,17 @@ func TestAssumirAAnalise(t *testing.T) {
 	assert.Equal(t, p.adminID("m.analista@exemplo.com"), a["id"])
 	assert.NotEmpty(t, a["name"])
 
-	// Idempotente; e outro Analista só passa a trabalhar, sem tomar a análise.
+	assert.Equal(t, true, a["isMe"], "o responsável vê que é ele")
+
+	// Idempotente para o responsável; outro Analista não toma a análise por "iniciar": precisa assumir o projeto.
 	assert.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	r = p.startAnalysis(other, fp.id)
-	require.Equal(t, 200, r.Status, r.Body)
-	assert.Equal(t, p.adminID("m.analista@exemplo.com"), r.data()["analyst"].(map[string]any)["id"], "o responsável não troca")
+	assert.Equal(t, 409, r.Status, r.Body)
+	assert.Equal(t, "not_responsible_analyst", r.errCode())
+	assert.Contains(t, r.Body["error"].(map[string]any)["message"], "Assuma o projeto")
+	seen := p.project(other, fp.id).data()["analyst"].(map[string]any)
+	assert.Equal(t, p.adminID("m.analista@exemplo.com"), seen["id"], "o responsável não troca")
+	assert.Equal(t, false, seen["isMe"], "para o outro Analista o responsável não é ele")
 
 	var n int
 	require.NoError(t, p.pool.QueryRow(context.Background(), "SELECT count(*) FROM audit_logs WHERE action = 'project.start-analysis' AND entity_id = $1", fp.id).Scan(&n))
@@ -127,25 +133,38 @@ func TestAssumirAAnalise(t *testing.T) {
 		require.Equal(t, 200, p.complement(staff.analyst, waiting.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 		assert.Equal(t, "project_stage_invalid", p.startAnalysis(staff.analyst, waiting.id).errCode())
 	})
-	t.Run("duas pessoas ao mesmo tempo: uma assume", func(t *testing.T) {
+	t.Run("duas pessoas ao mesmo tempo: uma assume, a outra é recusada", func(t *testing.T) {
 		race := p.submitted("9005/2026")
 		var wg sync.WaitGroup
+		codes := make(chan int, 2)
 		for _, tok := range []string{staff.analyst, other} {
 			wg.Add(1)
-			go func() { defer wg.Done(); assert.Equal(t, 200, p.startAnalysis(tok, race.id).Status) }()
+			go func() { defer wg.Done(); codes <- p.startAnalysis(tok, race.id).Status }()
 		}
 		wg.Wait()
+		close(codes)
+		got := map[int]int{}
+		for c := range codes {
+			got[c]++
+		}
+		assert.Equal(t, map[int]int{200: 1, 409: 1}, got)
 		var c int
 		require.NoError(t, p.pool.QueryRow(context.Background(), "SELECT count(*) FROM audit_logs WHERE action = 'project.start-analysis' AND entity_id = $1", race.id).Scan(&c))
 		assert.Equal(t, 1, c)
 	})
-	t.Run("em análise sem responsável: o primeiro a assumir vira o responsável", func(t *testing.T) {
+	t.Run("devolver sem responsável faz de quem devolveu o responsável", func(t *testing.T) {
 		orphan := p.submitted("9006/2026")
 		require.Equal(t, 200, p.complement(staff.analyst, orphan.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
-		pb := proposalBody(orphan.current(p.maria))
-		pb["objectNature"], pb["sigconNumber"] = "services", "9006/2026"
-		require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+orphan.id+"/proposal", pb, p.maria).Status)
-		require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+orphan.id+"/resubmit", map[string]any{"version": orphan.current(p.maria), "declaration": true}, p.maria).Status)
+		a := p.project(staff.analyst, orphan.id).data()["analyst"].(map[string]any)
+		assert.Equal(t, p.adminID("m.analista@exemplo.com"), a["id"])
+		assert.Equal(t, 409, p.complement(other, orphan.id, map[string]any{"items": []any{section("institution", "")}}).Status, "o outro Analista não age nele")
+	})
+	t.Run("em análise sem responsável (responsável excluído): o primeiro a iniciar vira o responsável", func(t *testing.T) {
+		orphan := p.submitted("9007/2026")
+		gone, _ := p.newAdmin(p.boss, "m.analista.saiu@exemplo.com", "analyst")
+		require.Equal(t, 200, p.startAnalysis(gone, orphan.id).Status)
+		_, err := p.pool.Exec(context.Background(), "DELETE FROM admins WHERE email = 'm.analista.saiu@exemplo.com'")
+		require.NoError(t, err)
 		assert.Equal(t, "in_analysis", p.project(staff.analyst, orphan.id).data()["stage"])
 		assert.Nil(t, p.project(staff.analyst, orphan.id).data()["analyst"])
 		r := p.startAnalysis(other, orphan.id)
@@ -175,7 +194,6 @@ func TestAprovarDocumentoExigeAbrirOArquivo(t *testing.T) {
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
 	fp := p.submitted("9201/2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
-	require.Equal(t, 200, p.startAnalysis(other, fp.id).Status)
 
 	doc := reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"]
 	require.NotNil(t, doc)
@@ -200,9 +218,10 @@ func TestAprovarDocumentoExigeAbrirOArquivo(t *testing.T) {
 	assert.Equal(t, true, got["files"].([]any)[0].(map[string]any)["opened"])
 
 	// A abertura é por pessoa: o que o primeiro Analista abriu não vale para o segundo, e a visão de cada um mostra o seu.
+	// Quem não é o responsável vê o projeto, mas não decide itens.
 	seen := reviewItems(p.project(other, fp.id))["document:requerimento_apoio"]
 	assert.Equal(t, false, seen["files"].([]any)[0].(map[string]any)["opened"])
-	assert.Equal(t, "file_not_opened", p.review(other, fp.id, "document", "requerimento_apoio", true).errCode())
+	assert.Equal(t, "not_responsible_analyst", p.review(other, fp.id, "document", "requerimento_apoio", true).errCode())
 
 	// Desfazer volta a pendente e some quem aprovou.
 	r = p.review(staff.analyst, fp.id, "document", "requerimento_apoio", false)

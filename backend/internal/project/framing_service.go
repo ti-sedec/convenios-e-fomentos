@@ -97,6 +97,9 @@ func (s *Service) AssignDepartment(ctx context.Context, actor Actor, id uuid.UUI
 		if framingPending(cur) {
 			return errFramingPending()
 		}
+		if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
+			return err
+		}
 		_, cl, err := s.viewWithChecklist(ctx, q, cur, actor)
 		if err != nil {
 			return err

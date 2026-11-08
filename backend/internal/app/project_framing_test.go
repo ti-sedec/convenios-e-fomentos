@@ -341,12 +341,11 @@ func TestDecisoesSimultaneas(t *testing.T) {
 		// Quem é de outro departamento continua sem acesso.
 		assert.Equal(t, 403, f.confirm(f.staff.reviewerOther, f.fp.id, 1).Status)
 	})
-	t.Run("dois Analistas indicam ao mesmo tempo: uma indicação", func(t *testing.T) {
+	t.Run("o Analista indica duas vezes ao mesmo tempo: uma indicação", func(t *testing.T) {
 		f := newFramingEnv(t, "7503/2026")
-		other, _ := f.newAdmin(f.boss, "m.analista2@exemplo.com", "analyst")
 		var wg sync.WaitGroup
 		codes := make(chan string, 2)
-		for _, tok := range []string{f.staff.analyst, other} {
+		for _, tok := range []string{f.staff.analyst, f.staff.analyst} {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

@@ -352,7 +352,7 @@ func TestExpiracaoSimultaneaArquivaUmaVez(t *testing.T) {
 			mails++
 		}
 	}
-	assert.Equal(t, 4, mails, "um e-mail por projeto")
+	assert.Equal(t, 8, mails, "por projeto: um e-mail ao proponente e outro ao analista que devolveu (virou o responsável)")
 	_ = ids
 }
 
@@ -378,8 +378,15 @@ func TestDesistenciaDoProponente(t *testing.T) {
 	assert.Equal(t, "withdrawn", r.data()["archive"].(map[string]any)["reason"])
 	assert.Equal(t, "Não vamos mais executar o projeto.", r.data()["archive"].(map[string]any)["note"])
 	assert.Equal(t, "cancelled", r.data()["complement"].(map[string]any)["status"])
-	assert.Equal(t, mailsBefore+1, p.mail.Count(), "a desistência também avisa o proponente")
-	msg := p.mail.Msgs[len(p.mail.Msgs)-1]
+	assert.Equal(t, mailsBefore+2, p.mail.Count(), "a desistência avisa o proponente e o analista responsável (quem devolveu)")
+	idx := -1
+	for i := mailsBefore; i < len(p.mail.Msgs); i++ {
+		if p.mail.Msgs[i].To == "maria@exemplo.com" {
+			idx = i
+		}
+	}
+	require.GreaterOrEqual(t, idx, 0, "o proponente foi avisado")
+	msg := p.mail.Msgs[idx]
 	assert.Contains(t, msg.Subject, "arquivado")
 	assert.Contains(t, msg.Body, "a pedido do próprio proponente")
 	assert.Contains(t, msg.Body, "Não vamos mais executar o projeto.")

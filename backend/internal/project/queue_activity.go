@@ -16,6 +16,7 @@ const (
 	QueueActSubmitted          = "submitted"
 	QueueActResubmitted        = "resubmitted"
 	QueueActAnalysisStarted    = "analysis_started"
+	QueueActAnalysisTakenOver  = "analysis_taken_over"
 	QueueActComplementRequest  = "complement_requested"
 	QueueActDepartmentAssigned = "department_assigned"
 	QueueActFramingConfirmed   = "framing_confirmed"
@@ -34,6 +35,7 @@ var queueActivityKinds = map[string]string{
 	actionSubmit:                QueueActSubmitted,
 	actionResubmit:              QueueActResubmitted,
 	actionStartAnalysis:         QueueActAnalysisStarted,
+	actionTakeOver:              QueueActAnalysisTakenOver,
 	actionComplementRequest:     QueueActComplementRequest,
 	"project.assign-department": QueueActDepartmentAssigned,
 	actionFramingConfirm:        QueueActFramingConfirmed,

@@ -143,6 +143,9 @@ func (s *Service) RequestComplement(ctx context.Context, actor Actor, id uuid.UU
 		if st := str(cur.Stage); st != StageAwaitingChecklist && st != StageInAnalysis {
 			return errStage(st)
 		}
+		if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
+			return err
+		}
 		_, cl, err := s.viewWithChecklist(ctx, q, cur, actor)
 		if err != nil {
 			return err
@@ -200,6 +203,12 @@ func (s *Service) RequestComplement(ctx context.Context, actor Actor, id uuid.UU
 			// O que volta ao proponente deixa de estar aprovado; o resto da conferência fica como está.
 			if err := q.ResetItemReview(ctx, db.ResetItemReviewParams{ProjectID: id, Kind: it.Kind, Target: it.Target}); err != nil {
 				return err
+			}
+		}
+		// Sem responsável, quem devolve o projeto passa a ser o analista dele: o reenvio volta para essa pessoa.
+		if cur.AnalystID == nil {
+			if _, err := q.SetProjectAnalyst(ctx, db.SetProjectAnalystParams{ID: id, AnalystID: &actor.ID}); err != nil {
+				return notFound(err)
 			}
 		}
 		row, err := q.SetProjectStage(ctx, db.SetProjectStageParams{ID: id, Stage: ptr(StageAwaitingProponent), UpdatedByID: &actor.ID})
@@ -345,8 +354,9 @@ func cleanNote(note string) (string, error) {
 }
 
 // archive é o arquivamento feito por uma pessoa: confere o alcance da permissão e a situação do projeto.
-// blockOnFraming impede o arquivamento pelo Analista com enquadramento pendente; a desistência e a negação não são bloqueadas.
-func (s *Service) archive(ctx context.Context, actor Actor, id uuid.UUID, reason, note string, dec authz.Decision, blockOnFraming bool) (*Project, error) {
+// byAnalyst marca o arquivamento feito como Analista: ele é bloqueado com enquadramento pendente e só o analista responsável o faz.
+// A desistência e a negação não passam por essas regras.
+func (s *Service) archive(ctx context.Context, actor Actor, id uuid.UUID, reason, note string, dec authz.Decision, byAnalyst bool) (*Project, error) {
 	note, err := cleanNote(note)
 	if err != nil {
 		return nil, err
@@ -368,8 +378,13 @@ func (s *Service) archive(ctx context.Context, actor Actor, id uuid.UUID, reason
 		case StatusArchived:
 			return httpapi.ErrConflict("project_archived", "Este projeto já está arquivado.")
 		}
-		if blockOnFraming && framingPending(cur) {
-			return errFramingPending()
+		if byAnalyst {
+			if framingPending(cur) {
+				return errFramingPending()
+			}
+			if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
+				return err
+			}
 		}
 		row, err := s.archiveRow(ctx, q, cur, &actor.ID, reason, note)
 		if err != nil {

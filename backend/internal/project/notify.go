@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -31,6 +32,7 @@ const (
 	kindResubmitted         = "project.resubmitted"
 	kindArchived            = "project.archived"
 	kindInvited             = "project.invited"
+	kindTakenOver           = "project.analysis-taken-over"
 )
 
 func primaryEmail(p *Project) string {
@@ -355,4 +357,30 @@ func (s *Service) notifyFramingRefused(ctx context.Context, q *db.Queries, p *Pr
 	fmt.Fprintf(&b, "Detalhes no sistema:\n%s\n", s.link(p.ID))
 	return s.toSupervisors(ctx, q, kindFramingRefused, fmt.Sprintf("framing-refused:%s:%d", p.ID, round), p,
 		fmt.Sprintf("Projeto %s: enquadramento recusado pelo departamento %s", p.Code, department), b.String())
+}
+
+// notifyTakenOver avisa o analista que perdeu o projeto: outra pessoa o assumiu. O e-mail leva só a lista permitida (projeto, quem
+// assumiu, quando e o link), sem dado pessoal do proponente. Se o anterior não pode receber (inativo, bloqueado ou excluído), não há aviso.
+func (s *Service) notifyTakenOver(ctx context.Context, q *db.Queries, p *Project, previous uuid.UUID, by Actor, at time.Time) error {
+	to, err := q.GetNotifiableAdminEmailByID(ctx, previous)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && to == "") {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	who := by.Name
+	if a, err := q.GetAdminByID(ctx, by.ID); err == nil {
+		who = adminDisplayName(a)
+	}
+	if who == "" {
+		who = "Outro analista"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s assumiu a análise do projeto %s, que estava com você. Você continua podendo visualizá-lo, mas não pode mais conferir itens, devolver, arquivar nem indicar o departamento.\n\n", who, p.Code)
+	fmt.Fprintf(&b, "Título: %s\nInstituição: %s\n", p.Proposal.Title, p.Institution.Name)
+	fmt.Fprintf(&b, "Assumido em: %s (horário de Cuiabá)\n\n", at.In(cuiaba()).Format("02/01/2006 15:04"))
+	fmt.Fprintf(&b, "Para voltar a analisá-lo, assuma o projeto no sistema:\n%s\n", s.link(p.ID))
+	return s.enqueue(ctx, q, kindTakenOver, p.ID, to, fmt.Sprintf("Projeto %s: sua análise foi assumida por outro analista", p.Code), b.String(),
+		fmt.Sprintf("analysis-taken-over:%s:%d:%s", p.ID, at.UnixNano(), strings.ToLower(to)))
 }

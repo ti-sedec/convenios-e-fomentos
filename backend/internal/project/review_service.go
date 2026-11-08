@@ -18,10 +18,11 @@ import (
 // maxUnopenedListed limita quantos arquivos o erro file_not_opened lista (o total vai junto).
 const maxUnopenedListed = 20
 
-// AnalystInfo é o analista responsável, na visão da equipe.
+// AnalystInfo é o analista responsável, na visão da equipe. IsMe diz se é quem consulta (só ele continua a análise).
 type AnalystInfo struct {
 	ID   uuid.UUID `json:"id"`
 	Name string    `json:"name"`
+	IsMe bool      `json:"isMe"`
 }
 
 // ReviewInput é o corpo de PUT /review/items: aprova, reprova (com justificativa) ou desfaz a decisão sobre um item.
@@ -69,10 +70,32 @@ func (s *Service) lockedForReview(ctx context.Context, q *db.Queries, id uuid.UU
 	return cur, nil
 }
 
-// StartAnalysis assume a análise: "Aguardando análise de checklist" passa a "Em análise" e quem assumiu vira o responsável.
-// É idempotente. Outro Analista que chame depois não troca o responsável: só passa a trabalhar no projeto (qualquer Analista pode
-// agir). Se o projeto já está em análise mas sem responsável (voltou de uma complementação pedida antes de alguém assumir), o
-// primeiro a assumir vira o responsável.
+// ensureResponsible garante que quem age é o analista responsável. Sem responsável a regra não se aplica (quem chama decide se a ação
+// o torna responsável). Com outro responsável a ação é recusada: para continuar a análise é preciso assumir o projeto (TakeOverAnalysis).
+// Vale para qualquer pessoa que aja como Analista, inclusive o Super Admin.
+func (s *Service) ensureResponsible(ctx context.Context, q *db.Queries, cur db.Project, actor Actor) error {
+	if cur.AnalystID == nil || *cur.AnalystID == actor.ID {
+		return nil
+	}
+	name := "outro analista"
+	if a, err := q.GetAdminByID(ctx, *cur.AnalystID); err == nil {
+		name = adminDisplayName(a)
+	}
+	return httpapi.ErrConflict("not_responsible_analyst", fmt.Sprintf("Este projeto está com %s. Assuma o projeto para continuar a análise.", name))
+}
+
+// adminDisplayName é o nome da pessoa ou, sem nome, o e-mail.
+func adminDisplayName(a db.Admin) string {
+	if name := strings.TrimSpace(a.FirstName + " " + a.LastName); name != "" {
+		return name
+	}
+	return a.Email
+}
+
+// StartAnalysis inicia a análise: "Aguardando análise de checklist" passa a "Em análise" e quem iniciou vira o responsável.
+// É idempotente para o próprio responsável. Se o projeto já está com outro analista a resposta é 409 not_responsible_analyst: para
+// continuar a análise é preciso assumir o projeto (TakeOverAnalysis). Se o projeto está em análise mas sem responsável (voltou de
+// uma complementação pedida por quem já saiu, ou de registro antigo), o primeiro a iniciar vira o responsável.
 func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, dec authz.Decision) (*Project, error) {
 	var out *Project
 	err := database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -90,7 +113,10 @@ func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, 
 			changed = true
 		case StageInAnalysis:
 			if cur.AnalystID != nil {
-				break // já assumido: nada muda
+				if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
+					return err
+				}
+				break // já é o responsável: nada muda
 			}
 			if row, err = q.ClaimProjectAnalyst(ctx, db.ClaimProjectAnalystParams{ID: id, AnalystID: &actor.ID}); err != nil {
 				return notFound(err)
@@ -102,6 +128,53 @@ func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, 
 		if changed {
 			if err := s.transition(ctx, q, row, actor.entry("project.start-analysis", id, map[string]any{"stage": StageInAnalysis})); err != nil {
 				return err
+			}
+		}
+		out, err = s.view(ctx, q, row, actor)
+		return err
+	})
+	return out, err
+}
+
+// TakeOverAnalysis é o ato de assumir ativamente um projeto que está com outro analista: quem chama passa a ser o responsável e o
+// anterior perde as ações (e é avisado por e-mail). Vale com o projeto em análise ou aguardando o proponente; não vale antes de
+// iniciar a análise (usa-se "iniciar"), com o enquadramento pendente (o projeto está com o Revisor) nem aguardando o parecer.
+// Idempotente para quem já é o responsável. A conferência já feita continua como está.
+func (s *Service) TakeOverAnalysis(ctx context.Context, actor Actor, id uuid.UUID, dec authz.Decision) (*Project, error) {
+	var out *Project
+	err := database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		cur, err := s.lockedForReview(ctx, q, id, dec)
+		if err != nil {
+			return err
+		}
+		switch str(cur.Stage) {
+		case StageInAnalysis, StageAwaitingProponent:
+		case StageAwaitingChecklist:
+			return errStageForReview(StageAwaitingChecklist)
+		default:
+			return errStage(str(cur.Stage))
+		}
+		if framingPending(cur) {
+			return errFramingPending()
+		}
+		row := cur
+		if cur.AnalystID == nil || *cur.AnalystID != actor.ID {
+			if row, err = q.SetProjectAnalyst(ctx, db.SetProjectAnalystParams{ID: id, AnalystID: &actor.ID}); err != nil {
+				return notFound(err)
+			}
+			detail := map[string]any{"to": actor.ID}
+			if cur.AnalystID != nil {
+				detail["from"] = *cur.AnalystID
+			}
+			if err := s.transition(ctx, q, row, actor.entry(actionTakeOver, id, detail)); err != nil {
+				return err
+			}
+			if cur.AnalystID != nil {
+				if out, err = s.view(ctx, q, row, actor); err != nil {
+					return err
+				}
+				return s.notifyTakenOver(ctx, q, out, *cur.AnalystID, actor, row.UpdatedAt)
 			}
 		}
 		out, err = s.view(ctx, q, row, actor)
@@ -149,6 +222,9 @@ func (s *Service) ReviewItem(ctx context.Context, actor Actor, id uuid.UUID, in 
 		}
 		if framingPending(cur) {
 			return errFramingPending()
+		}
+		if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
+			return err
 		}
 		_, cl, err := s.viewWithChecklist(ctx, q, cur, actor)
 		if err != nil {
@@ -292,11 +368,7 @@ func (s *Service) attachReview(ctx context.Context, q *db.Queries, r db.Project,
 	if r.AnalystID != nil {
 		a, err := q.GetAdminByID(ctx, *r.AnalystID)
 		if err == nil {
-			name := strings.TrimSpace(a.FirstName + " " + a.LastName)
-			if name == "" {
-				name = a.Email
-			}
-			p.Analyst = &AnalystInfo{ID: a.ID, Name: name}
+			p.Analyst = &AnalystInfo{ID: a.ID, Name: adminDisplayName(a), IsMe: a.ID == actor.ID}
 		}
 	}
 	return nil

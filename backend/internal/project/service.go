@@ -493,7 +493,7 @@ func (s *Service) List(ctx context.Context, p ListParams) ([]Summary, int, error
 				x.Department = &DepartmentRef{ID: depID, Name: str(depName)}
 			}
 			if anID != nil {
-				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName)}
+				x.Analyst = &AnalystInfo{ID: *anID, Name: str(anName), IsMe: *anID == p.Actor.ID}
 			}
 			x.StageSeconds = idle
 		} else {
