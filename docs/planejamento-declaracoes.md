@@ -9,6 +9,7 @@ Objetivo: o proponente confere o texto da declaração na tela, aceita a emissã
 | Modelos, prévia, PDF e resumo do conteúdo | Feito para as cinco declarações: contrapartida, não duplicidade, gratuidade, publicidade e compatibilidade de preços |
 | Aceite gravado (`project_declarations`), emissão, consulta, cancelamento, declaração desatualizada | Feito, com MT-ID simulado |
 | Tela de conferência e acompanhamento no frontend | Feita; ainda não verificada no navegador |
+| Reconhecimento das assinaturas e do cadastro | Feito: a leitura do projeto, do checklist, o envio e o reenvio concluem as assinaturas pendentes; o aviso de declaração desatualizada diz o que mudou; as pendências de endereço vêm por parte; telas atualizam o cache. Ver [planejamento-declaracoes-assinadas-reconhecimento.md](planejamento-declaracoes-assinadas-reconhecimento.md) |
 | Cliente real do MT-ID | Adiado: exige rede com acesso ao X-Via. Ver [debito-tecnico-mt-id.md](debito-tecnico-mt-id.md) |
 | Dados pessoais de quem assina (nacionalidade, estado civil, endereço; sem RG) | Feito, no perfil e no projeto. Gratuidade e publicidade dependem de respostas da SEDEC (abaixo) |
 
