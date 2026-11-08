@@ -1085,7 +1085,7 @@ paths:
       tags: [Projetos]
       summary: Detalha um projeto
       description: |
-        Permissão: `admin::projects.read`. Um projeto fora do alcance da permissão responde 404.
+        Permissão: `admin::projects.read`. Um projeto fora do alcance da permissão responde 404. Antes de montar a resposta, conclui as assinaturas pendentes das declarações (ver `GET .../documents`).
         Resposta: `{id, status, version, isOwner, access (owner|edit|read; vazio para a equipe), createdAt, updatedAt, proponent, institution, proposal, funding, documentOptions, documents {total, done, justified, missing, requiredTotal, requiredMissing}, code, stage, submittedAt, lateSubmission, complement, archive, originProjectId, originCode, issues}`. `code`, `stage` (`awaiting_checklist|in_analysis|awaiting_proponent`) e `submittedAt` só existem depois do envio; `complement` é o pedido de complementação aberto ou o mais recente `{number, status (open|answered|expired|cancelled), requestedAt, dueAt, overdue, message, items [{kind (section|document|extra), target, label, note, answered}]}`; `archive` (`{at, reason (complement_deadline|withdrawn|denied|missing_documents|other), note}`) só existe em projeto arquivado. Projeto com o prazo de complementação vencido é arquivado na hora em que é aberto ou alterado (e pela rotina periódica).
         `version` deve ser enviada em toda gravação de seção (controle de edição simultânea).
         `issues` lista as pendências: `{section, field, code, severity (block|warn), message}`. O rascunho aceita dados incompletos;
@@ -1438,6 +1438,8 @@ paths:
         Cada item: `{code, name, description, group, scope, amendmentId, amendmentLabel, source (item do checklist da SEDEC), template {name,url}, acceptsJustification, mandatory,
         files [{id, filename, contentType, sizeBytes, status (pending|confirmed), sha256 (arquivo confirmado), createdAt}], justification, status (missing|done|justified)}`.
         Só arquivo `confirmed` conta como entregue.
+        A leitura do checklist, a do projeto, o envio e o reenvio concluem as assinaturas pendentes: consultam o MT-ID sobre cada declaração que aguarda assinatura e, se o signatário
+        já assinou, trazem o arquivo assinado para o checklist (sem precisar abrir a declaração). Falha do MT-ID não impede a leitura.
         `mandatory` diz se o documento bloqueia a continuidade e o envio: obrigatório sem arquivo nem justificativa gera a pendência bloqueante
         `documents_missing`; opcional (`mandatory: false`) aparece marcado e nunca bloqueia.
         Resposta: `{options, instrument, summary {total, done, justified, missing, requiredTotal, requiredMissing}, items, extraDocuments}`.
@@ -1488,9 +1490,13 @@ paths:
         Resposta: `{code, name, annex, templateVersion, title, paragraphs, place, signerName, signerRole, institution, paramsSha256, ready, issues, current}`.
         `ready: false` quando faltam dados (`issues` com `section: declaration`); `paramsSha256` resume o conteúdo e muda se o cadastro mudar.
         `current` é a última emissão (nulo se nunca houve): `{id, status (awaiting_signature|signed|rejected|expired|cancelled|superseded), acceptedAt,
-        requestedBySigner, signerCpf (mascarado), signedAt, fileId, stale}`. `stale: true` quando o cadastro mudou depois da emissão: a declaração
-        deixa de valer e o item do checklist volta a faltar (`declarationStale`). `declarationAwaiting: true` no item enquanto a emissão aguarda a assinatura. Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o
-        signatário já assinou, traz o arquivo assinado para o checklist.
+        requestedBySigner, signerCpf (mascarado), signedAt, fileId, stale, staleReasons}`. `stale: true` quando o cadastro mudou depois da emissão: a declaração
+        deixa de valer e o item do checklist volta a faltar (`declarationStale`). `staleReasons` diz o que mudou (vazio se `stale: false`): `signer_role` (cargo de quem assina,
+        que vai impresso no PDF), `signer_name`, `signer_cpf`, `text` (dados do projeto, da instituição ou da pessoa que entram no texto), `place` (município, nome da instituição
+        ou município do endereço de quem assina) e `template` (modelo oficial atualizado); o item do checklist traz o mesmo em `declarationStaleReasons`. `declarationAwaiting: true` no item
+        enquanto a emissão aguarda a assinatura. Com a assinatura pendente, a consulta pergunta ao MT-ID e, se o signatário já assinou, traz o arquivo assinado para o checklist.
+        As pendências de dados pessoais (`issues`) vêm uma por parte do endereço residencial de quem assina: `decl_personal_street`, `decl_personal_number`, `decl_personal_district`
+        e `decl_personal_city`, no campo `personal.*` (ou `legalRepPersonal.*`, quando assina o representante legal).
         Código sem modelo ou projeto fora do alcance: 404. Declaração que não se aplica ao projeto: 409 `document_not_applicable`.
         Permissão: `admin::projects.read`.
       security: [{adminBearer: []}]

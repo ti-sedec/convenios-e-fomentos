@@ -90,6 +90,7 @@ func (s *Service) Submit(ctx context.Context, actor Actor, id uuid.UUID, in Subm
 	if !in.Declaration {
 		return nil, fieldIssue("declaration", "É preciso aceitar a declaração de veracidade para enviar o projeto.")
 	}
+	s.settleDeclarationsFor(ctx, id, sub) // a declaração que o signatário acabou de assinar conta no checklist
 	var (
 		out     *Project
 		pending []string

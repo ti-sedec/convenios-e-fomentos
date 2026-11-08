@@ -98,7 +98,7 @@ func phones(in []Phone, field string, p *problems) []Phone {
 		n, ok := phoneNumber(ph.Number)
 		switch {
 		case !ok:
-			p.add(f+".number", "Telefone inválido. Use DDD e número, por exemplo (65) 99999-8888.")
+			p.add(f+".number", "Telefone inválido. Use DDD e número, por exemplo (65) 9 9999-8888.")
 			continue
 		case ph.Type != PhoneMobile && ph.Type != PhoneLandline:
 			p.add(f+".type", "Use celular ou fixo.")

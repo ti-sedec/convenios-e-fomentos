@@ -43,7 +43,9 @@ func init() {
 	declarationSpecs["declaracao_publicidade"] = declSpec{
 		code: "declaracao_publicidade", name: "Declaração de publicidade da parceria", title: "DECLARAÇÃO DE PUBLICIDADE DA PARCERIA", version: "2026-10",
 		annex: byInstrument("Anexo VIII", "Anexo VII"),
-		check: func(p Project, e declEnv) []Issue { return personalIssues(signerPersonal(p), whoSigns(p), "personal") },
+		check: func(p Project, e declEnv) []Issue {
+			return personalIssues(signerPersonal(p), whoSigns(p), personalField(p))
+		},
 		body: func(p Project, e declEnv) []string {
 			return []string{fmt.Sprintf("%s, COMPROMETO-ME a manter um perfil na Plataforma Mapas, devidamente atualizado com as ações promovidas no museu, "+
 				"publicar na internet e em locais visíveis na sede da organização a parceria celebrada com a Secretaria de Estado de Desenvolvimento "+
@@ -94,6 +96,14 @@ func whoSigns(p Project) string {
 	return "de quem assina"
 }
 
+// personalField é o campo do projeto que guarda os dados pessoais de quem assina: os do proponente ou os do representante legal.
+func personalField(p Project) string {
+	if p.Proponent.IsLegalRepresentative != nil && !*p.Proponent.IsLegalRepresentative {
+		return "legalRepPersonal"
+	}
+	return "personal"
+}
+
 // signerIntro é "Eu, NOME, NACIONALIDADE, ESTADO CIVIL, portador(a) do CPF nº …, residente e domiciliado em ENDEREÇO".
 func signerIntro(p Project, e declEnv) string {
 	name, _, _ := signerOf(p)
@@ -109,7 +119,7 @@ func identification(p Project, e declEnv) string {
 
 // identificationIssues são as pendências de "identification": dados pessoais, instituição e CNPJ.
 func identificationIssues(p Project, e declEnv) []Issue {
-	out := personalIssues(signerPersonal(p), whoSigns(p), "personal")
+	out := personalIssues(signerPersonal(p), whoSigns(p), personalField(p))
 	if strings.TrimSpace(p.Institution.CNPJ) == "" {
 		out = append(out, declIssue("cnpj", "decl_cnpj", "Informe o CNPJ da instituição em Instituição."))
 	}

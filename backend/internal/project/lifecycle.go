@@ -241,6 +241,7 @@ func (s *Service) Resubmit(ctx context.Context, actor Actor, id uuid.UUID, in Su
 		return nil, fieldIssue("declaration", "É preciso aceitar a declaração de veracidade para reenviar o projeto.")
 	}
 	s.settle(ctx, id)
+	s.settleDeclarationsFor(ctx, id, sub)
 	var (
 		out     *Project
 		pending []string
