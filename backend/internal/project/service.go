@@ -197,7 +197,7 @@ func (s *Service) view(ctx context.Context, q *db.Queries, r db.Project, actor A
 
 // viewWithChecklist monta o projeto e, junto, o checklist de documentos (já calculado para o resumo e as pendências).
 func (s *Service) viewWithChecklist(ctx context.Context, q *db.Queries, r db.Project, actor Actor) (*Project, *Checklist, error) {
-	muns, err := q.ListProjectMunicipalities(ctx, r.ID)
+	periods, err := q.ListProjectExecutionPeriods(ctx, r.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -229,14 +229,11 @@ func (s *Service) viewWithChecklist(ctx context.Context, q *db.Queries, r db.Pro
 		},
 		Proposal: ProposalSection{
 			SigconNumber: str(r.SigconNumber), SigconRegisteredOn: dateString(r.SigconRegisteredOn), Title: r.Title, Object: r.ObjectDescription,
-			Justification: r.Justification, StartDate: dateString(r.StartDate), EndDate: dateString(r.EndDate), ObjectNature: str(r.ObjectNature),
-			HasArtisticHiring: r.HasArtisticHiring, Calamity: r.Calamity, ExecutionPlaceDetail: r.ExecutionPlaceDetail,
-			Municipalities: make([]Municipality, len(muns)),
+			Justification: r.Justification, ObjectNature: str(r.ObjectNature),
+			HasArtisticHiring: r.HasArtisticHiring, Calamity: r.Calamity,
 		},
 	}
-	for i, m := range muns {
-		p.Proposal.Municipalities[i] = Municipality{IBGECode: m.IbgeCode, Name: m.Name, UF: m.Uf}
-	}
+	p.Proposal.ExecutionPeriods, p.Proposal.StartDate, p.Proposal.EndDate, p.Proposal.Municipalities = executionPeriodsView(periods)
 	access, err := s.accessOf(ctx, q, r.ID, r.CreatedByID, actor)
 	if err != nil {
 		return nil, nil, err
@@ -747,7 +744,7 @@ func (s *Service) entityType(ctx context.Context, q *db.Queries, cur db.Project,
 	}
 }
 
-// SaveProposal grava a seção Proposta, inclusive os municípios de execução.
+// SaveProposal grava a seção Proposta, inclusive os períodos e locais de execução (que são regravados por inteiro).
 func (s *Service) SaveProposal(ctx context.Context, actor Actor, id uuid.UUID, version int32, in ProposalSection, upd authz.Decision) (*Project, error) {
 	return s.mutate(ctx, actor, id, version, upd, "proposal", func(q *db.Queries, _ db.Project) (db.Project, error) {
 		var p problems
@@ -765,18 +762,13 @@ func (s *Service) SaveProposal(ctx context.Context, actor Actor, id uuid.UUID, v
 		}
 		arg.Title = text(in.Title)
 		arg.ObjectDescription, arg.Justification = multiline(in.Object), multiline(in.Justification)
-		arg.ExecutionPlaceDetail = text(in.ExecutionPlaceDetail)
 		for _, c := range []struct {
 			v, field string
 			max      int
-		}{{arg.Title, "title", maxTitle}, {arg.ObjectDescription, "object", maxObject}, {arg.Justification, "justification", maxJustify}, {arg.ExecutionPlaceDetail, "executionPlaceDetail", maxPlaceDetail}} {
+		}{{arg.Title, "title", maxTitle}, {arg.ObjectDescription, "object", maxObject}, {arg.Justification, "justification", maxJustify}} {
 			if tooLong(c.v, c.max) {
 				p.add(c.field, fmt.Sprintf("Use até %d caracteres.", c.max))
 			}
-		}
-		arg.StartDate, arg.EndDate = date(in.StartDate, "startDate", &p), date(in.EndDate, "endDate", &p)
-		if arg.StartDate.Valid && arg.EndDate.Valid && arg.EndDate.Time.Before(arg.StartDate.Time) {
-			p.add("endDate", "O término não pode ser anterior ao início.")
 		}
 		switch in.ObjectNature {
 		case "", "works", "goods", "services", "event", "other":
@@ -786,26 +778,18 @@ func (s *Service) SaveProposal(ctx context.Context, actor Actor, id uuid.UUID, v
 		}
 		arg.HasArtisticHiring, arg.Calamity = in.HasArtisticHiring, in.Calamity
 
-		codes := uniqueCodes(in.MunicipalityCodes)
-		if len(codes) > maxMunicipality {
-			p.add("municipalityCodes", "Informe no máximo 50 municípios.")
-		} else if len(codes) > 0 {
-			n, err := q.CountExistingMunicipalities(ctx, db.CountExistingMunicipalitiesParams{Codes: codes, Uf: "MT"})
-			if err != nil {
-				return db.Project{}, err
-			}
-			if int(n) != len(codes) {
-				p.add("municipalityCodes", "Só municípios de Mato Grosso podem ser municípios de execução.")
-			}
+		periods, err := executionPeriodParams(ctx, q, id, in.ExecutionPeriods, &p)
+		if err != nil {
+			return db.Project{}, err
 		}
 		if err := p.err(); err != nil {
 			return db.Project{}, err
 		}
-		if err := q.ClearProjectMunicipalities(ctx, id); err != nil {
+		if err := q.ClearProjectExecutionPeriods(ctx, id); err != nil {
 			return db.Project{}, err
 		}
-		if len(codes) > 0 {
-			if err := q.AddProjectMunicipalities(ctx, db.AddProjectMunicipalitiesParams{ProjectID: id, Codes: codes}); err != nil {
+		for _, row := range periods {
+			if err := q.AddProjectExecutionPeriod(ctx, row); err != nil {
 				return db.Project{}, err
 			}
 		}
@@ -822,18 +806,6 @@ func (s *Service) SaveProposal(ctx context.Context, actor Actor, id uuid.UUID, v
 		}
 		return saved, nil
 	})
-}
-
-func uniqueCodes(in []string) []string {
-	seen := map[string]bool{}
-	out := make([]string, 0, len(in))
-	for _, c := range in {
-		if c = strings.TrimSpace(c); c != "" && !seen[c] {
-			seen[c] = true
-			out = append(out, c)
-		}
-	}
-	return out
 }
 
 // Delete exclui um rascunho. del é a decisão da ação delete.

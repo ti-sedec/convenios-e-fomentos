@@ -110,10 +110,8 @@ func proposalIssues(l *issueList, s ProposalSection, duplicatedSigcon bool) {
 	l.required(sec, "title", "Informe o título do projeto.", s.Title == "")
 	l.required(sec, "object", "Descreva o objeto.", s.Object == "")
 	l.required(sec, "justification", "Informe a justificativa.", s.Justification == "")
-	l.required(sec, "startDate", "Informe o início previsto da vigência.", s.StartDate == "")
-	l.required(sec, "endDate", "Informe o término previsto da vigência.", s.EndDate == "")
 	l.required(sec, "objectNature", "Informe a natureza do objeto.", s.ObjectNature == "")
-	l.required(sec, "municipalityCodes", "Informe pelo menos um município de execução.", len(s.Municipalities) == 0)
+	executionPeriodIssues(l, sec, s.ExecutionPeriods)
 
 	if s.SigconNumber != "" && len(s.SigconRegisteredOn) >= 4 {
 		if _, year, ok := strings.Cut(s.SigconNumber, "/"); ok && year != s.SigconRegisteredOn[:4] {

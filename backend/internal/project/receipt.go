@@ -70,11 +70,11 @@ func renderReceipt(snap VersionSnapshot) ([]byte, error) {
 	line("Nº no SIGCon:", p.Proposal.SigconNumber)
 	line("Objeto:", p.Proposal.Object)
 	line("Vigência prevista:", brDate(p.Proposal.StartDate)+" a "+brDate(p.Proposal.EndDate))
-	var places []string
-	for _, m := range p.Proposal.Municipalities {
-		places = append(places, m.Name)
+	label := "Execução em:"
+	for _, t := range executionPeriodsText(p.Proposal.ExecutionPeriods) {
+		line(label, t)
+		label = ""
 	}
-	line("Execução em:", strings.Join(places, ", "))
 
 	section("Instituição")
 	line("Nome:", p.Institution.Name)

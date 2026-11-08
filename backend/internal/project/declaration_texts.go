@@ -20,18 +20,24 @@ func init() {
 			if strings.TrimSpace(p.Proposal.Title) == "" {
 				out = append(out, declIssue("title", "decl_title", "Informe o título do projeto em Proposta: ele é o nome da programação."))
 			}
-			if len(p.Proposal.Municipalities) == 0 {
-				out = append(out, declIssue("municipalityCodes", "decl_execution_place", "Informe o município de execução em Proposta."))
+			if len(p.Proposal.ExecutionPeriods) == 0 {
+				out = append(out, declIssue("executionPeriods", "decl_execution_place", "Informe o município de execução em Proposta."))
+				out = append(out, declIssue("executionPeriods", "decl_period", "Informe o início e o término da execução em Proposta."))
 			}
-			if p.Proposal.StartDate == "" || p.Proposal.EndDate == "" {
-				out = append(out, declIssue("startDate", "decl_period", "Informe o início e o término da vigência em Proposta."))
+			for i, e := range p.Proposal.ExecutionPeriods {
+				if e.MunicipalityIBGE == "" {
+					out = append(out, declIssue(fmt.Sprintf("executionPeriods[%d].municipalityIbge", i), "decl_execution_place", fmt.Sprintf("Informe o município de execução do período %d em Proposta.", i+1)))
+				}
+				if e.StartDate == "" || e.EndDate == "" {
+					out = append(out, declIssue(fmt.Sprintf("executionPeriods[%d].startDate", i), "decl_period", fmt.Sprintf("Informe o início e o término do período %d em Proposta.", i+1)))
+				}
 			}
 			return out
 		},
 		body: func(p Project, e declEnv) []string {
-			return []string{fmt.Sprintf("%s, DECLARO que a Programação %s a ser realizada %s, %s, terá entrada gratuita, "+
+			return []string{fmt.Sprintf("%s, DECLARO que a Programação %s a ser realizada %s, terá entrada gratuita, "+
 				"sob pena de responsabilidade civil, penal e administrativa.",
-				identification(p, e), p.Proposal.Title, executionPlaces(p.Proposal.Municipalities), executionPeriod(p.Proposal.StartDate, p.Proposal.EndDate))}
+				identification(p, e), p.Proposal.Title, executionSchedule(p.Proposal.ExecutionPeriods))}
 		},
 	}
 	declarationSpecs["declaracao_publicidade"] = declSpec{
@@ -125,8 +131,9 @@ func executionPlaces(ms []Municipality) string {
 	return "nos municípios de " + strings.Join(names[:len(names)-1], ", ") + " e " + names[len(names)-1]
 }
 
-// executionPeriod escreve o período da vigência do projeto ("no dia 01/11/2026" ou "no período de 01/11/2026 a 01/05/2027"). O cadastro
-// não tem a data do evento; a vigência é o que há mais próximo e a SEDEC precisa confirmar (docs/planejamento-declaracoes.md).
+// executionPeriod escreve o período de uma linha de execução ("no dia 01/11/2026" ou "no período de 01/11/2026 a 01/05/2027"). O
+// cadastro não tem a data do evento; o período previsto é o que há mais próximo e a SEDEC precisa confirmar
+// (docs/planejamento-declaracoes.md).
 func executionPeriod(start, end string) string {
 	if start == "" || end == "" {
 		return "no período de — a —"
@@ -135,6 +142,32 @@ func executionPeriod(start, end string) string {
 		return "no dia " + formatDateBR(start)
 	}
 	return "no período de " + formatDateBR(start) + " a " + formatDateBR(end)
+}
+
+// executionSchedule escreve onde e quando o projeto será executado. Com uma linha, é o texto de sempre ("no município de A, no
+// período de …"). Com várias, enumera cada período com o seu local, e o detalhe do local, quando houver, vai entre parênteses.
+func executionSchedule(periods []ExecutionPeriod) string {
+	place := func(e ExecutionPeriod) string {
+		if e.Municipality == nil {
+			return executionPlaces(nil)
+		}
+		return executionPlaces([]Municipality{*e.Municipality})
+	}
+	switch len(periods) {
+	case 0:
+		return executionPlaces(nil) + ", " + executionPeriod("", "")
+	case 1:
+		return place(periods[0]) + ", " + executionPeriod(periods[0].StartDate, periods[0].EndDate)
+	}
+	items := make([]string, len(periods))
+	for i, e := range periods {
+		where := place(e)
+		if e.PlaceDetail != "" {
+			where += " (" + e.PlaceDetail + ")"
+		}
+		items[i] = where + ", " + executionPeriod(e.StartDate, e.EndDate)
+	}
+	return "nos seguintes locais e períodos: " + strings.Join(items, "; ")
 }
 
 // formatDateBR converte AAAA-MM-DD em DD/MM/AAAA.

@@ -73,8 +73,8 @@ INSERT INTO projects (
     instrument, institution_cnpj, institution_name, entity_type_id, entity_type_other, entity_nature, entity_non_profit,
     institution_uf, institution_municipality_ibge, institution_zip, institution_street, institution_number, institution_complement,
     institution_district, institution_email, institution_phone, habilitation_status, habilitation_number, habilitation_valid_until,
-    sigcon_number, sigcon_registered_on, title, object_description, justification, start_date, end_date, object_nature,
-    has_artistic_hiring, calamity, execution_place_detail,
+    sigcon_number, sigcon_registered_on, title, object_description, justification, object_nature,
+    has_artistic_hiring, calamity,
     funding_type, own_amount_cents, amendment_amount_cents, total_amount_cents, counterpart_kind, counterpart_cents, counterpart_description,
     indirect_costs_cents, tender_status, tender_notice_number, tender_approved_on, tender_legal_basis, tender_justification,
     artist_fees_cents, regional_artist_fees_cents, governor_waiver, price_oldest_collected_on,
@@ -86,8 +86,8 @@ SELECT
     p.instrument, p.institution_cnpj, p.institution_name, p.entity_type_id, p.entity_type_other, p.entity_nature, p.entity_non_profit,
     p.institution_uf, p.institution_municipality_ibge, p.institution_zip, p.institution_street, p.institution_number, p.institution_complement,
     p.institution_district, p.institution_email, p.institution_phone, p.habilitation_status, p.habilitation_number, p.habilitation_valid_until,
-    p.sigcon_number, p.sigcon_registered_on, p.title, p.object_description, p.justification, p.start_date, p.end_date, p.object_nature,
-    p.has_artistic_hiring, p.calamity, p.execution_place_detail,
+    p.sigcon_number, p.sigcon_registered_on, p.title, p.object_description, p.justification, p.object_nature,
+    p.has_artistic_hiring, p.calamity,
     p.funding_type, p.own_amount_cents, p.amendment_amount_cents, p.total_amount_cents, p.counterpart_kind, p.counterpart_cents, p.counterpart_description,
     p.indirect_costs_cents, p.tender_status, p.tender_notice_number, p.tender_approved_on, p.tender_legal_basis, p.tender_justification,
     p.artist_fees_cents, p.regional_artist_fees_cents, p.governor_waiver, p.price_oldest_collected_on,
@@ -95,9 +95,10 @@ SELECT
 FROM projects p WHERE p.id = $1
 RETURNING *;
 
--- name: CopyProjectMunicipalities :exec
-INSERT INTO project_municipalities (project_id, ibge_code)
-SELECT sqlc.arg('new_project_id')::uuid, pm.ibge_code FROM project_municipalities pm WHERE pm.project_id = sqlc.arg('source_project_id')::uuid;
+-- name: CopyProjectExecutionPeriods :exec
+INSERT INTO project_execution_periods (project_id, position, start_date, end_date, municipality_ibge, place_detail)
+SELECT sqlc.arg('new_project_id')::uuid, e.position, e.start_date, e.end_date, e.municipality_ibge, e.place_detail
+FROM project_execution_periods e WHERE e.project_id = sqlc.arg('source_project_id')::uuid;
 
 -- name: CopyProjectAmendment :exec
 INSERT INTO project_amendments (id, project_id, position, parliamentarian_id, parliamentarian_free_name, amendment_number, year, amount_cents)

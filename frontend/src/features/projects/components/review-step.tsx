@@ -62,11 +62,29 @@ function Summary({ project }: { project: Project }) {
             {i.cnpj && <span className='text-muted-foreground'> · {formatCnpj(i.cnpj)}</span>}
           </Row>
           <Row label='Vigência'>
-            {p.startDate && p.endDate
+            {p.executionPeriods.length > 1 && p.startDate && p.endDate
               ? `${formatDate(p.startDate)} a ${formatDate(p.endDate)}`
               : ''}
           </Row>
-          <Row label='Execução em'>{p.municipalities.map((m) => m.name).join(', ')}</Row>
+          <Row label={p.executionPeriods.length > 1 ? 'Períodos e locais' : 'Execução em'}>
+            {p.executionPeriods.length > 0 && (
+              <ul className='space-y-1'>
+                {p.executionPeriods.map((e, i) => (
+                  <li key={e.id ?? i}>
+                    {[
+                      e.startDate && e.endDate
+                        ? `${formatDate(e.startDate)} a ${formatDate(e.endDate)}`
+                        : '',
+                      e.municipality?.name ?? '',
+                      e.placeDetail
+                    ]
+                      .filter(Boolean)
+                      .join(' — ')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Row>
           <Row label='Tipo de recurso'>{f.type ? fundingTypeLabels[f.type] : ''}</Row>
           <Row label='Total solicitado'>{f.totalCents ? formatBrl(f.totalCents) : ''}</Row>
           <Row label='Contrapartida'>{f.counterpartCents ? formatBrl(f.counterpartCents) : ''}</Row>

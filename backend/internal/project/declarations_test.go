@@ -153,8 +153,8 @@ func signerWithPersonalData() (Project, declEnv) {
 	p.Institution.CNPJ = "11222333000181"
 	p.Proponent.Personal = PersonalData{Nationality: "brasileira", MaritalStatus: MaritalMarried, Street: "Rua das Flores", Number: "100",
 		District: "Centro", UF: "MT", MunicipalityIBGE: "5107925"}
-	p.Proposal = ProposalSection{Title: "Festival de Inverno", SigconNumber: "3216/2026", StartDate: "2026-11-01", EndDate: "2027-05-01",
-		Municipalities: []Municipality{{IBGECode: "5107925", Name: "Sorriso", UF: "MT"}}}
+	p.Proposal = ProposalSection{Title: "Festival de Inverno", SigconNumber: "3216/2026", ExecutionPeriods: []ExecutionPeriod{
+		{StartDate: "2026-11-01", EndDate: "2027-05-01", MunicipalityIBGE: "5107925", Municipality: &Municipality{IBGECode: "5107925", Name: "Sorriso", UF: "MT"}}}}
 	return p, declEnv{Place: "Sorriso/MT", SignerCPF: testCPF, HomePlace: "Sorriso/MT"}
 }
 
@@ -172,12 +172,36 @@ func TestGratuidadeUsaOsDadosDoCadastroSemRG(t *testing.T) {
 	assert.NotContains(t, got, "Identidade", "o CPF identifica a pessoa: não há RG")
 }
 
-func TestGratuidadeComVariosMunicipiosEUmDia(t *testing.T) {
+func TestGratuidadeComUmDia(t *testing.T) {
 	p, e := signerWithPersonalData()
-	p.Proposal.Municipalities = []Municipality{{Name: "Sorriso"}, {Name: "Sinop"}, {Name: "Lucas do Rio Verde"}}
-	p.Proposal.EndDate = p.Proposal.StartDate
+	p.Proposal.ExecutionPeriods[0].EndDate = p.Proposal.ExecutionPeriods[0].StartDate
 	d := buildDeclaration(declarationSpecs["declaracao_gratuidade"], p, e)
-	assert.Contains(t, d.Paragraphs[0], "nos municípios de Sorriso, Sinop e Lucas do Rio Verde, no dia 01/11/2026,")
+	assert.Contains(t, d.Paragraphs[0], "no município de Sorriso, no dia 01/11/2026,")
+}
+
+func TestGratuidadeEnumeraTodosOsPeriodosELocais(t *testing.T) {
+	p, e := signerWithPersonalData()
+	p.Proposal.ExecutionPeriods = []ExecutionPeriod{
+		{StartDate: "2026-11-01", EndDate: "2026-11-03", MunicipalityIBGE: "5107925", Municipality: &Municipality{Name: "Sorriso"}, PlaceDetail: "Ginásio"},
+		{StartDate: "2026-11-10", EndDate: "2026-11-10", MunicipalityIBGE: "5107909", Municipality: &Municipality{Name: "Sinop"}},
+	}
+	d := buildDeclaration(declarationSpecs["declaracao_gratuidade"], p, e)
+	assert.True(t, d.Ready, d.Issues)
+	assert.Contains(t, d.Paragraphs[0], "a ser realizada nos seguintes locais e períodos: "+
+		"no município de Sorriso (Ginásio), no período de 01/11/2026 a 03/11/2026; no município de Sinop, no dia 10/11/2026, terá entrada gratuita")
+}
+
+func TestGratuidadeExigeMunicipioEDatasEmCadaPeriodo(t *testing.T) {
+	p, e := signerWithPersonalData()
+	p.Proposal.ExecutionPeriods = append(p.Proposal.ExecutionPeriods, ExecutionPeriod{StartDate: "2026-12-01"})
+	d := buildDeclaration(declarationSpecs["declaracao_gratuidade"], p, e)
+	assert.False(t, d.Ready)
+	fields := map[string]string{}
+	for _, i := range d.Issues {
+		fields[i.Field] = i.Code
+	}
+	assert.Equal(t, "decl_execution_place", fields["executionPeriods[1].municipalityIbge"])
+	assert.Equal(t, "decl_period", fields["executionPeriods[1].startDate"])
 }
 
 func TestPublicidadeEOTextoOficialComOsDadosDoSignatario(t *testing.T) {

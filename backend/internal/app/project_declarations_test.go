@@ -367,8 +367,8 @@ func TestGratuidadeDaPrevisaoAAssinatura(t *testing.T) {
 	assert.Contains(t, text, "Eu, ")
 	assert.Contains(t, text, "brasileira, casado(a), portador(a) do CPF nº "+formatCPF(cpfMaria))
 	assert.Contains(t, text, "residente e domiciliado em Rua das Flores, nº 100, Bairro Centro – Cuiabá/MT,")
-	assert.Contains(t, text, "CNPJ nº 11.222.333/0001-81, DECLARO que a Programação Pavimentação da Rua A a ser realizada nos municípios de Cuiabá e")
-	assert.Contains(t, text, "no período de 01/11/2026 a 01/05/2027, terá entrada gratuita")
+	assert.Contains(t, text, "CNPJ nº 11.222.333/0001-81, DECLARO que a Programação Pavimentação da Rua A a ser realizada nos seguintes locais e períodos: "+
+		"no município de Cuiabá (Av. Principal), no período de 01/11/2026 a 15/12/2026; no município de Várzea Grande, no período de 10/01/2027 a 01/05/2027, terá entrada gratuita")
 	assert.NotContains(t, text, "Identidade")
 
 	require.Equal(t, 200, fp.accept(p.maria, "declaracao_gratuidade", hash, true).Status)

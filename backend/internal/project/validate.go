@@ -33,21 +33,21 @@ func (p problems) err() error {
 
 // Limites de tamanho (em caracteres).
 const (
-	maxContacts     = 5
-	maxJobTitle     = 100
-	maxPersonName   = 150
-	maxInstitution  = 200
-	maxOtherType    = 100
-	maxStreet       = 150
-	maxNumber       = 20
-	maxComplement   = 100
-	maxDistrict     = 100
-	maxHabilitation = 50
-	maxTitle        = 200
-	maxObject       = 5000
-	maxJustify      = 10000
-	maxPlaceDetail  = 500
-	maxMunicipality = 50
+	maxContacts         = 5
+	maxJobTitle         = 100
+	maxPersonName       = 150
+	maxInstitution      = 200
+	maxOtherType        = 100
+	maxStreet           = 150
+	maxNumber           = 20
+	maxComplement       = 100
+	maxDistrict         = 100
+	maxHabilitation     = 50
+	maxTitle            = 200
+	maxObject           = 5000
+	maxJustify          = 10000
+	maxPlaceDetail      = 500
+	maxExecutionPeriods = 50
 )
 
 func tooLong(s string, max int) bool { return len([]rune(s)) > max }

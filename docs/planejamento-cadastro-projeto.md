@@ -103,7 +103,7 @@ Os dados da instituição são **copiados para dentro do projeto** (não existe 
 | **Proponente (cópia)** | nome, CPF, telefones, e-mails, município/UF, cargo; é representante legal? (se não: nome, CPF e cargo do representante legal) |
 | **Instituição (cópia)** | CNPJ, nome, tipo de entidade (+ texto se OUTRO), natureza (pública/privada), sem fins lucrativos?, UF e município da sede, endereço, e-mail e telefone institucionais |
 | **Habilitação** | status declarado (Plena/Parcial), validade, nº da certidão (anexo no checklist) |
-| **Proposta** | nº SIGCon, data de cadastro no SIGCon, título, objeto, justificativa, vigência (início/fim), municípios de execução (1..n, todos MT), detalhe do local, natureza do objeto, evento com artistas?, calamidade/emergência? |
+| **Proposta** | nº SIGCon, data de cadastro no SIGCon, título, objeto, justificativa, **períodos e locais de execução** (1..50 linhas; cada uma com início e término previstos, município de execução de MT e detalhe do local opcional; a vigência do projeto é o menor início e o maior término), natureza do objeto, evento com artistas?, calamidade/emergência? |
 | **Recursos** | tipo (Emenda / Recurso próprio / Misto), valor recurso próprio, valor emenda (calculado), **total solicitado (calculado)**, contrapartida (valor + tipo), custos indiretos (Fomento) |
 | **Chamamento** | situação (realizado / dispensa / inexigível / não se aplica), nº do edital, data de homologação, hipótese legal, justificativa |
 | **Evento com artistas** | valor total de cachês, valor de cachês para artistas regionais |
@@ -164,10 +164,10 @@ Duas dimensões separadas, mais o parecer:
 | RN-01 | CNPJ com dígitos verificadores válidos. Vale o formato numérico e o alfanumérico (IN RFB 2.229/2024: 12 posições de 0-9 e A-Z + 2 dígitos verificadores numéricos; cálculo módulo 11 com o valor de cada caractere igual ao código ASCII − 48). | — | B |
 | RN-02 | **Fomento** só para entidade privada sem fins lucrativos. | Lei 13.019 | B |
 | RN-03 | **Convênio** vale para qualquer natureza, com o checklist de prefeituras. | IN 001/2015 | — |
-| RN-04 | Todos os municípios de **execução** são de MT. A sede pode ser de qualquer UF. | Decisão #12 | B |
+| RN-04 | Todos os municípios de **execução** (um por período/local) são de MT. A sede pode ser de qualquer UF. | Decisão #12 | B |
 | RN-05 | Nº SIGCon no formato `NNNN/AAAA`, com ano coerente com a data de cadastro. Único entre projetos **não arquivados**. | Decisão #6 | B |
 | RN-06 | Data de cadastro no SIGCon não pode ser futura. | — | B |
-| RN-07 | Vigência: fim depois do início. Aviso se o início for incompatível com a assinatura até o último dia útil de dezembro. | Manual SIGCon | B / A |
+| RN-07 | Vigência: em cada período/local, o término não é anterior ao início (períodos podem se sobrepor). Aviso se o início for incompatível com a assinatura até o último dia útil de dezembro. | Manual SIGCon | B / A |
 | RN-08 | Telefones: pelo menos 1 celular válido. E-mails: pelo menos 1 válido. | Pedido | B |
 | RN-09 | Valores positivos. Total solicitado = recurso próprio + emenda, sempre calculado no servidor. | — | B |
 | RN-10 | Tipo com emenda: pelo menos 1 linha (parlamentar, nº, valor > 0). Soma das linhas = valor em emenda. Cada linha com os 2 ofícios. | Pedido | B |
@@ -264,7 +264,7 @@ Observações:
 
 1. **Proponente:** perfil. Representante legal.
 2. **Instituição:** CNPJ, nome, tipo de entidade, instrumento, sede, habilitação. Bloqueio imediato da combinação inválida (Fomento + entidade pública).
-3. **Proposta:** nº SIGCon, data, título, objeto, justificativa, vigência, municípios de execução, natureza do objeto, perguntas condicionais (evento com artistas, calamidade).
+3. **Proposta:** nº SIGCon, data, título, objeto, justificativa, períodos e locais de execução (uma linha por período, com município e detalhe do local), natureza do objeto, perguntas condicionais (evento com artistas, calamidade).
 4. **Recursos:** tipo, valores, emendas (linha a linha com anexos), contrapartida, custos indiretos, chamamento. O total é mostrado em tempo real, só leitura.
 5. **Evento com artistas:** só aparece se marcado. Mostra o quanto falta para cumprir os limites.
 6. **Documentos:** checklist guiado por condições, com modelo para baixar, upload, justificativa e indicador de progresso.

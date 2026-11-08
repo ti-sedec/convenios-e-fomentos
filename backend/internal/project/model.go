@@ -210,23 +210,36 @@ type Municipality struct {
 	UF       string `json:"uf"`
 }
 
-// ProposalSection é a seção "Proposta". Na gravação, Municipalities é a lista de códigos IBGE
-// (MunicipalityCodes); na leitura, vêm os municípios completos.
-type ProposalSection struct {
-	SigconNumber         string `json:"sigconNumber"`
-	SigconRegisteredOn   string `json:"sigconRegisteredOn"`
-	Title                string `json:"title"`
-	Object               string `json:"object"`
-	Justification        string `json:"justification"`
-	StartDate            string `json:"startDate"`
-	EndDate              string `json:"endDate"`
-	ObjectNature         string `json:"objectNature"`
-	HasArtisticHiring    bool   `json:"hasArtisticHiring"`
-	Calamity             bool   `json:"calamity"`
-	ExecutionPlaceDetail string `json:"executionPlaceDetail"`
+// ExecutionPeriod é um período de execução com o seu local: início, término, município (sempre de Mato Grosso) e o detalhe do
+// local. O projeto tem uma ou mais. Na gravação, só vale MunicipalityIBGE; na leitura, Municipality traz o município completo.
+type ExecutionPeriod struct {
+	// ID é gerado pelo servidor; reenviá-lo é opcional (as linhas são regravadas a cada salvamento).
+	ID               string        `json:"id,omitempty"`
+	StartDate        string        `json:"startDate"`
+	EndDate          string        `json:"endDate"`
+	MunicipalityIBGE string        `json:"municipalityIbge"`
+	Municipality     *Municipality `json:"municipality,omitempty"`
+	PlaceDetail      string        `json:"placeDetail"`
+}
 
-	MunicipalityCodes []string       `json:"municipalityCodes,omitempty"`
-	Municipalities    []Municipality `json:"municipalities"`
+// ProposalSection é a seção "Proposta". Os períodos e locais de execução são ExecutionPeriods (lista ordenada, definida por quem
+// preenche). StartDate, EndDate e Municipalities são DERIVADOS e só existem na leitura: o menor início, o maior término e os
+// municípios distintos das linhas. Na gravação eles são ignorados.
+type ProposalSection struct {
+	SigconNumber       string `json:"sigconNumber"`
+	SigconRegisteredOn string `json:"sigconRegisteredOn"`
+	Title              string `json:"title"`
+	Object             string `json:"object"`
+	Justification      string `json:"justification"`
+	ObjectNature       string `json:"objectNature"`
+	HasArtisticHiring  bool   `json:"hasArtisticHiring"`
+	Calamity           bool   `json:"calamity"`
+
+	ExecutionPeriods []ExecutionPeriod `json:"executionPeriods"`
+
+	StartDate      string         `json:"startDate"`
+	EndDate        string         `json:"endDate"`
+	Municipalities []Municipality `json:"municipalities"`
 }
 
 // Amendment é uma emenda parlamentar do projeto. Na gravação, informe ParliamentarianID (do cadastro) ou, se o parlamentar

@@ -244,7 +244,7 @@ func TestComprovanteEmPDF(t *testing.T) {
 	assert.Equal(t, "private, no-store", hdr.Get("Cache-Control"))
 	assert.True(t, strings.HasPrefix(string(body), "%PDF-"), "é um PDF")
 	text := string(body)
-	for _, want := range []string{number, "Comprovante de recebimento", "SEDEC", "600/2026", "Pavimenta", "11.222.333/0001-81", "R$ 100.000,00", "Declara"} {
+	for _, want := range []string{number, "Comprovante de recebimento", "SEDEC", "600/2026", "Pavimenta", "11.222.333/0001-81", "R$ 100.000,00", "Declara", "01/11/2026 a 15/12/2026", "Av. Principal", "10/01/2027 a 01/05/2027"} {
 		assert.Contains(t, text, want)
 	}
 	assert.NotContains(t, text, "eleitoral")

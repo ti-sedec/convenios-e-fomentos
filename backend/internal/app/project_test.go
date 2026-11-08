@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -73,8 +74,11 @@ func institutionBody(version int, typeID string) map[string]any {
 func proposalBody(version int) map[string]any {
 	return map[string]any{
 		"version": version, "sigconNumber": "3216/2026", "sigconRegisteredOn": "2026-02-10", "title": "Pavimentação da Rua A",
-		"object": "Pavimentar 2 km da Rua A.", "justification": "A rua está intransitável.", "startDate": "2026-11-01", "endDate": "2027-05-01",
-		"objectNature": "works", "municipalityCodes": []any{"5103403", "5108402"},
+		"object": "Pavimentar 2 km da Rua A.", "justification": "A rua está intransitável.", "objectNature": "works",
+		"executionPeriods": []any{
+			map[string]any{"startDate": "2026-11-01", "endDate": "2026-12-15", "municipalityIbge": "5103403", "placeDetail": "Av. Principal"},
+			map[string]any{"startDate": "2027-01-10", "endDate": "2027-05-01", "municipalityIbge": "5108402"},
+		},
 	}
 }
 
@@ -189,7 +193,7 @@ func TestCriarProjetoCopiaOPerfilEListaAsPendencias(t *testing.T) {
 	assert.Empty(t, prop["phones"])
 	fields := issueFields(r)
 	for _, f := range []string{"proponent.phones", "proponent.emails", "proponent.isLegalRepresentative", "institution.instrument", "institution.cnpj",
-		"institution.entityTypeId", "institution.habilitationStatus", "proposal.sigconNumber", "proposal.title", "proposal.municipalityCodes"} {
+		"institution.entityTypeId", "institution.habilitationStatus", "proposal.sigconNumber", "proposal.title", "proposal.executionPeriods"} {
 		assert.Equal(t, "required", fields[f], f)
 	}
 
@@ -390,25 +394,68 @@ func TestSecaoProposta(t *testing.T) {
 	prop := r.data()["proposal"].(map[string]any)
 	assert.Equal(t, "3216/2026", prop["sigconNumber"])
 	assert.Equal(t, "works", prop["objectNature"])
+	// Os dados derivados (vigência e municípios) saem das linhas.
+	assert.Equal(t, "2026-11-01", prop["startDate"])
+	assert.Equal(t, "2027-05-01", prop["endDate"])
 	muns := prop["municipalities"].([]any)
 	require.Len(t, muns, 2)
 	assert.Equal(t, "Cuiabá", muns[0].(map[string]any)["name"])
 	assert.Equal(t, "Várzea Grande", muns[1].(map[string]any)["name"])
 	assert.Equal(t, "MT", muns[0].(map[string]any)["uf"])
+	periods := prop["executionPeriods"].([]any)
+	require.Len(t, periods, 2)
+	first := periods[0].(map[string]any)
+	assert.NotEmpty(t, first["id"])
+	assert.Equal(t, "2026-11-01", first["startDate"])
+	assert.Equal(t, "2026-12-15", first["endDate"])
+	assert.Equal(t, "5103403", first["municipalityIbge"])
+	assert.Equal(t, "Cuiabá", first["municipality"].(map[string]any)["name"])
+	assert.Equal(t, "Av. Principal", first["placeDetail"])
+	assert.Equal(t, "", periods[1].(map[string]any)["placeDetail"], "o detalhe do local é opcional")
 	for k := range issueFields(r) {
 		assert.NotContains(t, k, "proposal.", "proposta completa não deixa pendências")
 	}
 	v++
 
-	// Trocar os municípios substitui a lista; omitir apaga.
-	r = put(v, func(b map[string]any) { b["municipalityCodes"] = []any{"5103403", "5103403"} })
+	// As linhas são regravadas por inteiro, na ordem enviada; vários períodos no mesmo município e sobrepostos são permitidos.
+	r = put(v, func(b map[string]any) {
+		b["executionPeriods"] = []any{
+			map[string]any{"startDate": "2026-11-05", "endDate": "2026-11-10", "municipalityIbge": "5103403", "placeDetail": "Ginásio"},
+			map[string]any{"startDate": "2026-11-01", "endDate": "2026-11-08", "municipalityIbge": "5103403", "placeDetail": "Praça"},
+		}
+	})
 	require.Equal(t, 200, r.Status, r.Body)
-	assert.Len(t, r.data()["proposal"].(map[string]any)["municipalities"], 1, "repetidos viram um")
+	prop = r.data()["proposal"].(map[string]any)
+	periods = prop["executionPeriods"].([]any)
+	require.Len(t, periods, 2)
+	assert.Equal(t, "Ginásio", periods[0].(map[string]any)["placeDetail"], "mantém a ordem enviada")
+	assert.Equal(t, "2026-11-01", prop["startDate"], "menor início")
+	assert.Equal(t, "2026-11-10", prop["endDate"], "maior término")
+	assert.Len(t, prop["municipalities"], 1, "municípios distintos")
 	v++
-	r = put(v, func(b map[string]any) { delete(b, "municipalityCodes") })
+
+	// Omitir apaga; o rascunho aceita, mas o envio fica pendente.
+	r = put(v, func(b map[string]any) { delete(b, "executionPeriods") })
 	require.Equal(t, 200, r.Status)
-	assert.Empty(t, r.data()["proposal"].(map[string]any)["municipalities"])
-	assert.Equal(t, "required", issueFields(r)["proposal.municipalityCodes"])
+	prop = r.data()["proposal"].(map[string]any)
+	assert.Empty(t, prop["executionPeriods"])
+	assert.Empty(t, prop["municipalities"])
+	assert.Equal(t, "required", issueFields(r)["proposal.executionPeriods"])
+	v++
+
+	// Linha incompleta: cada campo que falta vira uma pendência apontando a linha.
+	r = put(v, func(b map[string]any) {
+		b["executionPeriods"] = []any{
+			map[string]any{"startDate": "2026-11-01", "endDate": "2026-11-02", "municipalityIbge": "5103403"},
+			map[string]any{"startDate": "2026-12-01"},
+		}
+	})
+	require.Equal(t, 200, r.Status, r.Body)
+	fields := issueFields(r)
+	assert.Equal(t, "required", fields["proposal.executionPeriods[1].endDate"])
+	assert.Equal(t, "required", fields["proposal.executionPeriods[1].municipalityIbge"])
+	assert.NotContains(t, fields, "proposal.executionPeriods[0].startDate")
+	assert.NotContains(t, fields, "proposal.executionPeriods[1].startDate")
 	v++
 
 	// O ano do número tem que bater com o da data de cadastro (pendência, não erro de gravação).
@@ -417,31 +464,36 @@ func TestSecaoProposta(t *testing.T) {
 	assert.Equal(t, "sigcon_year_mismatch", issueFields(r)["proposal.sigconNumber"])
 	v++
 
+	period := func(m map[string]any) func(map[string]any) {
+		return func(b map[string]any) { b["executionPeriods"] = []any{m} }
+	}
 	future := time.Now().AddDate(0, 0, 2).Format(time.DateOnly)
 	for name, mutate := range map[string]func(map[string]any){
-		"número fora do formato":    func(b map[string]any) { b["sigconNumber"] = "3216-2026" },
-		"número sem ano":            func(b map[string]any) { b["sigconNumber"] = "3216" },
-		"cadastro no futuro":        func(b map[string]any) { b["sigconRegisteredOn"] = future },
-		"data inválida":             func(b map[string]any) { b["startDate"] = "01/11/2026" },
-		"término antes do início":   func(b map[string]any) { b["startDate"], b["endDate"] = "2027-05-01", "2026-11-01" },
+		"número fora do formato":  func(b map[string]any) { b["sigconNumber"] = "3216-2026" },
+		"número sem ano":          func(b map[string]any) { b["sigconNumber"] = "3216" },
+		"cadastro no futuro":      func(b map[string]any) { b["sigconRegisteredOn"] = future },
+		"data inválida":           period(map[string]any{"startDate": "01/11/2026"}),
+		"término antes do início": period(map[string]any{"startDate": "2027-05-01", "endDate": "2026-11-01"}),
+		"linha repetida": func(b map[string]any) {
+			row := map[string]any{"startDate": "2026-11-01", "endDate": "2026-11-02", "municipalityIbge": "5103403"}
+			b["executionPeriods"] = []any{row, row}
+		},
+		"detalhe do local longo":    period(map[string]any{"placeDetail": repeat("a", 501)}),
 		"natureza inválida":         func(b map[string]any) { b["objectNature"] = "magia" },
-		"município de outro estado": func(b map[string]any) { b["municipalityCodes"] = []any{"3550308"} },
-		"município inexistente":     func(b map[string]any) { b["municipalityCodes"] = []any{"0000000"} },
+		"município de outro estado": period(map[string]any{"municipalityIbge": "3550308"}),
+		"município inexistente":     period(map[string]any{"municipalityIbge": "0000000"}),
 		"título longo":              func(b map[string]any) { b["title"] = repeat("a", 201) },
 		"objeto longo":              func(b map[string]any) { b["object"] = repeat("a", 5001) },
-		"mais de 50 municípios":     func(b map[string]any) { b["municipalityCodes"] = manyCodes(p, 51) },
+		"mais de 50 períodos": func(b map[string]any) {
+			rows := make([]any, 51)
+			for i := range rows {
+				rows[i] = map[string]any{"startDate": "2026-11-01", "endDate": "2026-11-02", "placeDetail": fmt.Sprintf("Local %d", i)}
+			}
+			b["executionPeriods"] = rows
+		},
 	} {
 		t.Run(name, func(t *testing.T) { assert.Equal(t, 422, put(v, mutate).Status) })
 	}
-}
-
-func manyCodes(p *projEnv, n int) []any {
-	list := p.do("GET", "/api/admin/catalog/municipalities?uf=MT&pageSize=100", nil, p.boss).list()
-	out := make([]any, 0, n)
-	for _, it := range list[:n] {
-		out = append(out, it.(map[string]any)["ibgeCode"])
-	}
-	return out
 }
 
 func TestProjetoCompletoNaoTemPendencias(t *testing.T) {

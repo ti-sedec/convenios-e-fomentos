@@ -36,31 +36,31 @@ RETURNING *;
 -- name: UpdateProjectProposal :one
 UPDATE projects SET
     sigcon_number = $2, sigcon_registered_on = $3, title = $4, object_description = $5, justification = $6,
-    start_date = $7, end_date = $8, object_nature = $9, has_artistic_hiring = $10, calamity = $11,
-    execution_place_detail = $12, version = version + 1, updated_at = now(), updated_by_id = $13
+    object_nature = $7, has_artistic_hiring = $8, calamity = $9,
+    version = version + 1, updated_at = now(), updated_by_id = $10
 WHERE id = $1
 RETURNING *;
 
--- name: ListProjectMunicipalities :many
-SELECT m.ibge_code, m.name, m.uf
-FROM project_municipalities pm JOIN municipalities m ON m.ibge_code = pm.ibge_code
-WHERE pm.project_id = $1
-ORDER BY m.search_name;
+-- name: ListProjectExecutionPeriods :many
+SELECT e.id, e.position, e.start_date, e.end_date, e.municipality_ibge, e.place_detail,
+       m.name AS municipality_name, m.uf AS municipality_uf
+FROM project_execution_periods e LEFT JOIN municipalities m ON m.ibge_code = e.municipality_ibge
+WHERE e.project_id = $1
+ORDER BY e.position;
 
--- name: ClearProjectMunicipalities :exec
-DELETE FROM project_municipalities WHERE project_id = $1;
+-- name: ClearProjectExecutionPeriods :exec
+DELETE FROM project_execution_periods WHERE project_id = $1;
 
--- name: AddProjectMunicipalities :exec
-INSERT INTO project_municipalities (project_id, ibge_code)
-SELECT $1, unnest(sqlc.arg('codes')::text[])
-ON CONFLICT DO NOTHING;
+-- name: AddProjectExecutionPeriod :exec
+INSERT INTO project_execution_periods (project_id, position, start_date, end_date, municipality_ibge, place_detail)
+VALUES ($1, $2, $3, $4, $5, $6);
 
 -- Outros projetos (de qualquer usuário) que ainda não foram arquivados com o mesmo número do SIGCon.
 -- name: CountOtherProjectsWithSigconNumber :one
 SELECT count(*) FROM projects WHERE sigcon_number = $1 AND id <> $2 AND status <> 'archived';
 
--- name: CountExistingMunicipalities :one
-SELECT count(*) FROM municipalities WHERE ibge_code = ANY(sqlc.arg('codes')::text[]) AND uf = sqlc.arg('uf')::text;
+-- name: ListExistingMunicipalityCodes :many
+SELECT ibge_code FROM municipalities WHERE ibge_code = ANY(sqlc.arg('codes')::text[]) AND uf = sqlc.arg('uf')::text;
 
 -- name: UpdateProjectFunding :one
 UPDATE projects SET

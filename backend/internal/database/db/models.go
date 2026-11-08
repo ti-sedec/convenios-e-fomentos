@@ -306,12 +306,9 @@ type Project struct {
 	Title                       string      `json:"title"`
 	ObjectDescription           string      `json:"object_description"`
 	Justification               string      `json:"justification"`
-	StartDate                   pgtype.Date `json:"start_date"`
-	EndDate                     pgtype.Date `json:"end_date"`
 	ObjectNature                *string     `json:"object_nature"`
 	HasArtisticHiring           bool        `json:"has_artistic_hiring"`
 	Calamity                    bool        `json:"calamity"`
-	ExecutionPlaceDetail        string      `json:"execution_place_detail"`
 	FundingType                 *string     `json:"funding_type"`
 	OwnAmountCents              int64       `json:"own_amount_cents"`
 	AmendmentAmountCents        int64       `json:"amendment_amount_cents"`
@@ -425,6 +422,16 @@ type ProjectDocumentItem struct {
 	Description     string     `json:"description"`
 }
 
+type ProjectExecutionPeriod struct {
+	ID               uuid.UUID   `json:"id"`
+	ProjectID        uuid.UUID   `json:"project_id"`
+	Position         int32       `json:"position"`
+	StartDate        pgtype.Date `json:"start_date"`
+	EndDate          pgtype.Date `json:"end_date"`
+	MunicipalityIbge *string     `json:"municipality_ibge"`
+	PlaceDetail      string      `json:"place_detail"`
+}
+
 type ProjectFile struct {
 	ID           uuid.UUID  `json:"id"`
 	ItemID       uuid.UUID  `json:"item_id"`
@@ -486,11 +493,6 @@ type ProjectMember struct {
 	RevokedAt   *time.Time `json:"revoked_at"`
 	RevokedByID *uuid.UUID `json:"revoked_by_id"`
 	Email       *string    `json:"email"`
-}
-
-type ProjectMunicipality struct {
-	ProjectID uuid.UUID `json:"project_id"`
-	IbgeCode  string    `json:"ibge_code"`
 }
 
 type ProjectStageHistory struct {

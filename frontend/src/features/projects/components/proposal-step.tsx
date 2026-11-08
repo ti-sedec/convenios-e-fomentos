@@ -4,13 +4,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useStore } from '@tanstack/react-form';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { FieldGroup } from '@/components/ui/field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
 import { projectKeys } from '../api/queries';
 import { saveProposal } from '../api/service';
 import { objectNatureLabels, type ObjectNature, type Project } from '../api/types';
-import { MunicipalitiesMultiSelect } from './municipalities-multi-select';
+import { ExecutionPeriodsEditor, fromRow, rowsOf } from './execution-periods-editor';
 import { ServerErrors } from './server-errors';
 import { StepActions } from './step-actions';
 
@@ -39,7 +39,8 @@ export function ProposalStep({
       saveProposal(project.id, {
         version: project.version,
         ...v,
-        objectNature: v.objectNature as ObjectNature | ''
+        objectNature: v.objectNature as ObjectNature | '',
+        executionPeriods: v.executionPeriods.map(fromRow)
       }),
     onSuccess: (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
@@ -56,13 +57,10 @@ export function ProposalStep({
     title: p.title,
     object: p.object,
     justification: p.justification,
-    startDate: p.startDate,
-    endDate: p.endDate,
     objectNature: p.objectNature as string,
     hasArtisticHiring: p.hasArtisticHiring,
     calamity: p.calamity,
-    executionPlaceDetail: p.executionPlaceDetail,
-    municipalityCodes: p.municipalities.map((m) => m.ibgeCode)
+    executionPeriods: rowsOf(p.executionPeriods)
   });
 
   const form = useAppForm({
@@ -130,16 +128,12 @@ export function ProposalStep({
               />
             )}
           />
-          <div className='grid gap-4 sm:grid-cols-2'>
-            <form.AppField
-              name='startDate'
-              children={(f) => <f.TextField label='Início previsto' type='date' required />}
-            />
-            <form.AppField
-              name='endDate'
-              children={(f) => <f.TextField label='Término previsto' type='date' required />}
-            />
-          </div>
+          <form.Field
+            name='executionPeriods'
+            children={(f) => (
+              <ExecutionPeriodsEditor value={f.state.value} onChange={f.handleChange} />
+            )}
+          />
           <form.AppField
             name='objectNature'
             children={(f) => (
@@ -149,32 +143,6 @@ export function ProposalStep({
                 placeholder='Escolha'
                 options={natureOptions}
                 description='Define quais documentos de engenharia, licenças e regras específicas se aplicam.'
-              />
-            )}
-          />
-          <form.Field
-            name='municipalityCodes'
-            children={(f) => (
-              <Field>
-                <FieldLabel htmlFor='proposal-municipalities'>Municípios de execução *</FieldLabel>
-                <MunicipalitiesMultiSelect
-                  id='proposal-municipalities'
-                  value={f.state.value}
-                  onChange={f.handleChange}
-                />
-                <FieldDescription>
-                  Onde o projeto será executado. Apenas municípios de Mato Grosso.
-                </FieldDescription>
-              </Field>
-            )}
-          />
-          <form.AppField
-            name='executionPlaceDetail'
-            children={(f) => (
-              <f.TextField
-                label='Detalhe do local'
-                maxLength={500}
-                description='Endereço, trecho ou coordenadas, se ajudar.'
               />
             )}
           />

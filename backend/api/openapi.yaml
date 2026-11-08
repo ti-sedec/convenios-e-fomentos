@@ -1173,9 +1173,14 @@ paths:
       summary: Grava a seção Proposta
       description: |
         Grava a seção inteira, com a `version` lida (409 `project_version_conflict` se desatualizada).
-        `sigconNumber` no formato `NNNN/AAAA`; `sigconRegisteredOn` não pode ser futura; `endDate` não pode ser anterior a `startDate`.
-        `municipalityCodes` é a lista de códigos IBGE dos municípios de execução (substitui a anterior; até 50; todos de MT, senão 422);
-        na resposta vêm como `municipalities: [{ibgeCode, name, uf}]`. `objectNature`: `works|goods|services|event|other`.
+        `sigconNumber` no formato `NNNN/AAAA`; `sigconRegisteredOn` não pode ser futura.
+        `executionPeriods` é a lista de períodos e locais de execução, regravada por inteiro a cada salvamento e na ordem enviada
+        (até 50). Cada linha tem `startDate`, `endDate` (não pode ser anterior ao início), `municipalityIbge` (só municípios de MT, senão 422)
+        e `placeDetail` (opcional, até 500). O rascunho aceita linhas incompletas; o envio exige ao menos uma linha, e cada uma com
+        início, término e município (pendências `proposal.executionPeriods[i].campo`). Períodos sobrepostos são permitidos; linhas
+        idênticas, não (422). Os erros de validação apontam a linha: `executionPeriods[1].endDate`. Na resposta, cada linha traz
+        também `id` e `municipality: {ibgeCode, name, uf}`, e `startDate` (menor início), `endDate` (maior término) e
+        `municipalities` (distintos) vêm DERIVADOS das linhas; na gravação, esses três são ignorados. `objectNature`: `works|goods|services|event|other`.
         Um número do SIGCon igual ao de outro projeto gera aviso (`sigcon_duplicated`), não erro. Permissão: `admin::projects.update`.
       security: [{adminBearer: []}]
       parameters:
@@ -1194,13 +1199,19 @@ paths:
                 title: {type: string, maxLength: 200}
                 object: {type: string, maxLength: 5000}
                 justification: {type: string, maxLength: 10000}
-                startDate: {type: string, format: date}
-                endDate: {type: string, format: date}
                 objectNature: {type: string, enum: ["", works, goods, services, event, other]}
                 hasArtisticHiring: {type: boolean}
                 calamity: {type: boolean}
-                executionPlaceDetail: {type: string, maxLength: 500}
-                municipalityCodes: {type: array, maxItems: 50, items: {type: string}}
+                executionPeriods:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    properties:
+                      startDate: {type: string, format: date}
+                      endDate: {type: string, format: date}
+                      municipalityIbge: {type: string, examples: ["5103403"]}
+                      placeDetail: {type: string, maxLength: 500}
       responses:
         "200": {description: OK}
         "401": {$ref: "#/components/responses/Error"}

@@ -505,7 +505,7 @@ func (s *Service) Duplicate(ctx context.Context, actor Actor, id uuid.UUID, in D
 		if err != nil {
 			return err
 		}
-		if err := q.CopyProjectMunicipalities(ctx, db.CopyProjectMunicipalitiesParams{SourceProjectID: id, NewProjectID: row.ID}); err != nil {
+		if err := q.CopyProjectExecutionPeriods(ctx, db.CopyProjectExecutionPeriodsParams{SourceProjectID: id, NewProjectID: row.ID}); err != nil {
 			return err
 		}
 		// Emendas: ids novos; o mapa leva os documentos por emenda para a emenda correspondente.

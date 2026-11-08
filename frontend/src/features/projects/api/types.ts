@@ -123,24 +123,44 @@ export interface ProjectMunicipality {
 
 export type ObjectNature = 'works' | 'goods' | 'services' | 'event' | 'other';
 
+/** Período de execução com o seu local. O município é sempre de Mato Grosso; o detalhe do local é opcional. */
+export interface ExecutionPeriod {
+  /** Gerado pelo servidor; as linhas são regravadas por inteiro a cada salvamento. */
+  id?: string;
+  startDate: string;
+  endDate: string;
+  municipalityIbge: string;
+  /** Só na leitura. */
+  municipality?: ProjectMunicipality;
+  placeDetail: string;
+}
+
 export interface ProposalSection {
   sigconNumber: string;
   sigconRegisteredOn: string;
   title: string;
   object: string;
   justification: string;
-  startDate: string;
-  endDate: string;
   objectNature: ObjectNature | '';
   hasArtisticHiring: boolean;
   calamity: boolean;
-  executionPlaceDetail: string;
+  /** Uma ou mais linhas, na ordem definida por quem preenche. */
+  executionPeriods: ExecutionPeriod[];
+  /** Derivados das linhas, só na leitura: menor início, maior término e municípios distintos. */
+  startDate: string;
+  endDate: string;
   municipalities: ProjectMunicipality[];
 }
 
-/** Corpo de gravação da proposta: os municípios vão como lista de códigos IBGE. */
-export type ProposalInput = Omit<ProposalSection, 'municipalities'> & {
-  municipalityCodes: string[];
+/** Corpo de gravação da proposta: o servidor deriva `startDate`, `endDate` e `municipalities` das linhas. */
+export type ProposalInput = Omit<
+  ProposalSection,
+  'startDate' | 'endDate' | 'municipalities' | 'executionPeriods'
+> & {
+  executionPeriods: Pick<
+    ExecutionPeriod,
+    'startDate' | 'endDate' | 'municipalityIbge' | 'placeDetail'
+  >[];
 };
 
 export type FundingType = 'amendment' | 'own' | 'mixed';

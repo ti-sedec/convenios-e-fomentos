@@ -473,6 +473,18 @@ func TestDuplicarProjeto(t *testing.T) {
 	assert.NotEqual(t, fp.id, d.data()["id"])
 	assert.Equal(t, fp.id, d.data()["originProjectId"])
 	assert.EqualValues(t, 1, d.data()["version"])
+	// Os períodos e locais de execução vêm junto, com ids novos.
+	srcPeriods := p.do("GET", "/api/admin/projects/"+fp.id, nil, p.maria).data()["proposal"].(map[string]any)["executionPeriods"].([]any)
+	copied := d.data()["proposal"].(map[string]any)["executionPeriods"].([]any)
+	require.Len(t, copied, len(srcPeriods))
+	require.Len(t, copied, 2)
+	for i := range copied {
+		a, b := srcPeriods[i].(map[string]any), copied[i].(map[string]any)
+		assert.NotEqual(t, a["id"], b["id"])
+		for _, k := range []string{"startDate", "endDate", "municipalityIbge", "placeDetail"} {
+			assert.Equal(t, a[k], b[k], k)
+		}
+	}
 	assert.Equal(t, "Pavimentação da Rua A", d.data()["proposal"].(map[string]any)["title"])
 	assert.Equal(t, "3216/2026", d.data()["proposal"].(map[string]any)["sigconNumber"])
 	assert.Len(t, d.data()["proposal"].(map[string]any)["municipalities"], 2)
