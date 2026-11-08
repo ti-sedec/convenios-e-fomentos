@@ -426,8 +426,10 @@ O frontend ainda não tem suíte de testes automatizados; a verificação de pon
   decisões de projeto) e [`backend/SEGURANCA.md`](backend/SEGURANCA.md) (revisão de segurança e pendências).
 - Contrato da API: <http://localhost/api/docs> com o ambiente no ar, ou [`backend/api/openapi.yaml`](backend/api/openapi.yaml).
 - Frontend: [`frontend/CLAUDE.md`](frontend/CLAUDE.md), [`frontend/AGENTS.md`](frontend/AGENTS.md) e [`frontend/docs/`](frontend/docs/)
-  (formulários e temas). Os Dockerfiles de **produção** do frontend e `frontend/docs/deployment.md` ainda mencionam o Clerk e
-  precisam ser revisados antes do deploy.
+  (formulários e temas). O `frontend/Dockerfile` (produção) já é o do projeto; o `frontend/Dockerfile.bun` e o
+  `frontend/docs/deployment.md` ainda são do template (Clerk) e não valem para este deploy.
+- **Produção (Portainer)**: [`docker-compose.prod.yml`](docker-compose.prod.yml), [`.env.prod.example`](.env.prod.example) e o passo a passo em
+  [`docs/deploy-producao.md`](docs/deploy-producao.md) (planejamento e testes em [`docs/planejamento-deploy-producao.md`](docs/planejamento-deploy-producao.md)).
 - Legislação e referências do domínio: [`docs/`](docs/).
 - O frontend parte do template [Kiranism/next-shadcn-dashboard-starter](https://github.com/Kiranism/next-shadcn-dashboard-starter)
   (licença MIT).

@@ -38,4 +38,6 @@ Frontend (`frontend/`, Bun): `bun run dev | typecheck | lint | format:check | fo
 
 **Frontend** (`frontend/src`). Organizado por feature em `features/<nome>/` com camadas `api/types.ts` → `api/service.ts` → `api/queries.ts` (React Query com key factories; prefetch no servidor + `useSuspenseQuery` + `HydrationBoundary`). Convenções: filtros de URL com nuqs; ícones só via `@/components/icons`; formulários com `useAppForm` (`@/lib/form`) + campos em `@/components/forms/fields` e Zod; cabeçalhos de página via props de `PageContainer`; permissões via `useCan()` / `<Can>`; chamadas do navegador usam `apiClient` (erros são `ApiError`). Guias em `frontend/docs/forms.md` e `themes.md`.
 
+**Produção** é `docker-compose.prod.yml` (Portainer, build no servidor a partir do Git; API em binário distroless e Next em modo standalone), documentada em [docs/deploy-producao.md](docs/deploy-producao.md). Não use bind mount de arquivo do repositório nele (o Portainer clona o Git dentro do contêiner dele); configuração vai dentro de imagens.
+
 Existe um grafo de conhecimento do repositório em `graphify-out/` (veja `GRAPH_REPORT.md`) para consultas de arquitetura.

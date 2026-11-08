@@ -1,73 +1,51 @@
-# ============================================
-# Stage 1: Install dependencies
-# ============================================
+# Imagem de PRODUÇÃO do frontend: build do Next.js em modo "standalone" (servidor Node mínimo, sem node_modules inteiro).
+# O dev usa o Dockerfile.dev (Bun + next dev com HMR). Este arquivo substitui o do template, que era do Clerk.
+#
+# Contexto de build: esta pasta (frontend/). Argumentos de build:
+#   NEXT_PUBLIC_APP_URL  origem pública (https://...). É EMBUTIDA no build: mudar o domínio exige reconstruir.
+# Tudo o mais (API_URL, MTLOGIN_*) é lido em tempo de execução.
 
-ARG NODE_VERSION=22-slim
+ARG NODE_VERSION=24-slim
 
-FROM node:${NODE_VERSION} AS dependencies
-
+# --- 1. Dependências (Bun resolve pelo bun.lock; o build roda no Node) ---
+FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
-
-# Install bun to use bun.lock for dependency resolution
-RUN npm install -g bun
-
-# Copy package-related files to leverage Docker cache
-COPY package.json bun.lock* ./
-
-# Install dependencies with frozen lockfile for reproducible builds
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY package.json bun.lock ./
+# --ignore-scripts: o "prepare" do projeto instala o husky (hooks do Git), inútil e sem .git na imagem.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --no-save --frozen-lockfile
+    bun install --frozen-lockfile --ignore-scripts
 
-# ============================================
-# Stage 2: Build the Next.js application
-# ============================================
-
+# --- 2. Build ---
 FROM node:${NODE_VERSION} AS builder
-
 WORKDIR /app
-
-COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL} \
+    NEXT_PUBLIC_SENTRY_DISABLED=true \
+    NEXT_TELEMETRY_DISABLED=1 \
+    BUILD_STANDALONE=true \
+    NODE_ENV=production
+# "prebuild" copia os arquivos do pdf.js para public/pdfjs; depois vem o next build.
+RUN bun run build
 
-# Build-time env vars — override these with --build-arg or in compose.yml
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ARG NEXT_PUBLIC_CLERK_SIGN_IN_URL=/auth/sign-in
-ARG NEXT_PUBLIC_CLERK_SIGN_UP_URL=/auth/sign-up
-ARG NEXT_PUBLIC_SENTRY_DISABLED=true
-
-ENV BUILD_STANDALONE=true
-
-RUN npm run build
-
-# ============================================
-# Stage 3: Production runner
-# ============================================
-
+# --- 3. Execução ---
 FROM node:${NODE_VERSION} AS runner
-
 WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Copy public assets
 COPY --from=builder --chown=node:node /app/public ./public
-
-# Create .next dir with correct permissions for prerender cache
-RUN mkdir .next && chown node:node .next
-
-# Copy standalone output and static files
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+# Cache de renderização do Next: o compose o monta em tmpfs (sistema de arquivos somente leitura).
+RUN mkdir -p .next/cache && chown node:node .next .next/cache
 
-# Run as non-root user
 USER node
-
 EXPOSE 3000
-
 CMD ["node", "server.js"]
