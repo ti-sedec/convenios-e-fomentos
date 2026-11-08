@@ -7,7 +7,7 @@ import { useStore } from '@tanstack/react-form';
 import { FieldGroup } from '@/components/ui/field';
 import { ReadOnlyScope } from '@/components/forms/read-only-scope';
 import { useAppForm } from '@/lib/form';
-import { projectKeys } from '../api/queries';
+import { invalidateAfterSave, projectKeys } from '../api/queries';
 import { saveProposal } from '../api/service';
 import { objectNatureLabels, type ObjectNature, type Project } from '../api/types';
 import { ExecutionPeriodsEditor, fromRow, rowsOf } from './execution-periods-editor';
@@ -44,8 +44,7 @@ export function ProposalStep({
       }),
     onSuccess: (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
-      void qc.invalidateQueries({ queryKey: projectKeys.checklist(project.id) });
-      void qc.invalidateQueries({ queryKey: projectKeys.lists() });
+      void invalidateAfterSave(qc, project.id);
       toast.success('Proposta salva.');
       onSaved(saved, advance.current);
     }

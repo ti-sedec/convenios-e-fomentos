@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCan } from '@/features/auth/session-provider';
 import { cn } from '@/lib/utils';
 import { accessOf } from '../access';
-import { projectKeys, projectQueryOptions } from '../api/queries';
+import { projectKeys, projectQueryOptions, useSignatureWatcher } from '../api/queries';
 import {
   accessLabels,
   instrumentLabels,
@@ -65,6 +65,15 @@ export function ProjectWizard({ id }: { id: string }) {
   const onDirty = useCallback((d: boolean) => setDirty(d), []);
   // Relógio da tela (prazo da complementação), fixado na montagem: a leitura da hora não pode acontecer a cada renderização.
   const [now] = useState(() => Date.now());
+  // Assinatura de declaração pendente: acompanha o resultado em qualquer etapa (só quem pode alterar o projeto).
+  const editableByMe =
+    !!query.data &&
+    (query.data.access === 'owner' || query.data.access === 'edit') &&
+    can(projectActions.update);
+  useSignatureWatcher(
+    id,
+    editableByMe && (query.data?.status === 'draft' || query.data?.stage === 'awaiting_proponent')
+  );
 
   if (query.isError) return <QueryError error={query.error} what='o projeto' />;
   if (query.isLoading || !query.data) return <Skeleton className='h-96 w-full' />;
@@ -199,6 +208,7 @@ export function ProjectWizard({ id }: { id: string }) {
               access={access}
               focus={focus}
               onContinue={() => go('submission')}
+              onGoStep={(s) => go(s)}
             />
           )}
           {step === 'submission' && (

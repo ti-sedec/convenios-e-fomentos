@@ -4,6 +4,7 @@ import { createFormHook } from '@tanstack/react-form';
 import { fieldContext, formContext } from '@/lib/form-context';
 import { TextField } from '@/components/forms/fields/text-field';
 import { CnpjField } from '@/components/forms/fields/cnpj-field';
+import { PhoneField, ZipField } from '@/components/forms/fields/masked-field';
 import { TextareaField } from '@/components/forms/fields/textarea-field';
 import { SelectField } from '@/components/forms/fields/select-field';
 import { CheckboxField } from '@/components/forms/fields/checkbox-field';
@@ -41,6 +42,8 @@ export const { useAppForm, withForm } = createFormHook({
   fieldComponents: {
     TextField,
     CnpjField,
+    PhoneField,
+    ZipField,
     TextareaField,
     SelectField,
     CheckboxField,

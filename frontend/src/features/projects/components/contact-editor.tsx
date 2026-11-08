@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { UFS } from '@/features/municipalities/api/queries';
 import { useFormReadOnly } from '@/lib/form-context';
-import { formatPhone } from '../format';
+import { maskPhone } from '@/lib/masks';
 import type { Contact, Email, Phone } from '../api/types';
 import { MunicipalitySelect } from './municipality-select';
 import { PersonalDataEditor } from './personal-data-editor';
@@ -36,10 +36,10 @@ function PhonesEditor({ value, onChange }: { value: Phone[]; onChange: (next: Ph
             aria-label={`Número do telefone ${i + 1}`}
             inputMode='tel'
             className='w-48'
-            placeholder='(65) 99999-8888'
+            maxLength={16}
+            placeholder={p.type === 'mobile' ? '(99) 9 9999-9999' : '(99) 9999-9999'}
             value={p.number}
-            onChange={(e) => set(i, { number: e.target.value })}
-            onBlur={(e) => set(i, { number: formatPhone(e.target.value) })}
+            onChange={(e) => set(i, { number: maskPhone(e.target.value) })}
           />
           {!readOnly && (
             <Button

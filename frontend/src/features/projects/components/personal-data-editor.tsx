@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { UFS } from '@/features/municipalities/api/queries';
 import { useZipLookup } from '@/features/zip-codes/use-zip-lookup';
-import { formatZip } from '../format';
+import { maskZip } from '@/lib/masks';
 import type { MaritalStatus, PersonalData } from '../api/types';
 import { MunicipalitySelect } from './municipality-select';
 
@@ -64,7 +64,7 @@ export function PersonalDataEditor({
     <FieldGroup>
       <div className='grid gap-4 sm:grid-cols-2'>
         <Field>
-          <FieldLabel htmlFor={`${id}-nationality`}>Nacionalidade</FieldLabel>
+          <FieldLabel htmlFor={`${id}-nationality`}>Nacionalidade *</FieldLabel>
           <Input
             id={`${id}-nationality`}
             maxLength={60}
@@ -74,7 +74,7 @@ export function PersonalDataEditor({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-marital`}>Estado civil</FieldLabel>
+          <FieldLabel htmlFor={`${id}-marital`}>Estado civil *</FieldLabel>
           <NativeSelect
             id={`${id}-marital`}
             className='w-full'
@@ -97,13 +97,11 @@ export function PersonalDataEditor({
           <Input
             id={`${id}-zip`}
             inputMode='numeric'
-            placeholder='00000-000'
+            maxLength={9}
+            placeholder='99999-999'
             value={value.zip}
-            onChange={(e) => patch({ zip: e.target.value })}
-            onBlur={(e) => {
-              patch({ zip: formatZip(e.target.value) });
-              void zipLookup.lookup(e.target.value);
-            }}
+            onChange={(e) => patch({ zip: maskZip(e.target.value) })}
+            onBlur={(e) => void zipLookup.lookup(e.target.value)}
           />
           {zipLookup.loading && (
             <FieldDescription className='flex items-center gap-1'>
@@ -113,7 +111,7 @@ export function PersonalDataEditor({
           {zipLookup.message && <FieldDescription>{zipLookup.message}</FieldDescription>}
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-street`}>Rua, avenida…</FieldLabel>
+          <FieldLabel htmlFor={`${id}-street`}>Rua, avenida… *</FieldLabel>
           <Input
             id={`${id}-street`}
             maxLength={150}
@@ -123,7 +121,7 @@ export function PersonalDataEditor({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-number`}>Número</FieldLabel>
+          <FieldLabel htmlFor={`${id}-number`}>Número *</FieldLabel>
           <Input
             id={`${id}-number`}
             maxLength={20}
@@ -144,7 +142,7 @@ export function PersonalDataEditor({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-district`}>Bairro</FieldLabel>
+          <FieldLabel htmlFor={`${id}-district`}>Bairro *</FieldLabel>
           <Input
             id={`${id}-district`}
             maxLength={100}
@@ -171,7 +169,7 @@ export function PersonalDataEditor({
           </NativeSelect>
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-municipality`}>Município</FieldLabel>
+          <FieldLabel htmlFor={`${id}-municipality`}>Município *</FieldLabel>
           <MunicipalitySelect
             id={`${id}-municipality`}
             uf={value.uf}
@@ -181,7 +179,9 @@ export function PersonalDataEditor({
         </Field>
       </div>
       <FieldDescription>
-        Aparecem no texto das declarações de gratuidade e de publicidade, assinadas por esta pessoa.
+        Os campos com * aparecem no texto das declarações de gratuidade e de publicidade, assinadas
+        por esta pessoa, e são necessários para gerá-las (no número, use S/N se não houver). Não
+        impedem salvar o cadastro.
       </FieldDescription>
     </FieldGroup>
   );
