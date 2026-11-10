@@ -57,6 +57,12 @@ x-api: &api
     # aprovado sozinho depois de MTID_SIMULATE_DELAY, sem validade alguma. Use MTID_SIMULATE=false para ver o erro 503.
     MTID_SIMULATE: ${MTID_SIMULATE:-true}
     MTID_SIMULATE_DELAY: ${MTID_SIMULATE_DELAY:-10s}
+    # MT-ID real (SmartPass pelo X-Via): com X_VIA_SEDEC_BASE_URL definido e MTID_SIMULATE=false, a API chama o serviço de verdade.
+    # X_VIA_CA_FILE aponta para o PEM do certificado do X-Via de desenvolvimento (guarde-o em backend/certs/, que o contêiner vê em /app/certs).
+    X_VIA_SEDEC_BASE_URL: ${X_VIA_SEDEC_BASE_URL:-}
+    X_ROAD_CLIENT: ${X_ROAD_CLIENT:-}
+    X_VIA_CA_FILE: ${X_VIA_CA_FILE:-}
+    X_VIA_TLS_SERVER_NAME: ${X_VIA_TLS_SERVER_NAME:-}
     # Segredos: os padrões servem SOMENTE para desenvolvimento.
     JWT_API_SECRET: ${JWT_API_SECRET:-dev-only-api-secret-change-me-000000000000}
     API_TOKEN_SALT: ${API_TOKEN_SALT:-dev-only-api-token-salt-change-me-0000000}
@@ -147,6 +153,7 @@ services:
       MTLOGIN_CLIENT_ID: ${MTLOGIN_CLIENT_ID:-}
       MTLOGIN_CLIENT_SECRET: ${MTLOGIN_CLIENT_SECRET:-}
       MTLOGIN_REDIRECT_URI: ${MTLOGIN_REDIRECT_URI:-${APP_URL:-http://localhost}/auth/callback}
+      MTLOGIN_SCOPE: ${MTLOGIN_SCOPE:-openid profile email}
       NEXT_PUBLIC_SENTRY_DISABLED: ${NEXT_PUBLIC_SENTRY_DISABLED:-true}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
       # Use "true" no macOS/Windows se o HMR não detectar mudanças.

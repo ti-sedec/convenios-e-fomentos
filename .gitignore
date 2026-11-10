@@ -20,3 +20,6 @@ Thumbs.db
 
 # Saída local do graphify
 graphify-out/
+
+# Certificados locais (ex.: X-Via de desenvolvimento)
+backend/certs/
