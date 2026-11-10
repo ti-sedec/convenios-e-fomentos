@@ -60,6 +60,16 @@ func run() error {
 		sim.AutoApprove = cfg.MTIDSimulateDelay
 		opts = append(opts, app.WithMTID(sim))
 		log.Warn("MT-ID SIMULADO ligado: as declarações são \"assinadas\" sozinhas, sem validade", "delay", cfg.MTIDSimulateDelay)
+	} else if cfg.XViaBaseURL != "" {
+		real, err := mtid.NewHTTP(mtid.HTTPConfig{
+			BaseURL: cfg.XViaBaseURL, Service: cfg.XViaMTIDService, XRoadClient: cfg.XRoadClient,
+			CAFile: cfg.XViaCAFile, TLSServerName: cfg.XViaTLSServerName, Timeout: cfg.XViaTimeout, Log: log,
+		})
+		if err != nil {
+			return err
+		}
+		opts = append(opts, app.WithMTID(real))
+		log.Info("MT-ID real ligado", "baseURL", cfg.XViaBaseURL, "xRoadClient", cfg.XRoadClient)
 	}
 	application, err := app.New(ctx, cfg, log, pool, mail, opts...)
 	if err != nil {

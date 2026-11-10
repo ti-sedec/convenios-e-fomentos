@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wagner/convenios-e-fomentos/backend/internal/httpapi"
+	"github.com/wagner/convenios-e-fomentos/backend/internal/mtid"
 )
 
 type principalKey struct{}
@@ -29,6 +30,8 @@ func (s *AdminAuth) RequireAdmin(next http.Handler) http.Handler {
 			httpapi.Error(w, r, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+		// O token segue no contexto para o MT-ID (assinatura das declarações), que autentica com o token do usuário.
+		ctx := mtid.WithToken(context.WithValue(r.Context(), principalKey{}, p), token)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

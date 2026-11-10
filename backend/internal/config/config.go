@@ -56,6 +56,16 @@ type Config struct {
 	// (docs/debito-tecnico-mt-id.md).
 	MTIDSimulate      bool          `env:"MTID_SIMULATE"`
 	MTIDSimulateDelay time.Duration `env:"MTID_SIMULATE_DELAY" envDefault:"10s"`
+	// MT-ID real (SmartPass pelo X-Via). Com XViaBaseURL definido (e sem MTIDSimulate), a API usa o serviço de verdade.
+	// XViaBaseURL é a raiz com a instância (ex.: https://host/r1/mt-dev); XRoadClient identifica o nosso subsistema no X-Via;
+	// XViaCAFile é um PEM com o certificado a confiar (o X-Via de desenvolvimento tem certificado próprio) e XViaTLSServerName o
+	// nome conferido nele, quando difere do host da URL. XViaMTIDService é o caminho do serviço.
+	XViaBaseURL       string        `env:"X_VIA_SEDEC_BASE_URL"`
+	XRoadClient       string        `env:"X_ROAD_CLIENT"`
+	XViaMTIDService   string        `env:"X_VIA_MTID_SERVICE" envDefault:"GOV/MTI/SMARTPASS"`
+	XViaCAFile        string        `env:"X_VIA_CA_FILE"`
+	XViaTLSServerName string        `env:"X_VIA_TLS_SERVER_NAME"`
+	XViaTimeout       time.Duration `env:"X_VIA_TIMEOUT" envDefault:"30s"`
 	MaxBodyBytes      int64         `env:"MAX_BODY_BYTES" envDefault:"1048576"`
 	PasswordMinLength int           `env:"PASSWORD_MIN_LENGTH" envDefault:"8"`
 
@@ -176,6 +186,16 @@ func (c *Config) Validate() error {
 	}
 	if c.MTIDSimulate && c.IsProduction() {
 		errs = append(errs, errors.New("MTID_SIMULATE não pode ficar ligado em produção: o MT-ID simulado não assina de verdade"))
+	}
+	if c.XViaBaseURL != "" {
+		if u, err := url.Parse(c.XViaBaseURL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+			errs = append(errs, errors.New("X_VIA_SEDEC_BASE_URL deve ser uma URL http(s) completa"))
+		} else if c.IsProduction() && u.Scheme != "https" {
+			errs = append(errs, errors.New("X_VIA_SEDEC_BASE_URL deve ser https em produção"))
+		}
+		if c.XRoadClient == "" {
+			errs = append(errs, errors.New("X_ROAD_CLIENT é obrigatório com X_VIA_SEDEC_BASE_URL"))
+		}
 	}
 	if c.MTIDSimulate && c.MTIDSimulateDelay < 0 {
 		errs = append(errs, errors.New("MTID_SIMULATE_DELAY não pode ser negativo"))
