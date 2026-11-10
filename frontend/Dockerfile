@@ -10,7 +10,7 @@ ARG NODE_VERSION=24-slim
 # --- 1. Dependências (Bun resolve pelo bun.lock; o build roda no Node) ---
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:1.4.4 /usr/local/bin/bun /usr/local/bin/bun
 COPY package.json bun.lock ./
 # --ignore-scripts: o "prepare" do projeto instala o husky (hooks do Git), inútil e sem .git na imagem.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # --- 2. Build ---
 FROM node:${NODE_VERSION} AS builder
 WORKDIR /app
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:1.4.4 /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

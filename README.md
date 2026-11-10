@@ -176,7 +176,7 @@ O arquivo [`docker-compose.dev.yml`](docker-compose.dev.yml) define cinco servi�
 | `migrate` | [`backend/Dockerfile.dev`](backend/Dockerfile.dev) | Aplica as migrações (`migrate:up`) e termina. A API só sobe depois que ele conclui. |
 | `api` | [`backend/Dockerfile.dev`](backend/Dockerfile.dev) | Go com [air](https://github.com/air-verse/air): recompila e reinicia a cada alteração em `.go`, `.sql` ou `.yaml`. |
 | `web` | [`frontend/Dockerfile.dev`](frontend/Dockerfile.dev) | `bun install` + `next dev` (Turbopack) com HMR. |
-| `haproxy` | `haproxy:lts-alpine` | Único ponto de entrada (porta `HAPROXY_PORT`, padrão 80): `/api/*` → `api`, `/storage/*` → MinIO (API S3), `/minio-console/*` → console do MinIO (só dev), o resto → `web`. Config em [`haproxy/haproxy.cfg`](haproxy/haproxy.cfg). |
+| `haproxy` | `haproxy:3.4.7-alpine` | Único ponto de entrada (porta `HAPROXY_PORT`, padrão 80): `/api/*` → `api`, `/storage/*` → MinIO (API S3), `/minio-console/*` → console do MinIO (só dev), o resto → `web`. Config em [`haproxy/haproxy.cfg`](haproxy/haproxy.cfg). |
 | `minio` / `minio-init` | `chainguard/minio` / `chainguard/minio-client` | Armazenamento S3 dos arquivos dos documentos; o `minio-init` cria o bucket privado. As imagens `minio/*` deixaram de ser publicadas. O navegador envia e baixa por URLs pré-assinadas em `/storage` (mesmo domínio). **`APP_URL` (ou `STORAGE_PUBLIC_URL`) precisa ter a mesma origem, com porta, que o navegador usa**: a assinatura cobre o `Host`. |
 
 **Live reload.** O código do host é montado nos contêineres (`./backend:/app`, `./frontend:/app`), então basta salvar o

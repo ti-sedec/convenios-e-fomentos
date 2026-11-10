@@ -116,10 +116,12 @@ services:
     networks: [app]
 
   # Armazenamento S3 dos documentos. As imagens oficiais minio/* deixaram de ser publicadas: usa-se a da Chainguard
-  # (a única tag gratuita é "latest"; depois do primeiro deploy a imagem fica no cache local, não rode "prune -a").
+  # (a única tag gratuita é "latest", então a versão é fixada pelo digest: minio RELEASE.2026-09-22T19-25-18Z; para atualizar,
+  # troque o digest aqui, em MINIO_IMAGE/MINIO_MC_IMAGE do .env e no docker-compose.dev.yml; depois do primeiro deploy a imagem fica
+  # no cache local, não rode "prune -a").
   # O console web fica desligado (MINIO_BROWSER=off) e não tem rota no HAProxy.
   convenios-minio:
-    image: ${MINIO_IMAGE:-chainguard/minio:latest}
+    image: ${MINIO_IMAGE:-chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880}
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -138,7 +140,7 @@ services:
 
   # Cria o bucket (privado por padrão). Se o MinIO ainda não estiver pronto o contêiner falha e é reiniciado até conseguir.
   minio-init:
-    image: ${MINIO_MC_IMAGE:-chainguard/minio-client:latest}
+    image: ${MINIO_MC_IMAGE:-chainguard/minio-client@sha256:72f9978d415ea8294d78051fb3aee2fd258d449237633f77f100b5367bb5225d}
     restart: on-failure
     logging: *logging
     <<: *hardening

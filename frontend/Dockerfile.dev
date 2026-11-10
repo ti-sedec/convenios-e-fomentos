@@ -1,6 +1,6 @@
 # Imagem de desenvolvimento do frontend: Bun + Next em modo dev (HMR).
 # O código-fonte NÃO é copiado: o docker-compose.dev.yml o monta como volume.
-FROM oven/bun:1
+FROM oven/bun:1.4.4
 
 WORKDIR /app
 

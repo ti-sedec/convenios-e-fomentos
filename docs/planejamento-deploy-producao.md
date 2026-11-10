@@ -27,7 +27,7 @@ Objetivo: um `docker-compose.prod.yml` que o Portainer (Stack a partir de reposi
 | R9 | Limite de corpo do proxy do servidor: o upload vai pelo domínio (`/storage`), até 200 MB. Nginx tem 1 MB por padrão. | Documentar o ajuste por proxy no runbook. |
 | R10 | Console do MinIO exposto em produção. | `MINIO_BROWSER=off` e nenhuma rota no HAProxy. |
 | R11 | Documentação da API pública (`/api/docs`) exposta. | Bloqueada no HAProxy (404). |
-| R12 | Deriva de versão das imagens de terceiros. | Tags fixas (`postgres:16-alpine`, `gotenberg:8`, `clamav:1.4`, `haproxy:lts-alpine`); MinIO só tem `latest` gratuito (documentado). |
+| R12 | Deriva de versão das imagens de terceiros. | Tags fixas (`postgres:16-alpine`, `gotenberg:8`, `clamav:1.4`, `haproxy:3.4.7-alpine`); MinIO só tem `latest` gratuito, fixado por digest. |
 
 ## 3. Arquitetura
 
