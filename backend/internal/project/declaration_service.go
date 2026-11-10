@@ -33,13 +33,6 @@ const (
 
 const pdfType = "application/pdf"
 
-// Posição provisória da assinatura no PDF (página 1, canto inferior): precisa ser calibrada contra o MT-ID real.
-// Ver docs/debito-tecnico-mt-id.md.
-const (
-	signatureX = 200
-	signatureY = 150
-)
-
 var (
 	errSignatureUnavailable = &httpapi.APIError{Status: 503, Code: "signature_unavailable", Message: "A assinatura digital não está disponível agora."}
 	errSignatureFailed      = &httpapi.APIError{Status: 502, Code: "signature_failed", Message: "Não foi possível pedir a assinatura ao MT-ID agora. Tente novamente em instantes."}
@@ -196,7 +189,7 @@ func (s *Service) AcceptDeclaration(ctx context.Context, actor Actor, id uuid.UU
 	}
 
 	// 2. Gera o PDF e pede a assinatura. Nada disso fica dentro de transação: são chamadas de rede.
-	pdf, err := renderDeclaration(d, s.now())
+	pdf, spot, err := renderDeclaration(d, s.now())
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +206,7 @@ func (s *Service) AcceptDeclaration(ctx context.Context, actor Actor, id uuid.UU
 	}
 	orderID, err := s.mtid.RequestSignature(ctx, mtid.Request{
 		SignerCPF: d.signerCPF, Description: d.Name + " — projeto " + projectCode, FileID: fileID,
-		X: signatureX, Y: signatureY, Pages: []int{0},
+		X: spot.X, Y: spot.Y, Pages: []int{spot.Page},
 		Metadata: map[string]string{"projectId": id.String(), "declaration": code},
 	})
 	if err != nil {
