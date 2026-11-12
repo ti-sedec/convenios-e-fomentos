@@ -12,7 +12,13 @@
 #
 # Pré-requisito (uma vez): a rede externa do proxy do servidor precisa existir:  docker network create proxy
 # Nada aqui usa bind mount de arquivo do repositório (o Portainer clona o Git dentro do contêiner dele): configurações
-# vão dentro das imagens (build:) e os dados ficam em volumes nomeados.
+# vão dentro das imagens e os dados ficam em volumes nomeados.
+#
+# As imagens próprias NÃO são construídas no servidor: o GitHub Actions (.github/workflows/build-images.yml) as constrói e
+# publica em ghcr.io/ti-sedec/convenios-*, e o servidor só baixa (pull_policy: always). IMAGE_TAG escolhe a versão:
+# "prod" (main), "hml" (develop) ou "sha-<commit>" para fixar/voltar. Para construir localmente em vez de baixar:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml up -d --build
+# Guia: docs/build-imagens.md
 #
 # Os valores ${VAR:?...} são obrigatórios: sem eles o deploy falha com a mensagem indicada, em vez de subir quebrado.
 
@@ -26,12 +32,8 @@ x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
 
-# Os três serviços abaixo usam a MESMA imagem; declarar o build em cada um (idêntico) evita que o Compose tente baixar
-# "convenios-api:prod" de um registry antes de construí-la. O BuildKit reaproveita o resultado.
-x-api-build: &api-build
-  context: ./backend
-  dockerfile: Dockerfile
-  target: api
+# migrate, seed e convenios-api usam a MESMA imagem.
+x-api-image: &api-image ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-api:${IMAGE_TAG:-prod}
 
 x-api-env: &api-env
   APP_ENV: production
@@ -156,8 +158,8 @@ services:
   # ---------------------------------------------------------------------------------------------------------------
   # A API NÃO aplica migrações sozinha: este serviço roda a cada deploy e a API só sobe depois que ele conclui.
   migrate:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: "no"
     logging: *logging
     <<: *hardening
@@ -172,8 +174,8 @@ services:
   # Roles e permissões padrão e os Super Admins de SEED_SUPER_ADMIN_CPF. Idempotente e não destrutivo (não desfaz o
   # que os administradores alteraram); em produção não cria usuários de exemplo.
   seed:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: "no"
     logging: *logging
     <<: *hardening
@@ -190,8 +192,8 @@ services:
   # Aplicação
   # ---------------------------------------------------------------------------------------------------------------
   convenios-api:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -224,13 +226,10 @@ services:
     networks: [app, egress]
 
   convenios-web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # Embutida no build do Next (metadataBase): mudar o domínio exige reconstruir esta imagem.
-        NEXT_PUBLIC_APP_URL: ${APP_URL}
-    image: convenios-web:prod
+    # O endereço público (NEXT_PUBLIC_APP_URL) é embutido no build do Next: a imagem :hml e a :prod são diferentes
+    # (variáveis HML_APP_URL/PROD_APP_URL do repositório no GitHub). Mudar o domínio exige reconstruí-la.
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-web:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -322,11 +321,8 @@ services:
   # Limpeza diária: sessões e tokens vencidos, e-mails já enviados, envios de arquivo nunca confirmados (débito T1).
   # CLEANUP_DRAFT_DAYS > 0 também apaga rascunhos de projeto sem alteração há mais de N dias (padrão 0 = não apaga).
   cleanup:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: tools
-    image: convenios-tools:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-tools:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -360,10 +356,8 @@ services:
   # pg_dump diário (BACKUP_HOUR_UTC) com retenção de BACKUP_RETENTION_DAYS, no volume "backups". O dump fica no MESMO
   # servidor: copie o volume para fora dele (ver docs/deploy-producao.md). Os documentos do MinIO não entram aqui.
   backup:
-    build:
-      context: ./ops/backup
-      dockerfile: Dockerfile
-    image: convenios-backup:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-backup:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -394,10 +388,8 @@ services:
   # Roteador interno. O proxy do servidor aponta para "convenios-proxy:80" pela rede "proxy" ou, se ele roda no
   # próprio host, para 127.0.0.1:${HAPROXY_PORT} (a porta só escuta no loopback, nunca na internet).
   convenios-proxy:
-    build:
-      context: ./haproxy
-      dockerfile: Dockerfile
-    image: convenios-proxy:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-proxy:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening

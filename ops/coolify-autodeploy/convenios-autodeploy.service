@@ -1,0 +1,11 @@
+[Unit]
+Description=Deploy no Coolify quando as imagens do GitHub ficam prontas
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/convenios-autodeploy.env
+ExecStart=/usr/local/bin/convenios-autodeploy
+# Instalado só para root; o token do Coolify fica em /etc/convenios-autodeploy.env (chmod 600).
+NoNewPrivileges=true

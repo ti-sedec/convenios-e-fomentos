@@ -9,7 +9,7 @@ Objetivo: um `docker-compose.prod.yml` que o Portainer (Stack a partir de reposi
 | # | Decisão | Consequência no desenho |
 |---|---|---|
 | D1 | Já existe proxy no servidor (Traefik / Nginx Proxy Manager / Caddy) | Ele termina o TLS. O HAProxy da stack continua como roteador interno por caminho (`/api`, `/storage`, `/`), **sem TLS**, e entra na rede externa do proxy. |
-| D2 | Build no servidor, pelo Portainer, a partir do Git | O compose usa `build:`. **Nada de bind mount de arquivo do repositório** (ver R1): o HAProxy e o script de backup viram imagens próprias. |
+| D2 | ~~Build no servidor, pelo Portainer, a partir do Git~~ **Substituída**: o build roda no GitHub Actions e o servidor baixa as imagens do GHCR ([build-imagens.md](build-imagens.md)); o servidor de hml não tem RAM para o `next build` | O compose usava `build:` (hoje só no override `docker-compose.prod.build.yml`). **Nada de bind mount de arquivo do repositório** (ver R1): o HAProxy e o script de backup viram imagens próprias. |
 | D3 | Entram: Gotenberg, ClamAV, rotina de limpeza, backup do Postgres | Seis serviços além do núcleo (ver seção 3). |
 
 ## 2. Riscos conhecidos que o desenho precisa neutralizar
