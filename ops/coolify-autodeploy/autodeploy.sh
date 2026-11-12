@@ -34,7 +34,7 @@ last=$(cat "$STATE_FILE" 2>/dev/null || true)
 [ "$sha" != "$last" ] || exit 0   # nada novo
 
 echo "imagens novas em ${BRANCH} (${sha:0:7}); disparando deploy no Coolify"
-curl -fsS --max-time 30 -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+curl -fsS --max-time 30 -X POST -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
   "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}"
 echo
 echo "$sha" > "$STATE_FILE"
