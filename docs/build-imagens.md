@@ -1,11 +1,11 @@
 # Build das imagens no GitHub (GHCR)
 
-Os servidores **não compilam mais nada**. O GitHub Actions constrói as imagens e as publica no GitHub Container Registry; o Coolify (hml) e o Portainer (produção) só baixam as imagens prontas. Motivo: o `next build` precisa de ~2 GB de RAM livres e o servidor de homologação não tem folga para isso.
+Os servidores **não compilam mais nada**. O GitHub Actions constrói as imagens e as publica no GitHub Container Registry; o Coolify (hml e produção) só baixa as imagens prontas. Motivo: o `next build` precisa de ~2 GB de RAM livres e o servidor de homologação não tem folga para isso.
 
 ```
 git push develop ─┐                            ┌─> Coolify (hml): baixa :hml
                   ├─> GitHub Actions ──> GHCR ─┤
-git push main ────┘   (build-images.yml)        └─> Portainer (prod): baixa :prod
+git push main ────┘   (build-images.yml)        └─> Coolify (prod): baixa :prod
 ```
 
 ## Imagens
@@ -27,7 +27,7 @@ Tags de cada imagem: `:hml` (branch `develop`), `:prod` (branch `main`) e `:sha-
 ## Configuração (uma vez)
 
 1. **Variáveis do repositório** (Settings > Secrets and variables > Actions > *Variables*):
-   - `PROD_APP_URL`: origem pública da produção, em https e sem barra final (ex.: `https://convenios.exemplo.gov.br`). **Obrigatória**: sem ela o build do `web` na `main` falha com a mensagem do que falta.
+   - `PROD_APP_URL`: origem pública da produção, em https e sem barra final. Opcional: o padrão é `https://convenios-fomento.sedec.mt.gov.br`. Só defina se o domínio mudar.
    - `HML_APP_URL`: opcional; o padrão é `https://convenios-fomento-hml.sedec.mt.gov.br`.
 2. **Primeiro push**: rode o workflow (push em `develop` ou *Actions > Build das imagens > Run workflow*). Os pacotes nascem **privados**.
 3. **Tornar os pacotes públicos** (uma vez por pacote): GitHub > organização `ti-sedec` > *Packages* > cada `convenios-*` > *Package settings* > *Change visibility* > Public. O repositório é público, então não há segredo nas imagens, e assim o Coolify e o Portainer baixam sem credencial. (Se preferir manter privadas, é preciso um *registry login* com um PAT `read:packages` em cada servidor.)
@@ -65,9 +65,11 @@ Fluxo resultante: push em `develop` → o workflow publica as imagens (~5 min na
 
 Para forçar um deploy sem push novo: apague `/var/lib/convenios-autodeploy/last-sha` e rode `systemctl start convenios-autodeploy`, ou use o botão *Deploy* do painel.
 
-## Produção (Portainer)
+## Produção (Coolify)
 
-Mesma stack, com `IMAGE_TAG=prod` (o padrão) e a branch `main`. Para atualizar: espere o workflow da `main` terminar (aba *Actions*) e, na stack, **Pull and redeploy** com *Re-pull image* ligado (o compose já tem `pull_policy: always`). O `main` não tem deploy automático, de propósito.
+A produção também roda no Coolify (VM própria, painel em `http://201.49.171.163:8000`), com a mesma stack, `IMAGE_TAG=prod` e a branch `main`. O deploy automático é o mesmo timer do hml, instalado com `BRANCH=main` e o `COOLIFY_APP_UUID` da aplicação de produção (o `/etc/convenios-autodeploy.env` é por servidor). O Coolify lê o certificado público do X-Via de produção em `backend/certs/xvia.crt` (nome conferido: `XV-SS-SEDEC`, não o host da URL).
+
+Se o seu ambiente de produção for o Portainer: o `main` não tem deploy automático; espere o workflow da `main` terminar (aba *Actions*) e, na stack, **Pull and redeploy** com *Re-pull image* ligado (o compose já tem `pull_policy: always`).
 
 **Voltar atrás**: ponha `IMAGE_TAG=sha-<commit anterior>` nas variáveis da stack e refaça o deploy (as migrações não são desfeitas sozinhas; veja [deploy-producao.md](deploy-producao.md)).
 
@@ -87,6 +89,6 @@ O override [`docker-compose.prod.build.yml`](../docker-compose.prod.build.yml) r
 |---|---|
 | `pull access denied` / `unauthorized` no servidor | O pacote ainda está privado: torne-o público (acima). |
 | `manifest unknown` | A tag ainda não existe: o workflow da branch não terminou (ou falhou). Veja a aba *Actions*. |
-| Build do `web` falha com "APP_URL inválida" | Falta a variável `PROD_APP_URL` (ou `HML_APP_URL` malformada) no repositório. |
+| Build do `web` falha com "APP_URL inválida" | `PROD_APP_URL` ou `HML_APP_URL` malformada no repositório (precisa ser origem https, sem barra final). |
 | Mudou o domínio | Altere `PROD_APP_URL`/`HML_APP_URL` e rode o workflow de novo (o `web` é reconstruído com o endereço novo). |
 | O timer não dispara o deploy | `journalctl -u convenios-autodeploy`. Causas típicas: token do Coolify inválido, `COOLIFY_APP_UUID` errado, API do Coolify desabilitada, limite de 60 consultas/hora da API do GitHub sem token (o timer usa 30/h). |

@@ -7,7 +7,7 @@
 #
 # O NEXT_PUBLIC_APP_URL é embutido no build do web, por isso as imagens de hml e de produção são diferentes.
 # Configure em Settings > Secrets and variables > Actions > Variables:
-#   PROD_APP_URL  origem pública da produção (https, sem barra final). Obrigatória para publicar a partir da main.
+#   PROD_APP_URL  origem pública da produção (https, sem barra final; opcional, o padrão é o domínio abaixo).
 #   HML_APP_URL   origem pública do hml (opcional; o padrão é o domínio abaixo).
 #
 # Guia completo: docs/build-imagens.md
@@ -46,7 +46,7 @@ jobs:
           - { image: convenios-backup, context: ops/backup, target: '', cache: backup }
     env:
       DEPLOY_ENV: ${{ github.ref_name == 'main' && 'prod' || 'hml' }}
-      APP_URL: ${{ github.ref_name == 'main' && vars.PROD_APP_URL || (vars.HML_APP_URL || 'https://convenios-fomento-hml.sedec.mt.gov.br') }}
+      APP_URL: ${{ github.ref_name == 'main' && (vars.PROD_APP_URL || 'https://convenios-fomento.sedec.mt.gov.br') || (vars.HML_APP_URL || 'https://convenios-fomento-hml.sedec.mt.gov.br') }}
     steps:
       - uses: actions/checkout@v7
 
