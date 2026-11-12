@@ -20,3 +20,7 @@ Thumbs.db
 
 # Saída local do graphify
 graphify-out/
+
+# Certificados: só os públicos (CA/servidor) vão para o Git; chaves e o resto de backend/certs/ ficam de fora
+backend/certs/*
+!backend/certs/*.crt

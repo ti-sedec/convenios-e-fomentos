@@ -1,8 +1,8 @@
 # Imagem de desenvolvimento da API: Go + air (live reload) + CLI de migrações.
 # O código-fonte NÃO é copiado: o docker-compose.dev.yml o monta como volume.
-FROM golang:1.27
+FROM golang:1.27.3
 
-RUN go install github.com/air-verse/air@latest
+RUN go install github.com/air-verse/air@v1.67.4
 
 # Diretórios graváveis por qualquer UID: o compose roda o contêiner com o UID do host
 # para que tmp/ e go.sum gerados no volume não fiquem como root.

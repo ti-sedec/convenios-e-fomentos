@@ -12,7 +12,13 @@
 #
 # Pré-requisito (uma vez): a rede externa do proxy do servidor precisa existir:  docker network create proxy
 # Nada aqui usa bind mount de arquivo do repositório (o Portainer clona o Git dentro do contêiner dele): configurações
-# vão dentro das imagens (build:) e os dados ficam em volumes nomeados.
+# vão dentro das imagens e os dados ficam em volumes nomeados.
+#
+# As imagens próprias NÃO são construídas no servidor: o GitHub Actions (.github/workflows/build-images.yml) as constrói e
+# publica em ghcr.io/ti-sedec/convenios-*, e o servidor só baixa (pull_policy: always). IMAGE_TAG escolhe a versão:
+# "prod" (main), "hml" (develop) ou "sha-<commit>" para fixar/voltar. Para construir localmente em vez de baixar:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml up -d --build
+# Guia: docs/build-imagens.md
 #
 # Os valores ${VAR:?...} são obrigatórios: sem eles o deploy falha com a mensagem indicada, em vez de subir quebrado.
 
@@ -26,12 +32,8 @@ x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
 
-# Os três serviços abaixo usam a MESMA imagem; declarar o build em cada um (idêntico) evita que o Compose tente baixar
-# "convenios-api:prod" de um registry antes de construí-la. O BuildKit reaproveita o resultado.
-x-api-build: &api-build
-  context: ./backend
-  dockerfile: Dockerfile
-  target: api
+# migrate, seed e convenios-api usam a MESMA imagem.
+x-api-image: &api-image ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-api:${IMAGE_TAG:-prod}
 
 x-api-env: &api-env
   APP_ENV: production
@@ -80,8 +82,16 @@ x-api-env: &api-env
   # Conversão de Word em PDF (visualizador) e antivírus, ambos só na rede interna.
   PREVIEW_CONVERTER_URL: http://gotenberg:3000
   CLAMAV_ADDR: clamav:3310
-  # O MT-ID real ainda não existe (docs/debito-tecnico-mt-id.md) e a API recusa o simulado em produção.
+  # MT-ID: o simulado é recusado em produção. O cliente real (SmartPass pelo X-Via) liga quando X_VIA_SEDEC_BASE_URL está
+  # definido; sem ele, emitir declaração responde 503. X_VIA_CA_FILE é o caminho DENTRO da imagem da API (backend/certs/
+  # vai para /app/certs); X_VIA_TLS_SERVER_NAME é o nome conferido no certificado (SAN), quando difere do host da URL.
   MTID_SIMULATE: "false"
+  X_VIA_SEDEC_BASE_URL: ${X_VIA_SEDEC_BASE_URL:-}
+  X_ROAD_CLIENT: ${X_ROAD_CLIENT:-}
+  X_VIA_MTID_SERVICE: ${X_VIA_MTID_SERVICE:-GOV/MTI/SMARTPASS}
+  X_VIA_CA_FILE: ${X_VIA_CA_FILE:-}
+  X_VIA_TLS_SERVER_NAME: ${X_VIA_TLS_SERVER_NAME:-}
+  X_VIA_TIMEOUT: ${X_VIA_TIMEOUT:-30s}
 
 services:
   # ---------------------------------------------------------------------------------------------------------------
@@ -116,10 +126,12 @@ services:
     networks: [app]
 
   # Armazenamento S3 dos documentos. As imagens oficiais minio/* deixaram de ser publicadas: usa-se a da Chainguard
-  # (a única tag gratuita é "latest"; depois do primeiro deploy a imagem fica no cache local, não rode "prune -a").
+  # (a única tag gratuita é "latest", então a versão é fixada pelo digest: minio RELEASE.2026-09-22T19-25-18Z; para atualizar,
+  # troque o digest aqui, em MINIO_IMAGE/MINIO_MC_IMAGE do .env e no docker-compose.dev.yml; depois do primeiro deploy a imagem fica
+  # no cache local, não rode "prune -a").
   # O console web fica desligado (MINIO_BROWSER=off) e não tem rota no HAProxy.
   convenios-minio:
-    image: ${MINIO_IMAGE:-chainguard/minio:latest}
+    image: ${MINIO_IMAGE:-chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880}
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -138,7 +150,7 @@ services:
 
   # Cria o bucket (privado por padrão). Se o MinIO ainda não estiver pronto o contêiner falha e é reiniciado até conseguir.
   minio-init:
-    image: ${MINIO_MC_IMAGE:-chainguard/minio-client:latest}
+    image: ${MINIO_MC_IMAGE:-chainguard/minio-client@sha256:72f9978d415ea8294d78051fb3aee2fd258d449237633f77f100b5367bb5225d}
     restart: on-failure
     logging: *logging
     <<: *hardening
@@ -154,8 +166,8 @@ services:
   # ---------------------------------------------------------------------------------------------------------------
   # A API NÃO aplica migrações sozinha: este serviço roda a cada deploy e a API só sobe depois que ele conclui.
   migrate:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: "no"
     logging: *logging
     <<: *hardening
@@ -170,8 +182,8 @@ services:
   # Roles e permissões padrão e os Super Admins de SEED_SUPER_ADMIN_CPF. Idempotente e não destrutivo (não desfaz o
   # que os administradores alteraram); em produção não cria usuários de exemplo.
   seed:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: "no"
     logging: *logging
     <<: *hardening
@@ -188,8 +200,8 @@ services:
   # Aplicação
   # ---------------------------------------------------------------------------------------------------------------
   convenios-api:
-    build: *api-build
-    image: convenios-api:prod
+    image: *api-image
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -222,13 +234,10 @@ services:
     networks: [app, egress]
 
   convenios-web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # Embutida no build do Next (metadataBase): mudar o domínio exige reconstruir esta imagem.
-        NEXT_PUBLIC_APP_URL: ${APP_URL}
-    image: convenios-web:prod
+    # O endereço público (NEXT_PUBLIC_APP_URL) é embutido no build do Next: a imagem :hml e a :prod são diferentes
+    # (variáveis HML_APP_URL/PROD_APP_URL do repositório no GitHub). Mudar o domínio exige reconstruí-la.
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-web:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -249,6 +258,8 @@ services:
       MTLOGIN_CLIENT_SECRET: ${MTLOGIN_CLIENT_SECRET:-}
       # Precisa estar cadastrada no client do Keycloak, assim como a de pós-logout (<APP_URL>/auth/sign-in).
       MTLOGIN_REDIRECT_URI: ${APP_URL}/auth/callback
+      # Escopos pedidos no login. Para assinar no MT-ID inclua signature-requester (liberado no client do Keycloak).
+      MTLOGIN_SCOPE: ${MTLOGIN_SCOPE:-openid profile email}
       NEXT_TELEMETRY_DISABLED: "1"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/auth/sign-in').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
@@ -320,11 +331,8 @@ services:
   # Limpeza diária: sessões e tokens vencidos, e-mails já enviados, envios de arquivo nunca confirmados (débito T1).
   # CLEANUP_DRAFT_DAYS > 0 também apaga rascunhos de projeto sem alteração há mais de N dias (padrão 0 = não apaga).
   cleanup:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: tools
-    image: convenios-tools:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-tools:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -358,10 +366,8 @@ services:
   # pg_dump diário (BACKUP_HOUR_UTC) com retenção de BACKUP_RETENTION_DAYS, no volume "backups". O dump fica no MESMO
   # servidor: copie o volume para fora dele (ver docs/deploy-producao.md). Os documentos do MinIO não entram aqui.
   backup:
-    build:
-      context: ./ops/backup
-      dockerfile: Dockerfile
-    image: convenios-backup:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-backup:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening
@@ -392,10 +398,8 @@ services:
   # Roteador interno. O proxy do servidor aponta para "convenios-proxy:80" pela rede "proxy" ou, se ele roda no
   # próprio host, para 127.0.0.1:${HAPROXY_PORT} (a porta só escuta no loopback, nunca na internet).
   convenios-proxy:
-    build:
-      context: ./haproxy
-      dockerfile: Dockerfile
-    image: convenios-proxy:prod
+    image: ${IMAGE_REGISTRY:-ghcr.io/ti-sedec}/convenios-proxy:${IMAGE_TAG:-prod}
+    pull_policy: always
     restart: unless-stopped
     logging: *logging
     <<: *hardening

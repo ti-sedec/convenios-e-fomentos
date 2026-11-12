@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_TermoDeFomento" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.52.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_TermoDeFomento" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.53.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
   <bpmn:collaboration id="Collaboration_TermoDeFomento">
     <bpmn:participant id="Participant_TermoDeFomento" name="TERMO DE FOMENTO" processRef="Process_TermoDeFomento" />
     <bpmn:participant id="Participant_Supervisor" name="Supervisor Administrador" />
@@ -21,8 +21,8 @@
         <bpmn:flowNodeRef>Task_ExcluirRascunho</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>End_RascunhoExcluido</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>SubProcess_Complementacao</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Event_PrazoComplementacao</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>SubProcess_Desistencia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_PrazoComplementacao</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_Sistema" name="Sistema">
         <bpmn:flowNodeRef>Task_EmailRecebimento</bpmn:flowNodeRef>
@@ -72,7 +72,7 @@
       <bpmn:outgoing>Flow_DecidirExcluir</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="Task_EnviarProjeto" name="Enviar projeto para análise">
-      <bpmn:documentation>É preciso aceitar a declaração de veracidade. Ao enviar, o sistema gera o código do projeto, a versão 1 e o comprovante em PDF, e o projeto passa para a etapa &quot;Aguardando análise de checklist&quot;. A partir daí o Proponente não pode mais alterar o projeto. Se a data-limite de protocolo antes da vedação eleitoral já passou, o envio é permitido, mas o projeto só terá atos preparatórios e preliminares (o repasse fica para depois do período de restrição); o aviso consta no comprovante e no e-mail.</bpmn:documentation>
+      <bpmn:documentation>É preciso aceitar a declaração de veracidade. Ao enviar, o sistema gera o código do projeto, a versão 1 e o comprovante em PDF, e o projeto passa para a etapa "Aguardando análise de checklist". A partir daí o Proponente não pode mais alterar o projeto. Se a data-limite de protocolo antes da vedação eleitoral já passou, o envio é permitido, mas o projeto só terá atos preparatórios e preliminares (o repasse fica para depois do período de restrição); o aviso consta no comprovante e no e-mail.</bpmn:documentation>
       <bpmn:incoming>Flow_DecidirEnviar</bpmn:incoming>
       <bpmn:outgoing>Flow_EnviarEmail</bpmn:outgoing>
     </bpmn:userTask>
@@ -85,7 +85,7 @@
       <bpmn:incoming>Flow_ExcluirFim</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:subProcess id="SubProcess_Complementacao" name="Complementação do projeto">
-      <bpmn:documentation>Etapa do projeto: Aguardando correções do proponente. O prazo é o parâmetro de regra &quot;complement_days&quot; (Portaria 247/2024, art. 2º, III; hoje 3 dias corridos), contado da devolução e encerrado às 23:59:59 do último dia, horário de Cuiabá. O prazo vale até o reenvio, não só até a correção dos itens. Quem tem edição no projeto compartilhado também pode complementar e reenviar.</bpmn:documentation>
+      <bpmn:documentation>Etapa do projeto: Aguardando correções do proponente. O prazo é o parâmetro de regra "complement_days" (Portaria 247/2024, art. 2º, III; hoje 3 dias corridos), contado da devolução e encerrado às 23:59:59 do último dia, horário de Cuiabá. O prazo vale até o reenvio, não só até a correção dos itens. Quem tem edição no projeto compartilhado também pode complementar e reenviar.</bpmn:documentation>
       <bpmn:incoming>Flow_EmailComplementar</bpmn:incoming>
       <bpmn:outgoing>Flow_ComplementacaoEmail</bpmn:outgoing>
       <bpmn:startEvent id="Start_Complementacao">
@@ -97,7 +97,7 @@
         <bpmn:outgoing>Flow_ComplementarReenviar</bpmn:outgoing>
       </bpmn:userTask>
       <bpmn:userTask id="Task_ReenviarProjeto" name="Reenviar projeto para análise">
-        <bpmn:documentation>É preciso aceitar a declaração de veracidade. Cria uma nova versão do projeto (2, 3, ...) e o projeto volta direto para a etapa &quot;Em análise&quot;, sem passar de novo por &quot;Aguardando análise de checklist&quot;. A partir daí o Proponente não pode mais alterar o projeto.</bpmn:documentation>
+        <bpmn:documentation>É preciso aceitar a declaração de veracidade. Cria uma nova versão do projeto (2, 3, ...) e o projeto volta direto para a etapa "Em análise", sem passar de novo por "Aguardando análise de checklist". A partir daí o Proponente não pode mais alterar o projeto.</bpmn:documentation>
         <bpmn:incoming>Flow_ComplementarReenviar</bpmn:incoming>
         <bpmn:outgoing>Flow_ReenviarFim</bpmn:outgoing>
       </bpmn:userTask>
@@ -108,7 +108,7 @@
       <bpmn:sequenceFlow id="Flow_ComplementarReenviar" sourceRef="Task_ComplementarItens" targetRef="Task_ReenviarProjeto" />
       <bpmn:sequenceFlow id="Flow_ReenviarFim" sourceRef="Task_ReenviarProjeto" targetRef="End_Complementacao" />
     </bpmn:subProcess>
-    <bpmn:boundaryEvent id="Event_PrazoComplementacao" name="Prazo vencido" attachedToRef="SubProcess_Complementacao" cancelActivity="true">
+    <bpmn:boundaryEvent id="Event_PrazoComplementacao" name="Prazo vencido" attachedToRef="SubProcess_Complementacao">
       <bpmn:documentation>Se o Proponente não reenviar o projeto até o fim do prazo, o sistema arquiva o projeto. Um serviço do sistema confere os prazos a cada 5 minutos, e a conferência também acontece quando alguém consulta o projeto, de modo que o arquivamento não depende do serviço ter rodado.</bpmn:documentation>
       <bpmn:outgoing>Flow_PrazoArquivar</bpmn:outgoing>
       <bpmn:timerEventDefinition id="TimerEventDefinition_PrazoComplementacao">
@@ -116,8 +116,8 @@
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:subProcess id="SubProcess_Desistencia" name="Desistência do projeto" triggeredByEvent="true">
-      <bpmn:documentation>O Proponente (titular do projeto) pode desistir com confirmação e motivo. A desistência interrompe o processo e arquiva o projeto imediatamente, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver &quot;Excluir rascunho&quot;).</bpmn:documentation>
-      <bpmn:startEvent id="Start_Desistencia" name="Proponente decide desistir do projeto" isInterrupting="true">
+      <bpmn:documentation>O Proponente (titular do projeto) pode desistir com confirmação e motivo. A desistência interrompe o processo e arquiva o projeto imediatamente, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
+      <bpmn:startEvent id="Start_Desistencia" name="Proponente decide desistir do projeto">
         <bpmn:outgoing>Flow_DesistenciaIniciar</bpmn:outgoing>
         <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Desistencia" />
       </bpmn:startEvent>
@@ -127,7 +127,7 @@
         <bpmn:outgoing>Flow_DesistenciaArquivar</bpmn:outgoing>
       </bpmn:userTask>
       <bpmn:callActivity id="Call_ArquivarDesistencia" name="Arquivar projeto e notificar interessados" calledElement="Process_ArquivarProjeto">
-        <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo &quot;Arquivar projeto e notificar interessados&quot;.</bpmn:documentation>
+        <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo "Arquivar projeto e notificar interessados".</bpmn:documentation>
         <bpmn:incoming>Flow_DesistenciaArquivar</bpmn:incoming>
         <bpmn:outgoing>Flow_DesistenciaFim</bpmn:outgoing>
       </bpmn:callActivity>
@@ -154,7 +154,7 @@
       <bpmn:outgoing>Flow_EmailComplementar</bpmn:outgoing>
     </bpmn:sendTask>
     <bpmn:callActivity id="Call_ArquivarProjeto" name="Arquivar projeto e notificar interessados" calledElement="Process_ArquivarProjeto">
-      <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo &quot;Arquivar projeto e notificar interessados&quot;.</bpmn:documentation>
+      <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo "Arquivar projeto e notificar interessados".</bpmn:documentation>
       <bpmn:incoming>Flow_PrazoArquivar</bpmn:incoming>
       <bpmn:incoming>Flow_FaltaDocumentosArquivar</bpmn:incoming>
       <bpmn:outgoing>Flow_ArquivarFim</bpmn:outgoing>
@@ -168,7 +168,7 @@
       <bpmn:outgoing>Flow_DividirEncaminhar</bpmn:outgoing>
     </bpmn:parallelGateway>
     <bpmn:sendTask id="Task_EmailSupervisorRegular" name="Enviar e-mail ao Supervisor Administrador">
-      <bpmn:documentation>O sistema envia automaticamente um e-mail ao &quot;Supervisor Administrador&quot; informando que a documentação do projeto está regular e que ele foi encaminhado ao &quot;Revisor do Departamento&quot;. O e-mail traz apenas dados não pessoais do projeto (código, título, instrumento, valores, datas e situação, entre outros) e o Departamento selecionado para o enquadramento; não traz CPF, telefones, e-mails pessoais, endereços, justificativa nem os documentos anexados.</bpmn:documentation>
+      <bpmn:documentation>O sistema envia automaticamente um e-mail ao "Supervisor Administrador" informando que a documentação do projeto está regular e que ele foi encaminhado ao "Revisor do Departamento". O e-mail traz apenas dados não pessoais do projeto (código, título, instrumento, valores, datas e situação, entre outros) e o Departamento selecionado para o enquadramento; não traz CPF, telefones, e-mails pessoais, endereços, justificativa nem os documentos anexados.</bpmn:documentation>
       <bpmn:incoming>Flow_DividirEmailRegular</bpmn:incoming>
       <bpmn:outgoing>Flow_EmailRegularFim</bpmn:outgoing>
     </bpmn:sendTask>
@@ -176,17 +176,17 @@
       <bpmn:incoming>Flow_EmailRegularFim</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:serviceTask id="Task_EncaminharRevisor" name="Encaminhar projeto ao Revisor do Departamento">
-      <bpmn:documentation>O sistema disponibiliza o projeto para todos os usuários com perfil &quot;Revisor do Departamento&quot; que pertençam ao Departamento selecionado. Os Revisores podem abrir os documentos do projeto, mas não recebem e-mail.</bpmn:documentation>
+      <bpmn:documentation>O sistema disponibiliza o projeto para todos os usuários com perfil "Revisor do Departamento" que pertençam ao Departamento selecionado. Os Revisores podem abrir os documentos do projeto, mas não recebem e-mail.</bpmn:documentation>
       <bpmn:incoming>Flow_DividirEncaminhar</bpmn:incoming>
       <bpmn:outgoing>Flow_EncaminharAnalisarEnquadramento</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sendTask id="Task_EmailSupervisorRecusa" name="Enviar e-mail de recusa ao Supervisor Administrador">
-      <bpmn:documentation>O sistema envia automaticamente um e-mail ao &quot;Supervisor Administrador&quot; informando que o &quot;Revisor do Departamento&quot; recusou o enquadramento, com o Departamento recusado e a justificativa. A recusa limpa o Departamento indicado e o projeto retorna à etapa &quot;Em análise&quot;, com todas as opções do Analista (indicar outro Departamento, desfazer aprovações, devolver para correção ou arquivar). Não há limite de recusas.</bpmn:documentation>
+      <bpmn:documentation>O sistema envia automaticamente um e-mail ao "Supervisor Administrador" informando que o "Revisor do Departamento" recusou o enquadramento, com o Departamento recusado e a justificativa. A recusa limpa o Departamento indicado e o projeto retorna à etapa "Em análise", com todas as opções do Analista (indicar outro Departamento, desfazer aprovações, devolver para correção ou arquivar). Não há limite de recusas.</bpmn:documentation>
       <bpmn:incoming>Flow_EnquadramentoNao</bpmn:incoming>
       <bpmn:outgoing>Flow_RecusaAnalisar</bpmn:outgoing>
     </bpmn:sendTask>
     <bpmn:userTask id="Task_IniciarAnalise" name="Iniciar análise">
-      <bpmn:documentation>O Analista assume o projeto: ele passa da etapa &quot;Aguardando análise de checklist&quot; para &quot;Em análise&quot; e o Analista fica como responsável pela análise (a ação é registrada no histórico). Só ocorre na primeira análise: em um reenvio o projeto já volta para &quot;Em análise&quot;.</bpmn:documentation>
+      <bpmn:documentation>O Analista assume o projeto: ele passa da etapa "Aguardando análise de checklist" para "Em análise" e o Analista fica como responsável pela análise (a ação é registrada no histórico). Só ocorre na primeira análise: em um reenvio o projeto já volta para "Em análise".</bpmn:documentation>
       <bpmn:incoming>Flow_EmailRecebimentoIniciar</bpmn:incoming>
       <bpmn:outgoing>Flow_IniciarUniao</bpmn:outgoing>
     </bpmn:userTask>
@@ -209,7 +209,7 @@
       <bpmn:outgoing>Flow_ResultadoRegular</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="Task_DevolverComplementacao" name="Devolver para correção">
-      <bpmn:documentation>O Analista seleciona os itens devolvidos e registra a observação de cada um. O projeto passa para a etapa &quot;Aguardando correções do proponente&quot; com o prazo da regra &quot;complement_days&quot; (hoje 3 dias corridos, até 23:59:59 do último dia, horário de Cuiabá), e o Proponente volta a poder alterar somente os itens devolvidos.</bpmn:documentation>
+      <bpmn:documentation>O Analista seleciona os itens devolvidos e registra a observação de cada um. O projeto passa para a etapa "Aguardando correções do proponente" com o prazo da regra "complement_days" (hoje 3 dias corridos, até 23:59:59 do último dia, horário de Cuiabá), e o Proponente volta a poder alterar somente os itens devolvidos.</bpmn:documentation>
       <bpmn:incoming>Flow_ResultadoComplementar</bpmn:incoming>
       <bpmn:outgoing>Flow_DevolverEmail</bpmn:outgoing>
     </bpmn:userTask>
@@ -219,12 +219,12 @@
       <bpmn:outgoing>Flow_FaltaDocumentosArquivar</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="Task_IndicarDepartamento" name="Indicar departamento de enquadramento">
-      <bpmn:documentation>Quando todos os documentos e informações estão corretos, o sistema abre um campo para o Analista selecionar o Departamento da Área Finalística à qual o projeto pertence. O projeto passa a aparecer para todos os usuários com perfil &quot;Revisor do Departamento&quot; que pertençam ao Departamento selecionado.</bpmn:documentation>
+      <bpmn:documentation>Quando todos os documentos e informações estão corretos, o sistema abre um campo para o Analista selecionar o Departamento da Área Finalística à qual o projeto pertence. O projeto passa a aparecer para todos os usuários com perfil "Revisor do Departamento" que pertençam ao Departamento selecionado.</bpmn:documentation>
       <bpmn:incoming>Flow_ResultadoRegular</bpmn:incoming>
       <bpmn:outgoing>Flow_IndicarDividir</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:userTask id="Task_AnalisarEnquadramento" name="Analisar enquadramento">
-      <bpmn:documentation>O &quot;Revisor do Departamento&quot; confirma apenas se o projeto se enquadra ou não no seu Departamento. Se recusar, deve registrar a justificativa. Vale a primeira decisão de qualquer Revisor do Departamento: ao decidir, o projeto sai da fila dos demais.</bpmn:documentation>
+      <bpmn:documentation>O "Revisor do Departamento" confirma apenas se o projeto se enquadra ou não no seu Departamento. Se recusar, deve registrar a justificativa. Vale a primeira decisão de qualquer Revisor do Departamento: ao decidir, o projeto sai da fila dos demais.</bpmn:documentation>
       <bpmn:incoming>Flow_EncaminharAnalisarEnquadramento</bpmn:incoming>
       <bpmn:outgoing>Flow_AnalisarEnquadramentoGateway</bpmn:outgoing>
     </bpmn:userTask>
@@ -244,8 +244,8 @@
       <bpmn:incoming>Flow_AguardandoParecerFim</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:subProcess id="SubProcess_Negacao" name="Negação do projeto" triggeredByEvent="true">
-      <bpmn:documentation>O Secretário de Estado pode negar o projeto, sem passar por parecer, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. A negação interrompe o processo e arquiva o projeto imediatamente. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver &quot;Excluir rascunho&quot;).</bpmn:documentation>
-      <bpmn:startEvent id="Start_Negacao" name="Secretário de Estado decide negar o projeto" isInterrupting="true">
+      <bpmn:documentation>O Secretário de Estado pode negar o projeto, sem passar por parecer, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. A negação interrompe o processo e arquiva o projeto imediatamente. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
+      <bpmn:startEvent id="Start_Negacao" name="Secretário de Estado decide negar o projeto">
         <bpmn:outgoing>Flow_NegacaoIniciar</bpmn:outgoing>
         <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Negacao" />
       </bpmn:startEvent>
@@ -255,7 +255,7 @@
         <bpmn:outgoing>Flow_NegacaoArquivar</bpmn:outgoing>
       </bpmn:userTask>
       <bpmn:callActivity id="Call_ArquivarNegacao" name="Arquivar projeto e notificar interessados" calledElement="Process_ArquivarProjeto">
-        <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo &quot;Arquivar projeto e notificar interessados&quot;.</bpmn:documentation>
+        <bpmn:documentation>Quem arquivou informa o motivo (obrigatório): prazo de complementação vencido (sistema), falta de documentos obrigatórios (Analista), desistência (Proponente) ou negação (Secretário de Estado). O mesmo subprocesso vale para os quatro casos. Detalhes no processo "Arquivar projeto e notificar interessados".</bpmn:documentation>
         <bpmn:incoming>Flow_NegacaoArquivar</bpmn:incoming>
         <bpmn:outgoing>Flow_NegacaoFim</bpmn:outgoing>
       </bpmn:callActivity>
@@ -308,7 +308,7 @@
       <bpmn:outgoing>Flow_ArqArquivar</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sendTask id="Task_EmailArquivamento" name="Enviar e-mail de arquivamento">
-      <bpmn:documentation>O sistema envia automaticamente um e-mail ao &quot;Proponente&quot;, ao &quot;Revisor do Departamento&quot; (quando o Departamento já foi indicado), ao &quot;Analista&quot; (o responsável pela análise, se houver; do contrário, todos os Analistas) e ao &quot;Supervisor Administrador&quot;, informando o arquivamento. O Proponente recebe o texto do motivo; o e-mail da equipe traz apenas a categoria do motivo, sem o texto.</bpmn:documentation>
+      <bpmn:documentation>O sistema envia automaticamente um e-mail ao "Proponente", ao "Revisor do Departamento" (quando o Departamento já foi indicado), ao "Analista" (o responsável pela análise, se houver; do contrário, todos os Analistas) e ao "Supervisor Administrador", informando o arquivamento. O Proponente recebe o texto do motivo; o e-mail da equipe traz apenas a categoria do motivo, sem o texto.</bpmn:documentation>
       <bpmn:incoming>Flow_ArqArquivar</bpmn:incoming>
       <bpmn:outgoing>Flow_ArqNotificar</bpmn:outgoing>
     </bpmn:sendTask>
@@ -321,23 +321,44 @@
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_TermoDeFomento">
-      <bpmndi:BPMNShape id="Participant_TermoDeFomento_di" bpmnElement="Participant_TermoDeFomento" isHorizontal="true"><dc:Bounds x="160" y="160" width="2340" height="1240" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Participant_Supervisor_di" bpmnElement="Participant_Supervisor" isHorizontal="true"><dc:Bounds x="1300" y="40" width="700" height="60" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Proponente_di" bpmnElement="Lane_Proponente" isHorizontal="true"><dc:Bounds x="190" y="160" width="2310" height="260" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Sistema_di" bpmnElement="Lane_Sistema" isHorizontal="true"><dc:Bounds x="190" y="420" width="2310" height="260" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Analista_di" bpmnElement="Lane_Analista" isHorizontal="true"><dc:Bounds x="190" y="680" width="2310" height="360" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_RevisorDepartamento_di" bpmnElement="Lane_RevisorDepartamento" isHorizontal="true"><dc:Bounds x="190" y="1040" width="2310" height="180" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_SecretarioEstado_di" bpmnElement="Lane_SecretarioEstado" isHorizontal="true"><dc:Bounds x="190" y="1220" width="2310" height="180" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_TermoDeFomento_di" bpmnElement="Participant_TermoDeFomento" isHorizontal="true">
+        <dc:Bounds x="130" y="160" width="2370" height="1240" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_SecretarioEstado_di" bpmnElement="Lane_SecretarioEstado" isHorizontal="true">
+        <dc:Bounds x="160" y="1220" width="2340" height="180" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_RevisorDepartamento_di" bpmnElement="Lane_RevisorDepartamento" isHorizontal="true">
+        <dc:Bounds x="160" y="1040" width="2340" height="180" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Analista_di" bpmnElement="Lane_Analista" isHorizontal="true">
+        <dc:Bounds x="160" y="680" width="2340" height="360" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Sistema_di" bpmnElement="Lane_Sistema" isHorizontal="true">
+        <dc:Bounds x="160" y="420" width="2340" height="260" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Proponente_di" bpmnElement="Lane_Proponente" isHorizontal="true">
+        <dc:Bounds x="160" y="160" width="2340" height="260" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_ProjetoPrecisaSerSubmetido_di" bpmnElement="Start_ProjetoPrecisaSerSubmetido">
         <dc:Bounds x="232" y="232" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="205" y="273" width="85" height="54" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="205" y="273" width="85" height="54" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_PreencherFormulario_di" bpmnElement="Task_PreencherFormulario">
         <dc:Bounds x="290" y="210" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_EnviarOuExcluir_di" bpmnElement="Gateway_EnviarOuExcluir" isMarkerVisible="true">
         <dc:Bounds x="415" y="225" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="402" y="195" width="76" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="402" y="195" width="76" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EnviarProjeto_di" bpmnElement="Task_EnviarProjeto">
         <dc:Bounds x="510" y="210" width="100" height="80" />
@@ -347,7 +368,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_RascunhoExcluido_di" bpmnElement="End_RascunhoExcluido">
         <dc:Bounds x="232" y="342" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="210" y="381" width="80" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="210" y="381" width="80" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Complementacao_di" bpmnElement="SubProcess_Complementacao" isExpanded="true">
         <dc:Bounds x="700" y="185" width="500" height="130" />
@@ -364,16 +387,26 @@
       <bpmndi:BPMNShape id="End_Complementacao_di" bpmnElement="End_Complementacao">
         <dc:Bounds x="1112" y="232" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_PrazoComplementacao_di" bpmnElement="Event_PrazoComplementacao">
-        <dc:Bounds x="1182" y="232" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1222" y="222" width="70" height="27" /></bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ComplInicio_di" bpmnElement="Flow_ComplInicio">
+        <di:waypoint x="758" y="250" />
+        <di:waypoint x="790" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ComplementarReenviar_di" bpmnElement="Flow_ComplementarReenviar">
+        <di:waypoint x="890" y="250" />
+        <di:waypoint x="960" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReenviarFim_di" bpmnElement="Flow_ReenviarFim">
+        <di:waypoint x="1060" y="250" />
+        <di:waypoint x="1112" y="250" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="SubProcess_Desistencia_di" bpmnElement="SubProcess_Desistencia" isExpanded="true">
         <dc:Bounds x="1990" y="180" width="470" height="150" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_Desistencia_di" bpmnElement="Start_Desistencia">
         <dc:Bounds x="2012" y="237" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1995" y="276" width="80" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1995" y="276" width="80" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ConfirmarDesistencia_di" bpmnElement="Task_ConfirmarDesistencia">
         <dc:Bounds x="2100" y="215" width="100" height="80" />
@@ -383,8 +416,22 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ArquivadoDesistencia_di" bpmnElement="End_ArquivadoDesistencia">
         <dc:Bounds x="2402" y="237" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="2392" y="276" width="60" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2392" y="276" width="60" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_DesistenciaIniciar_di" bpmnElement="Flow_DesistenciaIniciar">
+        <di:waypoint x="2048" y="255" />
+        <di:waypoint x="2100" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DesistenciaArquivar_di" bpmnElement="Flow_DesistenciaArquivar">
+        <di:waypoint x="2200" y="255" />
+        <di:waypoint x="2240" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DesistenciaFim_di" bpmnElement="Flow_DesistenciaFim">
+        <di:waypoint x="2340" y="255" />
+        <di:waypoint x="2402" y="255" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Task_EmailRecebimento_di" bpmnElement="Task_EmailRecebimento">
         <dc:Bounds x="510" y="450" width="100" height="80" />
       </bpmndi:BPMNShape>
@@ -399,7 +446,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ProjetoArquivado_di" bpmnElement="End_ProjetoArquivado">
         <dc:Bounds x="1390" y="472" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1378" y="513" width="60" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1378" y="513" width="60" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_DividirEncaminhamento_di" bpmnElement="Gateway_DividirEncaminhamento">
         <dc:Bounds x="1595" y="565" width="50" height="50" />
@@ -409,7 +458,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_SupervisorInformado_di" bpmnElement="End_SupervisorInformado">
         <dc:Bounds x="1832" y="472" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1810" y="513" width="80" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1810" y="513" width="80" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EncaminharRevisor_di" bpmnElement="Task_EncaminharRevisor">
         <dc:Bounds x="1680" y="550" width="100" height="80" />
@@ -428,7 +479,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_ResultadoAnalise_di" bpmnElement="Gateway_ResultadoAnalise" isMarkerVisible="true">
         <dc:Bounds x="945" y="815" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="880" y="763" width="85" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="880" y="763" width="85" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_DevolverComplementacao_di" bpmnElement="Task_DevolverComplementacao">
         <dc:Bounds x="1100" y="690" width="100" height="80" />
@@ -444,22 +497,30 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_EnquadramentoCorreto_di" bpmnElement="Gateway_EnquadramentoCorreto" isMarkerVisible="true">
         <dc:Bounds x="1415" y="1105" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1395" y="1163" width="90" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1395" y="1163" width="90" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_AguardandoParecer_di" bpmnElement="Event_AguardandoParecer">
         <dc:Bounds x="1304" y="1112" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1282" y="1153" width="80" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1282" y="1153" width="80" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_SegueParecer_di" bpmnElement="End_SegueParecer">
         <dc:Bounds x="1202" y="1112" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1170" y="1153" width="100" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1170" y="1153" width="100" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Negacao_di" bpmnElement="SubProcess_Negacao" isExpanded="true">
         <dc:Bounds x="260" y="1245" width="470" height="150" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_Negacao_di" bpmnElement="Start_Negacao">
         <dc:Bounds x="282" y="1302" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="265" y="1341" width="80" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="265" y="1341" width="80" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_NegarProjeto_di" bpmnElement="Task_NegarProjeto">
         <dc:Bounds x="370" y="1280" width="100" height="80" />
@@ -469,7 +530,27 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ArquivadoNegacao_di" bpmnElement="End_ArquivadoNegacao">
         <dc:Bounds x="672" y="1302" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="662" y="1341" width="60" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="662" y="1341" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_NegacaoIniciar_di" bpmnElement="Flow_NegacaoIniciar">
+        <di:waypoint x="318" y="1320" />
+        <di:waypoint x="370" y="1320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NegacaoArquivar_di" bpmnElement="Flow_NegacaoArquivar">
+        <di:waypoint x="470" y="1320" />
+        <di:waypoint x="510" y="1320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NegacaoFim_di" bpmnElement="Flow_NegacaoFim">
+        <di:waypoint x="610" y="1320" />
+        <di:waypoint x="672" y="1320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Event_PrazoComplementacao_di" bpmnElement="Event_PrazoComplementacao">
+        <dc:Bounds x="1182" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1222" y="222" width="70" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_InicioPreencher_di" bpmnElement="Flow_InicioPreencher">
         <di:waypoint x="268" y="250" />
@@ -482,13 +563,17 @@
       <bpmndi:BPMNEdge id="Flow_DecidirEnviar_di" bpmnElement="Flow_DecidirEnviar">
         <di:waypoint x="465" y="250" />
         <di:waypoint x="510" y="250" />
-        <bpmndi:BPMNLabel><dc:Bounds x="468" y="230" width="40" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="468" y="230" width="40" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DecidirExcluir_di" bpmnElement="Flow_DecidirExcluir">
         <di:waypoint x="440" y="275" />
         <di:waypoint x="440" y="360" />
         <di:waypoint x="390" y="360" />
-        <bpmndi:BPMNLabel><dc:Bounds x="446" y="300" width="45" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="446" y="300" width="45" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ExcluirFim_di" bpmnElement="Flow_ExcluirFim">
         <di:waypoint x="290" y="360" />
@@ -526,18 +611,24 @@
         <di:waypoint x="970" y="815" />
         <di:waypoint x="970" y="730" />
         <di:waypoint x="1100" y="730" />
-        <bpmndi:BPMNLabel><dc:Bounds x="976" y="734" width="120" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="976" y="734" width="120" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ResultadoFaltaDocumentos_di" bpmnElement="Flow_ResultadoFaltaDocumentos">
         <di:waypoint x="995" y="840" />
         <di:waypoint x="1100" y="840" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1000" y="844" width="95" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1000" y="844" width="95" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ResultadoRegular_di" bpmnElement="Flow_ResultadoRegular">
         <di:waypoint x="970" y="865" />
         <di:waypoint x="970" y="950" />
         <di:waypoint x="1100" y="950" />
-        <bpmndi:BPMNLabel><dc:Bounds x="976" y="932" width="50" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="976" y="932" width="50" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DevolverEmail_di" bpmnElement="Flow_DevolverEmail">
         <di:waypoint x="1150" y="690" />
@@ -590,12 +681,16 @@
       <bpmndi:BPMNEdge id="Flow_EnquadramentoSim_di" bpmnElement="Flow_EnquadramentoSim">
         <di:waypoint x="1415" y="1130" />
         <di:waypoint x="1340" y="1130" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1362" y="1112" width="20" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1362" y="1112" width="20" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EnquadramentoNao_di" bpmnElement="Flow_EnquadramentoNao">
         <di:waypoint x="1440" y="1105" />
         <di:waypoint x="1440" y="630" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1446" y="1060" width="24" height="14" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1446" y="1060" width="24" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_RecusaAnalisar_di" bpmnElement="Flow_RecusaAnalisar">
         <di:waypoint x="1390" y="590" />
@@ -608,61 +703,41 @@
         <di:waypoint x="1304" y="1130" />
         <di:waypoint x="1238" y="1130" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_DesistenciaIniciar_di" bpmnElement="Flow_DesistenciaIniciar">
-        <di:waypoint x="2048" y="255" />
-        <di:waypoint x="2100" y="255" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_DesistenciaArquivar_di" bpmnElement="Flow_DesistenciaArquivar">
-        <di:waypoint x="2200" y="255" />
-        <di:waypoint x="2240" y="255" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_DesistenciaFim_di" bpmnElement="Flow_DesistenciaFim">
-        <di:waypoint x="2340" y="255" />
-        <di:waypoint x="2402" y="255" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_NegacaoIniciar_di" bpmnElement="Flow_NegacaoIniciar">
-        <di:waypoint x="318" y="1320" />
-        <di:waypoint x="370" y="1320" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_NegacaoArquivar_di" bpmnElement="Flow_NegacaoArquivar">
-        <di:waypoint x="470" y="1320" />
-        <di:waypoint x="510" y="1320" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_NegacaoFim_di" bpmnElement="Flow_NegacaoFim">
-        <di:waypoint x="610" y="1320" />
-        <di:waypoint x="672" y="1320" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ComplInicio_di" bpmnElement="Flow_ComplInicio">
-        <di:waypoint x="758" y="250" />
-        <di:waypoint x="790" y="250" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ComplementarReenviar_di" bpmnElement="Flow_ComplementarReenviar">
-        <di:waypoint x="890" y="250" />
-        <di:waypoint x="960" y="250" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ReenviarFim_di" bpmnElement="Flow_ReenviarFim">
-        <di:waypoint x="1060" y="250" />
-        <di:waypoint x="1112" y="250" />
-      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Supervisor_di" bpmnElement="Participant_Supervisor" isHorizontal="true">
+        <dc:Bounds x="1300" y="40" width="700" height="60" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Message_EmailSupervisorRegular_di" bpmnElement="Message_EmailSupervisorRegular">
         <di:waypoint x="1730" y="450" />
         <di:waypoint x="1730" y="100" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1736" y="190" width="90" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1736" y="190" width="90" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Message_EmailSupervisorRecusa_di" bpmnElement="Message_EmailSupervisorRecusa">
         <di:waypoint x="1460" y="550" />
         <di:waypoint x="1460" y="100" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1466" y="190" width="90" height="40" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1466" y="190" width="90" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
   <bpmndi:BPMNDiagram id="BPMNDiagram_Arquivar">
     <bpmndi:BPMNPlane id="BPMNPlane_Arquivar" bpmnElement="Collaboration_ArquivarProjeto">
-      <bpmndi:BPMNShape id="Participant_ArquivarProjeto_di" bpmnElement="Participant_ArquivarProjeto" isHorizontal="true"><dc:Bounds x="160" y="120" width="700" height="160" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Participant_SupervisorArquivamento_di" bpmnElement="Participant_SupervisorArquivamento" isHorizontal="true"><dc:Bounds x="350" y="10" width="400" height="60" /><bpmndi:BPMNLabel /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_ArquivarProjeto_di" bpmnElement="Participant_ArquivarProjeto" isHorizontal="true">
+        <dc:Bounds x="160" y="120" width="700" height="160" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_SupervisorArquivamento_di" bpmnElement="Participant_SupervisorArquivamento" isHorizontal="true">
+        <dc:Bounds x="350" y="10" width="400" height="60" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_ArquivamentoSolicitado_di" bpmnElement="Start_ArquivamentoSolicitado">
         <dc:Bounds x="232" y="182" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="200" y="223" width="100" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="200" y="223" width="100" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ArquivarProjetoSistema_di" bpmnElement="Task_ArquivarProjetoSistema">
         <dc:Bounds x="340" y="160" width="100" height="80" />
@@ -672,7 +747,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ProjetoArquivadoNotificado_di" bpmnElement="End_ProjetoArquivadoNotificado">
         <dc:Bounds x="652" y="182" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="640" y="223" width="60" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="640" y="223" width="60" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_ArqIniciar_di" bpmnElement="Flow_ArqIniciar">
         <di:waypoint x="268" y="200" />
@@ -689,7 +766,9 @@
       <bpmndi:BPMNEdge id="Message_ArquivamentoSupervisor_di" bpmnElement="Message_ArquivamentoSupervisor">
         <di:waypoint x="550" y="160" />
         <di:waypoint x="550" y="70" />
-        <bpmndi:BPMNLabel><dc:Bounds x="556" y="85" width="90" height="27" /></bpmndi:BPMNLabel>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="556" y="85" width="90" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

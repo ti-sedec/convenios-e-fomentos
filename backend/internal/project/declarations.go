@@ -288,8 +288,9 @@ func (s *Service) DeclarationPreview(ctx context.Context, actor Actor, id uuid.U
 }
 
 // renderDeclaration gera o PDF da declaração (A4), no formato do modelo oficial: anexo, título, texto, "Local e data", nome e cargo
-// do responsável com a instituição. Deixa livre o espaço da assinatura. at é a data da emissão (horário de Cuiabá).
-func renderDeclaration(d GeneratedDeclaration, at time.Time) ([]byte, error) {
+// do responsável com a instituição. Deixa livre o espaço da assinatura e devolve onde ele ficou (signatureSpot): o texto varia de
+// uma declaração para outra, então a posição sai do próprio layout, não de uma constante. at é a data da emissão (horário de Cuiabá).
+func renderDeclaration(d GeneratedDeclaration, at time.Time) ([]byte, signatureSpot, error) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetCompression(false) // textos legíveis no arquivo: facilita conferência e testes
 	pdf.SetTitle(d.Name, true)
@@ -318,7 +319,13 @@ func renderDeclaration(d GeneratedDeclaration, at time.Time) ([]byte, error) {
 	}
 	pdf.Ln(10)
 	pdf.CellFormat(0, 7, tr(fmt.Sprintf("%s, %s.", d.Place, longDate(at.In(cuiaba())))), "", 1, "L", false, 0, "")
-	pdf.Ln(28) // espaço da assinatura
+	// O espaço da assinatura e o bloco do nome (12 mm) precisam caber na mesma página: se não couberem, vão para a próxima.
+	const pageH, bottomMargin = 297.0, 20.0
+	if pdf.GetY()+signatureGapMM+12 > pageH-bottomMargin {
+		pdf.AddPage()
+	}
+	spot := signatureSpotAt(pdf.PageNo()-1, pdf.GetY())
+	pdf.Ln(signatureGapMM) // espaço da assinatura
 
 	pdf.SetFont("Helvetica", "B", 12)
 	pdf.CellFormat(0, 6, tr(d.SignerName), "", 1, "C", false, 0, "")
@@ -327,9 +334,34 @@ func renderDeclaration(d GeneratedDeclaration, at time.Time) ([]byte, error) {
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
-		return nil, err
+		return nil, signatureSpot{}, err
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes(), spot, nil
+}
+
+// signatureGapMM é a altura (mm) deixada em branco entre a data e o nome do responsável para a assinatura.
+const signatureGapMM = 28
+
+// signatureSpot é onde o MT-ID deve pôr a assinatura: página (a primeira é 0) e coordenadas em pontos (1/72"), com origem no
+// canto superior esquerdo da página.
+type signatureSpot struct{ Page, X, Y int }
+
+// Calibração contra o MT-ID de desenvolvimento (novembro de 2026): o pedido com x=200, y=150 gerou um carimbo visível de cerca de
+// 217 x 28 pt com a borda esquerda em x+3 e o centro vertical em y-2 (o campo de assinatura do PDF tem 260 x 80 pt, e o carimbo
+// ocupa a parte de baixo dele). Ou seja: x é a borda esquerda e y o centro vertical do carimbo, medidos a partir do topo.
+const (
+	signatureStampWidthPt = 217
+	signatureStampXOffset = 3
+	signatureStampYOffset = -2
+	pageWidthPt           = 595.28
+	ptPerMM               = 72 / 25.4
+)
+
+// signatureSpotAt centraliza o carimbo, na horizontal, na página e, na vertical, no meio do espaço que começa em topMM (mm).
+func signatureSpotAt(page int, topMM float64) signatureSpot {
+	x := (pageWidthPt-signatureStampWidthPt)/2 - signatureStampXOffset
+	y := (topMM+signatureGapMM/2)*ptPerMM - signatureStampYOffset
+	return signatureSpot{Page: page, X: int(x + 0.5), Y: int(y + 0.5)}
 }
 
 var months = [...]string{"janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"}

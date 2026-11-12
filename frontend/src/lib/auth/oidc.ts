@@ -13,6 +13,8 @@ interface OidcConfig {
   /** Só para clients confidenciais; o padrão é um client público com PKCE. */
   clientSecret?: string;
   redirectUri: string;
+  /** Escopos pedidos no login. Para assinar com o MT-ID inclua `signature-requester` (precisa estar liberado no client). */
+  scope: string;
 }
 
 const REQUIRED = [
@@ -39,7 +41,8 @@ export function oidcConfig(): OidcConfig {
     endSessionUri: process.env.MTLOGIN_END_SESSION_URI!,
     clientId: process.env.MTLOGIN_CLIENT_ID!,
     clientSecret: process.env.MTLOGIN_CLIENT_SECRET?.trim() || undefined,
-    redirectUri: process.env.MTLOGIN_REDIRECT_URI!
+    redirectUri: process.env.MTLOGIN_REDIRECT_URI!,
+    scope: process.env.MTLOGIN_SCOPE?.trim() || 'openid profile email'
   };
 }
 
@@ -97,7 +100,7 @@ export async function startLogin(
     response_type: 'code',
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
-    scope: 'openid profile email',
+    scope: cfg.scope,
     state: flow.state,
     nonce: flow.nonce,
     code_challenge: await challengeFor(flow.verifier),

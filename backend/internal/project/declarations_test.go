@@ -130,13 +130,37 @@ func TestRenderDeclarationGeraPDFComOTextoOficial(t *testing.T) {
 	d := buildDeclaration(declarationSpecs["declaracao_contrapartida"], municipalConvenio(), declEnv{Place: "Sorriso/MT", SignerCPF: testCPF})
 	at := time.Date(2026, time.October, 24, 15, 0, 0, 0, time.UTC)
 
-	pdf, err := renderDeclaration(d, at)
+	pdf, spot, err := renderDeclaration(d, at)
 	require.NoError(t, err)
+	assert.Equal(t, 0, spot.Page)
 	require.True(t, strings.HasPrefix(string(pdf), "%PDF-"))
 	body := string(pdf)
 	for _, want := range []string{"ANEXO IV", "DECLARACAO DE CONTRAPARTIDA", "Sorriso/MT, 24 de outubro de 2026.", "Maria da Silva", "Prefeita"} {
 		// A fonte padrão é Latin-1: acentos viram bytes únicos. Compara sem eles os trechos acentuados.
 		assert.Contains(t, stripAccents(body), stripAccents(want), want)
+	}
+}
+
+// A assinatura fica centralizada na página e no espaço entre a data e o nome: nunca em cima do título.
+func TestSignatureSpotFicaNoEspacoDaAssinatura(t *testing.T) {
+	// Layout medido: com o texto mais curto (nao duplicidade) a data termina perto de 107 mm do topo.
+	spot := signatureSpotAt(0, 107)
+	assert.Equal(t, 186, spot.X) // carimbo de 217 pt centralizado em 595 pt
+	assert.InDelta(t, (107+14)*72/25.4, float64(spot.Y), 3)
+	assert.Equal(t, 0, spot.Page)
+}
+
+func TestRenderDeclarationPosicaoAcompanhaOTamanhoDoTexto(t *testing.T) {
+	short := buildDeclaration(declarationSpecs["declaracao_nao_duplicidade"], municipalConvenio(), declEnv{Place: "Sorriso/MT", SignerCPF: testCPF})
+	long := buildDeclaration(declarationSpecs["declaracao_contrapartida"], municipalConvenio(), declEnv{Place: "Sorriso/MT", SignerCPF: testCPF})
+	_, a, err := renderDeclaration(short, time.Now())
+	require.NoError(t, err)
+	_, b, err := renderDeclaration(long, time.Now())
+	require.NoError(t, err)
+	assert.Less(t, a.Y, b.Y, "texto mais longo empurra a assinatura para baixo")
+	for _, sp := range []signatureSpot{a, b} {
+		assert.Greater(t, sp.Y, 250, "abaixo do título e do texto")
+		assert.Less(t, sp.Y, 842-60, "dentro da página")
 	}
 }
 

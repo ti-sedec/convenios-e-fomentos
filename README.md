@@ -176,7 +176,7 @@ O arquivo [`docker-compose.dev.yml`](docker-compose.dev.yml) define cinco servi�
 | `migrate` | [`backend/Dockerfile.dev`](backend/Dockerfile.dev) | Aplica as migrações (`migrate:up`) e termina. A API só sobe depois que ele conclui. |
 | `api` | [`backend/Dockerfile.dev`](backend/Dockerfile.dev) | Go com [air](https://github.com/air-verse/air): recompila e reinicia a cada alteração em `.go`, `.sql` ou `.yaml`. |
 | `web` | [`frontend/Dockerfile.dev`](frontend/Dockerfile.dev) | `bun install` + `next dev` (Turbopack) com HMR. |
-| `haproxy` | `haproxy:lts-alpine` | Único ponto de entrada (porta `HAPROXY_PORT`, padrão 80): `/api/*` → `api`, `/storage/*` → MinIO (API S3), `/minio-console/*` → console do MinIO (só dev), o resto → `web`. Config em [`haproxy/haproxy.cfg`](haproxy/haproxy.cfg). |
+| `haproxy` | `haproxy:3.4.7-alpine` | Único ponto de entrada (porta `HAPROXY_PORT`, padrão 80): `/api/*` → `api`, `/storage/*` → MinIO (API S3), `/minio-console/*` → console do MinIO (só dev), o resto → `web`. Config em [`haproxy/haproxy.cfg`](haproxy/haproxy.cfg). |
 | `minio` / `minio-init` | `chainguard/minio` / `chainguard/minio-client` | Armazenamento S3 dos arquivos dos documentos; o `minio-init` cria o bucket privado. As imagens `minio/*` deixaram de ser publicadas. O navegador envia e baixa por URLs pré-assinadas em `/storage` (mesmo domínio). **`APP_URL` (ou `STORAGE_PUBLIC_URL`) precisa ter a mesma origem, com porta, que o navegador usa**: a assinatura cobre o `Host`. |
 
 **Live reload.** O código do host é montado nos contêineres (`./backend:/app`, `./frontend:/app`), então basta salvar o
@@ -396,6 +396,9 @@ O frontend ainda não tem suíte de testes automatizados; a verificação de pon
 ```
 .
 ├── docker-compose.dev.yml      # ambiente completo de desenvolvimento (live reload)
+├── docker-compose.prod.yml     # stack de hml/produção (baixa as imagens do GHCR); .prod.build.yml as constrói localmente
+├── .github/workflows/          # build-images.yml: constrói e publica as imagens no GHCR
+├── haproxy/, ops/              # HAProxy de produção, backup do PostgreSQL e autodeploy do Coolify (hml)
 ├── .dockerignore
 ├── backend/                    # API em Go
 │   ├── cmd/api, cmd/cli        # servidor HTTP e CLI (migrate, seed, admin:create --cpf, cleanup...)
@@ -430,6 +433,9 @@ O frontend ainda não tem suíte de testes automatizados; a verificação de pon
   `frontend/docs/deployment.md` ainda são do template (Clerk) e não valem para este deploy.
 - **Produção (Portainer)**: [`docker-compose.prod.yml`](docker-compose.prod.yml), [`.env.prod.example`](.env.prod.example) e o passo a passo em
   [`docs/deploy-producao.md`](docs/deploy-producao.md) (planejamento e testes em [`docs/planejamento-deploy-producao.md`](docs/planejamento-deploy-producao.md)).
+- **Build das imagens (GitHub Actions + GHCR)**: os servidores não compilam; o workflow [`build-images.yml`](.github/workflows/build-images.yml)
+  publica as imagens em `ghcr.io/ti-sedec/convenios-*` (`develop` → `:hml`, `main` → `:prod`) e o Coolify/Portainer só as baixam. Variáveis do
+  repositório, visibilidade dos pacotes, deploy automático no hml e rollback em [`docs/build-imagens.md`](docs/build-imagens.md).
 - Legislação e referências do domínio: [`docs/`](docs/).
 - O frontend parte do template [Kiranism/next-shadcn-dashboard-starter](https://github.com/Kiranism/next-shadcn-dashboard-starter)
   (licença MIT).

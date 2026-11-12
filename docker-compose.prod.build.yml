@@ -1,0 +1,43 @@
+# Override para CONSTRUIR as imagens localmente em vez de baixá-las do GHCR (teste de uma alteração antes do push, ou
+# servidor sem acesso ao registry). As tags ficam as mesmas (IMAGE_TAG, padrão "prod"):
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.prod.build.yml up -d --build
+#
+# O build do Next.js precisa de ~2 GB de RAM livres. Guia: docs/build-imagens.md
+
+services:
+  migrate:
+    build: &api-build
+      context: ./backend
+      dockerfile: Dockerfile
+      target: api
+    pull_policy: build
+  seed:
+    build: *api-build
+    pull_policy: build
+  convenios-api:
+    build: *api-build
+    pull_policy: build
+  convenios-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${APP_URL}
+    pull_policy: build
+  cleanup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+    pull_policy: build
+  backup:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    pull_policy: build
+  convenios-proxy:
+    build:
+      context: ./haproxy
+      dockerfile: Dockerfile
+    pull_policy: build

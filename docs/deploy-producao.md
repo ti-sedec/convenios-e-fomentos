@@ -1,6 +1,6 @@
 # Deploy em produção (Portainer)
 
-Stack: [`docker-compose.prod.yml`](../docker-compose.prod.yml). Variáveis: [`.env.prod.example`](../.env.prod.example). Decisões, riscos e plano de testes: [planejamento-deploy-producao.md](planejamento-deploy-producao.md).
+Stack: [`docker-compose.prod.yml`](../docker-compose.prod.yml). Variáveis: [`.env.prod.example`](../.env.prod.example). As imagens próprias **não são construídas no servidor**: o GitHub Actions as publica no GHCR e a stack só as baixa ([build-imagens.md](build-imagens.md)). Decisões, riscos e plano de testes: [planejamento-deploy-producao.md](planejamento-deploy-producao.md).
 
 ```
 Internet --TLS--> proxy do servidor --(rede "proxy")--> convenios-proxy (HAProxy :80)
@@ -15,7 +15,8 @@ db, minio, gotenberg, clamav, cleanup, backup: só na rede interna (sem porta pu
 1. **DNS** do domínio apontando para o servidor e **proxy do servidor** pronto para ele (seção 3).
 2. **Rede do proxy** existente: `docker network create proxy` (ou o nome que o seu proxy já usa, e então `PROXY_NETWORK=<nome>`). Se ela não existir o deploy falha com "network proxy declared as external, but could not be found".
 3. **MT Login de produção**: cadastre no client do Keycloak a URL de retorno `https://<domínio>/auth/callback` e a de pós-logout `https://<domínio>/auth/sign-in`. Os endereços de produção do MT Login são pedidos à SEPLAG; **não** use os de homologação (`hml.login...`) no `.env` de produção.
-4. **Recursos do servidor**: o build do Next.js precisa de ~2 GB de RAM livres (só durante o build), o ClamAV usa ~1 GB em regime, e as imagens ocupam ~3,5 GB de disco (o Gotenberg sozinho tem 2,5 GB).
+4. **Recursos do servidor**: sem build local, não é preciso RAM extra para compilar (o `next build` roda no GitHub). O ClamAV usa ~1 GB em regime, e as imagens ocupam ~3,5 GB de disco (o Gotenberg sozinho tem 2,5 GB).
+   **Imagens no GHCR**: o workflow da branch `main` precisa ter rodado (variável `PROD_APP_URL` definida no repositório) e os pacotes `ghcr.io/ti-sedec/convenios-*` precisam estar públicos; veja [build-imagens.md](build-imagens.md).
 5. **Sub-rede**: `APP_SUBNET` (padrão `10.231.0.0/24`) não pode colidir com nenhuma rede Docker existente (`docker network ls` + `docker network inspect`). Se colidir, o deploy falha com "Pool overlaps": escolha outra faixa.
 6. **Segredos**: gere com `openssl rand -hex 32` (JWT e salt) e `openssl rand -hex 24` (senhas do banco e do MinIO). Hexadecimal, porque as senhas entram em URLs.
 
@@ -25,12 +26,12 @@ db, minio, gotenberg, clamav, cleanup, backup: só na rede interna (sem porta pu
 2. *Repository URL* do projeto (com autenticação, se privado) e *Reference* `refs/heads/main` (ou uma tag, para fixar a versão).
 3. *Compose path*: `docker-compose.prod.yml`.
 4. *Environment variables*: **Load variables from .env file** com o `.env.prod.example` preenchido. Os obrigatórios que faltarem derrubam o deploy com a mensagem do que falta.
-5. **Deploy the stack**. A primeira vez constrói três imagens (Go ~1 min, Next ~2 min) e o ClamAV baixa as assinaturas: conte **5 a 10 minutos**. Enquanto o `clamav` não fica `healthy`, os **envios de arquivo são recusados** (a varredura falha fechada); o restante funciona.
+5. **Deploy the stack**. A primeira vez baixa as imagens do GHCR e o ClamAV baixa as assinaturas: conte **5 a 10 minutos**. Enquanto o `clamav` não fica `healthy`, os **envios de arquivo são recusados** (a varredura falha fechada); o restante funciona.
 6. Resultado esperado: `migrate`, `seed` e `minio-init` em *exited (0)*; os demais *running*, com `healthy` em db, api, web, proxy, gotenberg e clamav.
 
 > Não há bind mount de arquivos do repositório de propósito: o Portainer clona o Git dentro do contêiner dele, e um caminho relativo apontaria para um diretório vazio no host. As configurações vão dentro das imagens.
 
-> Testei esta stack com `docker compose up -d --build` a partir de uma cópia limpa do repositório, mas **não pela interface do Portainer**. Se a atualização pelo Portainer não reconstruir as imagens (confira a data de criação em *Images*), force com *Pull and redeploy*; em último caso, na linha de comando do servidor: `docker compose -p <nome-da-stack> build` na pasta clonada.
+> Testei esta stack construindo as imagens localmente (`docker-compose.prod.build.yml`) a partir de uma cópia limpa do repositório, mas **não pela interface do Portainer** nem baixando do GHCR em um servidor de produção. Se a atualização pelo Portainer não trouxer a imagem nova (confira a data de criação em *Images*), use *Pull and redeploy* com *Re-pull image* ligado.
 
 ## 3. Proxy do servidor
 
@@ -94,9 +95,9 @@ docker exec <stack>-convenios-api-1 /cli cleanup          # já roda sozinho, 1x
 
 ## 6. Atualizar e voltar atrás
 
-- **Atualizar**: faça o push no Git e, na stack, **Pull and redeploy**. O `migrate` roda sozinho antes da API; o `seed` também (não desfaz o que os administradores alteraram). O banco, os documentos e as assinaturas do ClamAV ficam em volumes e sobrevivem.
-- **Mudou o domínio (`APP_URL`)?** Reconstrua a imagem do `web` (o endereço é embutido no build do Next).
-- **Voltar atrás**: aponte a *Reference* da stack para a tag/commit anterior e faça *Pull and redeploy*. **Migrações não são desfeitas sozinhas**: se a versão nova trouxe uma, restaure o backup de antes do deploy ou rode `/cli migrate:down` (desfaz uma de cada vez; só se a migração tiver `down` seguro). Por isso, **faça um backup manual antes de cada atualização** (abaixo).
+- **Atualizar**: faça o push na `main`, espere o workflow *Build das imagens* terminar (aba *Actions* do GitHub) e, na stack, **Pull and redeploy** (com *Re-pull image*). O `migrate` roda sozinho antes da API; o `seed` também (não desfaz o que os administradores alteraram). O banco, os documentos e as assinaturas do ClamAV ficam em volumes e sobrevivem.
+- **Mudou o domínio (`APP_URL`)?** Altere `PROD_APP_URL` nas variáveis do repositório no GitHub e rode o workflow de novo: a imagem do `web` é reconstruída (o endereço é embutido no build do Next).
+- **Voltar atrás**: ponha `IMAGE_TAG=sha-<commit anterior>` nas variáveis da stack (e a *Reference* no commit correspondente) e faça *Pull and redeploy*. **Migrações não são desfeitas sozinhas**: se a versão nova trouxe uma, restaure o backup de antes do deploy ou rode `/cli migrate:down` (desfaz uma de cada vez; só se a migração tiver `down` seguro). Por isso, **faça um backup manual antes de cada atualização** (abaixo).
 - Não rode `docker system prune -a` no servidor: a imagem do MinIO (Chainguard) só tem a tag `latest` gratuita e uma versão antiga pode não voltar a ser baixável.
 
 ## 7. Backup e restauração

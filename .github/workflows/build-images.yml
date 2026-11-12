@@ -1,0 +1,89 @@
+# Constrói as imagens de produção no GitHub e as publica no GHCR (ghcr.io/ti-sedec/convenios-*).
+# Os servidores (Coolify em hml, Portainer em produção) só baixam as imagens prontas: não compilam nada.
+#
+#   develop -> ambiente hml  (tag :hml)
+#   main    -> produção      (tag :prod)
+# Toda imagem recebe também a tag :sha-<commit>, usada para voltar a uma versão anterior (IMAGE_TAG no .env da stack).
+#
+# O NEXT_PUBLIC_APP_URL é embutido no build do web, por isso as imagens de hml e de produção são diferentes.
+# Configure em Settings > Secrets and variables > Actions > Variables:
+#   PROD_APP_URL  origem pública da produção (https, sem barra final; opcional, o padrão é o domínio abaixo).
+#   HML_APP_URL   origem pública do hml (opcional; o padrão é o domínio abaixo).
+#
+# Guia completo: docs/build-imagens.md
+
+name: Build das imagens
+
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+# Um push novo na mesma branch cancela o build em andamento (só importa a versão mais recente).
+concurrency:
+  group: build-images-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: ${{ matrix.image }}
+    if: github.ref_name == 'develop' || github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # api e tools compartilham o estágio de compilação do Go (mesmo cache).
+          - { image: convenios-api, context: backend, target: api, cache: backend }
+          - { image: convenios-tools, context: backend, target: tools, cache: backend }
+          - { image: convenios-web, context: frontend, target: '', cache: web }
+          - { image: convenios-proxy, context: haproxy, target: '', cache: proxy }
+          - { image: convenios-backup, context: ops/backup, target: '', cache: backup }
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'main' && 'prod' || 'hml' }}
+      APP_URL: ${{ github.ref_name == 'main' && (vars.PROD_APP_URL || 'https://convenios-fomento.sedec.mt.gov.br') || (vars.HML_APP_URL || 'https://convenios-fomento-hml.sedec.mt.gov.br') }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Nome do registry (minúsculas)
+        run: |
+          echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Validar NEXT_PUBLIC_APP_URL (web)
+        if: matrix.image == 'convenios-web'
+        run: |
+          if [[ ! "$APP_URL" =~ ^https?://[^/]+$ ]]; then
+            echo "::error::APP_URL inválida ('$APP_URL'). Defina a variável do repositório ${DEPLOY_ENV^^}_APP_URL (origem https, sem barra final)."
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          build-args: ${{ matrix.image == 'convenios-web' && format('NEXT_PUBLIC_APP_URL={0}', env.APP_URL) || '' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.image }}:${{ env.DEPLOY_ENV }}
+            ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ env.SHORT_SHA }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.cache }}-${{ env.DEPLOY_ENV }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache }}-${{ env.DEPLOY_ENV }}
