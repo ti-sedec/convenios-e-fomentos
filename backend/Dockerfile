@@ -25,6 +25,8 @@ ENTRYPOINT ["/usr/local/bin/cli"]
 # --- API (última etapa = alvo padrão) ---
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab AS api
 COPY --from=build /out/api /out/cli /out/healthcheck /
+# Certificados públicos de CA/servidor (ex.: X-Via, X_VIA_CA_FILE=/app/certs/xvia-dev.crt). Nunca chaves privadas.
+COPY certs/ /app/certs/
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

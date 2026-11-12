@@ -82,8 +82,16 @@ x-api-env: &api-env
   # Conversão de Word em PDF (visualizador) e antivírus, ambos só na rede interna.
   PREVIEW_CONVERTER_URL: http://gotenberg:3000
   CLAMAV_ADDR: clamav:3310
-  # O MT-ID real ainda não existe (docs/debito-tecnico-mt-id.md) e a API recusa o simulado em produção.
+  # MT-ID: o simulado é recusado em produção. O cliente real (SmartPass pelo X-Via) liga quando X_VIA_SEDEC_BASE_URL está
+  # definido; sem ele, emitir declaração responde 503. X_VIA_CA_FILE é o caminho DENTRO da imagem da API (backend/certs/
+  # vai para /app/certs); X_VIA_TLS_SERVER_NAME é o nome conferido no certificado (SAN), quando difere do host da URL.
   MTID_SIMULATE: "false"
+  X_VIA_SEDEC_BASE_URL: ${X_VIA_SEDEC_BASE_URL:-}
+  X_ROAD_CLIENT: ${X_ROAD_CLIENT:-}
+  X_VIA_MTID_SERVICE: ${X_VIA_MTID_SERVICE:-GOV/MTI/SMARTPASS}
+  X_VIA_CA_FILE: ${X_VIA_CA_FILE:-}
+  X_VIA_TLS_SERVER_NAME: ${X_VIA_TLS_SERVER_NAME:-}
+  X_VIA_TIMEOUT: ${X_VIA_TIMEOUT:-30s}
 
 services:
   # ---------------------------------------------------------------------------------------------------------------
@@ -250,6 +258,8 @@ services:
       MTLOGIN_CLIENT_SECRET: ${MTLOGIN_CLIENT_SECRET:-}
       # Precisa estar cadastrada no client do Keycloak, assim como a de pós-logout (<APP_URL>/auth/sign-in).
       MTLOGIN_REDIRECT_URI: ${APP_URL}/auth/callback
+      # Escopos pedidos no login. Para assinar no MT-ID inclua signature-requester (liberado no client do Keycloak).
+      MTLOGIN_SCOPE: ${MTLOGIN_SCOPE:-openid profile email}
       NEXT_TELEMETRY_DISABLED: "1"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/auth/sign-in').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
