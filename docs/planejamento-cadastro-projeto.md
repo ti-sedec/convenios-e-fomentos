@@ -16,7 +16,7 @@
 | 3 | SIGCon | O sistema **não integra** com o SIGCon: reproduz o fluxo. O proponente lança o plano lá e anexa os PDFs aqui. |
 | 4 | Lei 12.082/2023 | Todas as regras valem quando o objeto for evento com contratação de artistas. |
 | 5 | Checklist | Convênio usa o checklist de **prefeituras**, para qualquer entidade. Fomento usa o de **OSC**. |
-| 6 | Número do termo = nº da proposta no SIGCon | **Um campo só** (`NNNN/AAAA`, ex.: 3216/2026). |
+| 6 | Número do termo = nº da proposta no SIGCon | **Um campo só** (`NNNN-AAAA`, ex.: 3216-2026). |
 | 7 | "Recursos próprios" | É **recurso orçamentário da SEDEC**. A contrapartida do proponente é um campo separado. |
 | 8 | Chamamento | Exigido sempre que houver recurso próprio (inclusive misto com emenda). O analista pode dispensar, com registro. |
 | 9 | Resultado do parecer | **Deferido/Indeferido** é o parecer técnico do analista. **Arquivado** é a situação do projeto. São coisas separadas. |
@@ -35,7 +35,7 @@
 | Identificador | Quem gera | Quando |
 |---|---|---|
 | **Código do projeto** (`2026-000123`, sequencial por ano) | Sistema | No envio (rascunho não tem). É o comprovante de recebimento, com data e hora do servidor. |
-| **Nº da proposta/termo no SIGCon** (`NNNN/AAAA`) | Proponente | No cadastro. |
+| **Nº da proposta/termo no SIGCon** (`NNNN-AAAA`) | Proponente | No cadastro. |
 | **Nº do processo no SIGADOC** | Analista | Depois do envio. É o protocolo oficial (a Portaria 247 só gera o protocolo após a conferência). |
 
 ---
@@ -165,7 +165,7 @@ Duas dimensões separadas, mais o parecer:
 | RN-02 | **Fomento** só para entidade privada sem fins lucrativos. | Lei 13.019 | B |
 | RN-03 | **Convênio** vale para qualquer natureza, com o checklist de prefeituras. | IN 001/2015 | — |
 | RN-04 | Todos os municípios de **execução** (um por período/local) são de MT. A sede pode ser de qualquer UF. | Decisão #12 | B |
-| RN-05 | Nº SIGCon no formato `NNNN/AAAA`, com ano coerente com a data de cadastro. Único entre projetos **não arquivados**. | Decisão #6 | B |
+| RN-05 | Nº SIGCon no formato `NNNN-AAAA`, com ano coerente com a data de cadastro. Único entre projetos **não arquivados**. | Decisão #6 | B |
 | RN-06 | Data de cadastro no SIGCon não pode ser futura. | — | B |
 | RN-07 | Vigência: em cada período/local, o término não é anterior ao início (períodos podem se sobrepor). Aviso se o início for incompatível com a assinatura até o último dia útil de dezembro. | Manual SIGCon | B / A |
 | RN-08 | Telefones: pelo menos 1 celular válido. E-mails: pelo menos 1 válido. | Pedido | B |

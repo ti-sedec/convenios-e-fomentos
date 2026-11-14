@@ -49,7 +49,7 @@ Regras já implementadas na prévia:
 9. Podemos omitir o RG ("Cédula de Identidade nº") dos modelos de gratuidade e de publicidade e identificar a pessoa só pelo CPF?
 10. **Gratuidade, data:** o modelo diz "no dia 00/00/201X" (data do evento), e o cadastro só tem a vigência do projeto. Hoje o texto sai "no período de [início] a [término]" (ou "no dia" se forem iguais). Isso serve, ou devemos pedir a data do evento no cadastro?
 11. **Gratuidade, mais de um município:** o texto sai "nos municípios de A, B e C". Está bem?
-12. **Compatibilidade de preços:** o modelo da prefeitura diz "proposta do termo de fomento n.º" (parece cópia do modelo da OSC). Podemos escrever "convênio" quando o instrumento é convênio? Aceita o número da proposta do SIGCon (ex.: 3216/2026) no lugar de "XXXX/201X"?
+12. **Compatibilidade de preços:** o modelo da prefeitura diz "proposta do termo de fomento n.º" (parece cópia do modelo da OSC). Podemos escrever "convênio" quando o instrumento é convênio? Aceita o número da proposta do SIGCon (ex.: 3216-2026) no lugar de "XXXX/201X"?
 13. O texto diz "residente e domiciliado em", com a flexão "(a)" onde o modelo supõe o gênero ("portador(a)", "casado(a)"). Podemos manter?
 
 ## Perguntas para a MTI (MT-ID)

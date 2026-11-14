@@ -425,14 +425,14 @@ func TestCompatibilidadeDePrecosNaoPedeDadosPessoais(t *testing.T) {
 	d, hash := fp.preview(p.maria, "declaracao_compatibilidade_precos")
 	require.Equal(t, true, d["ready"], d["issues"])
 	assert.Equal(t, "Anexo V", d["annex"])
-	assert.Contains(t, d["paragraphs"].([]any)[0], "apresentadas por Prefeitura Municipal de Cuiabá, referentes à proposta do convênio n.º 3216/2026, contemplam preços compatíveis")
+	assert.Contains(t, d["paragraphs"].([]any)[0], "apresentadas por Prefeitura Municipal de Cuiabá, referentes à proposta do convênio n.º 3216-2026, contemplam preços compatíveis")
 	require.Equal(t, 200, fp.accept(p.maria, "declaracao_compatibilidade_precos", hash, true).Status)
 
 	osc := p.newFundingProject("fomento", "association", nil)
 	osc.save("proponent", proponentBody(0))
 	d, _ = osc.preview(p.maria, "declaracao_compatibilidade_precos")
 	assert.Equal(t, "Anexo IV", d["annex"])
-	assert.Contains(t, d["paragraphs"].([]any)[0], "proposta do termo de fomento n.º 3216/2026")
+	assert.Contains(t, d["paragraphs"].([]any)[0], "proposta do termo de fomento n.º 3216-2026")
 }
 
 func TestEquipeVeOCPFMascaradoNaDeclaracao(t *testing.T) {

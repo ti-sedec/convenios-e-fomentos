@@ -32,7 +32,7 @@ func TestArquivamentoAvisaProponenteRevisorAnalistaESupervisor(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	fin := p.deptID("Financeiro")
-	fp := p.submitted("8001/2026")
+	fp := p.submitted("8001-2026")
 	p.setProjectDepartment(fp.id, fin)
 	p.mail.Msgs = nil
 
@@ -70,7 +70,7 @@ func TestArquivamentoSemDepartamentoNaoAvisaRevisor(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("8002/2026")
+	fp := p.submitted("8002-2026")
 	p.mail.Msgs = nil
 
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/archive", map[string]any{"reason": "missing_documents", "note": "Faltam documentos."}, staff.analyst).Status)
@@ -112,7 +112,7 @@ func TestTodosOsMotivosDeArquivamentoAvisam(t *testing.T) {
 	for name, archive := range cases {
 		i++
 		t.Run(name, func(t *testing.T) {
-			fp := p.submitted("81" + string(rune('0'+i)) + "0/2026")
+			fp := p.submitted("81" + string(rune('0'+i)) + "0-2026")
 			p.mail.Msgs = nil
 			require.Equal(t, 200, archive(fp.id))
 			got := p.archivedMails()
@@ -137,7 +137,7 @@ func TestArquivamentoNaoRepeteDestinatarioENaoAvisaBloqueado(t *testing.T) {
 	_, err = p.pool.Exec(context.Background(), "UPDATE admins SET blocked = true WHERE email = 'bloqueado@exemplo.com'")
 	require.NoError(t, err)
 
-	fp := p.submitted("8201/2026")
+	fp := p.submitted("8201-2026")
 	p.mail.Msgs = nil
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/deny", map[string]any{"note": "Negado."}, staff.secretary).Status)
 
@@ -158,7 +158,7 @@ func TestEnvioEhAssincronoESobreviveAFalhaDoSMTP(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("8301/2026")
+	fp := p.submitted("8301-2026")
 	p.mail.Msgs = nil
 	p.keepOutbox = true // este teste controla quando a caixa de saída é esvaziada
 
@@ -193,7 +193,7 @@ func TestAcaoRecusadaNaoDeixaEmailNaCaixaDeSaida(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("8401/2026")
+	fp := p.submitted("8401-2026")
 	p.keepOutbox = true
 	before := p.outboxCount()
 

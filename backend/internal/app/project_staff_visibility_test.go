@@ -16,9 +16,9 @@ func TestEquipeNaoEnxergaRascunhos(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 
-	draft := p.completeProject("7001/2026")
+	draft := p.completeProject("7001-2026")
 	draftFile := draft.upload(p.maria, "requerimento_apoio", "")
-	sent := p.submitted("7002/2026")
+	sent := p.submitted("7002-2026")
 	items, _ := sent.checklist(p.maria)
 	sentFile := items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
 

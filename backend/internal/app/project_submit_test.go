@@ -99,7 +99,7 @@ func TestEnvioBloqueadoPorPendencias(t *testing.T) {
 	assert.EqualValues(t, v, got.data()["version"], "nada mudou")
 
 	// Falta só um documento: ainda bloqueia.
-	fp := p.completeProject("100/2026")
+	fp := p.completeProject("100-2026")
 	require.Equal(t, 200, p.do("PUT", docsPath(fp.id, "/cartao_cnpj/justification"), map[string]any{"text": ""}, p.maria).Status)
 	r = fp.submit(p.maria, true)
 	assert.Equal(t, "project_has_issues", r.errCode())
@@ -108,7 +108,7 @@ func TestEnvioBloqueadoPorPendencias(t *testing.T) {
 
 func TestEnvioExigeDeclaracaoEVersaoAtual(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("200/2026")
+	fp := p.completeProject("200-2026")
 	v := fp.current(p.maria)
 
 	r := p.do("POST", "/api/admin/projects/"+fp.id+"/submit", map[string]any{"version": v, "declaration": false}, p.maria)
@@ -124,7 +124,7 @@ func TestEnvioExigeDeclaracaoEVersaoAtual(t *testing.T) {
 func TestEnvioCompleto(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30)) // dentro do prazo, qualquer que seja o dia em que o teste rode
-	fp := p.completeProject("300/2026")
+	fp := p.completeProject("300-2026")
 	before := fp.current(p.maria)
 
 	r := fp.submit(p.maria, true)
@@ -141,7 +141,7 @@ func TestEnvioCompleto(t *testing.T) {
 	assert.NotContains(t, issueFields(r), "documents.documents")
 
 	// O segundo projeto recebe o código seguinte.
-	fp2 := p.completeProject("301/2026")
+	fp2 := p.completeProject("301-2026")
 	assert.Equal(t, fmt.Sprintf("%d-000002", cuiabaYear()), fp2.submit(p.maria, true).data()["code"])
 
 	// Depois do envio, nada do projeto muda mais.
@@ -180,7 +180,7 @@ func TestEnvioCompleto(t *testing.T) {
 
 func TestEnvioDescartaArquivosNaoConfirmados(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("400/2026")
+	fp := p.completeProject("400-2026")
 	r := p.do("POST", docsPath(fp.id, "/pesquisa_precos/files"), map[string]any{"filename": "a.pdf", "contentType": pdfType, "sizeBytes": 10}, p.maria)
 	require.Equal(t, 201, r.Status, r.Body)
 	pendingID := r.data()["file"].(map[string]any)["id"].(string)
@@ -201,7 +201,7 @@ func TestEnvioDescartaArquivosNaoConfirmados(t *testing.T) {
 
 func TestVersaoDoEnvioEhImutavel(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("500/2026")
+	fp := p.completeProject("500-2026")
 	code := fp.submit(p.maria, true).data()["code"].(string)
 	ctx := context.Background()
 
@@ -230,7 +230,7 @@ func TestVersaoDoEnvioEhImutavel(t *testing.T) {
 func TestComprovanteEmPDF(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.completeProject("600/2026")
+	fp := p.completeProject("600-2026")
 
 	// Rascunho não tem comprovante.
 	code, _, _ := p.raw("GET", "/api/admin/projects/"+fp.id+"/receipt", p.maria)
@@ -244,7 +244,7 @@ func TestComprovanteEmPDF(t *testing.T) {
 	assert.Equal(t, "private, no-store", hdr.Get("Cache-Control"))
 	assert.True(t, strings.HasPrefix(string(body), "%PDF-"), "é um PDF")
 	text := string(body)
-	for _, want := range []string{number, "Comprovante de recebimento", "SEDEC", "600/2026", "Pavimenta", "11.222.333/0001-81", "R$ 100.000,00", "Declara", "01/11/2026 a 15/12/2026", "Av. Principal", "10/01/2027 a 01/05/2027"} {
+	for _, want := range []string{number, "Comprovante de recebimento", "SEDEC", "600-2026", "Pavimenta", "11.222.333/0001-81", "R$ 100.000,00", "Declara", "01/11/2026 a 15/12/2026", "Av. Principal", "10/01/2027 a 01/05/2027"} {
 		assert.Contains(t, text, want)
 	}
 	assert.NotContains(t, text, "eleitoral")
@@ -265,8 +265,8 @@ func TestComprovanteEmPDF(t *testing.T) {
 
 func TestNumeroDoSigconEhUnicoEntreEnviados(t *testing.T) {
 	p := newProjEnv(t)
-	a := p.completeProject("700/2026")
-	b := p.completeProject("700/2026") // rascunho repetido só gera aviso
+	a := p.completeProject("700-2026")
+	b := p.completeProject("700-2026") // rascunho repetido só gera aviso
 	assert.Equal(t, "sigcon_duplicated", issueFields(p.do("GET", "/api/admin/projects/"+b.id, nil, p.maria))["proposal.sigconNumber"])
 
 	require.Equal(t, 200, a.submit(p.maria, true).Status)
@@ -276,7 +276,7 @@ func TestNumeroDoSigconEhUnicoEntreEnviados(t *testing.T) {
 	assert.Equal(t, "draft", p.do("GET", "/api/admin/projects/"+b.id, nil, p.maria).data()["status"])
 	// Trocando o número, envia.
 	pb := proposalBody(0)
-	pb["sigconNumber"], pb["objectNature"] = "701/2026", "services"
+	pb["sigconNumber"], pb["objectNature"] = "701-2026", "services"
 	b.save("proposal", pb)
 	assert.Equal(t, 200, b.submit(p.maria, true).Status)
 }
@@ -285,7 +285,7 @@ func TestEnvioForaDoPrazoEleitoral(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, -1))
 
-	fp := p.completeProject("800/2026")
+	fp := p.completeProject("800-2026")
 	got := p.do("GET", "/api/admin/projects/"+fp.id, nil, p.maria)
 	assert.Equal(t, "electoral_deadline_passed", issueFields(got)["submission.electoralDeadline"])
 	for _, it := range got.data()["issues"].([]any) {
@@ -302,7 +302,7 @@ func TestEnvioForaDoPrazoEleitoral(t *testing.T) {
 
 	// Dentro do prazo: sem aviso nem marca.
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 5))
-	ok := p.completeProject("801/2026")
+	ok := p.completeProject("801-2026")
 	assert.NotContains(t, issueFields(p.do("GET", "/api/admin/projects/"+ok.id, nil, p.maria)), "submission.electoralDeadline")
 	assert.Equal(t, false, ok.submit(p.maria, true).data()["lateSubmission"])
 
@@ -318,7 +318,7 @@ func TestEnvioForaDoPrazoEleitoral(t *testing.T) {
 
 func TestEnviosSimultaneosGeramUmSoEnvio(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("900/2026")
+	fp := p.completeProject("900-2026")
 	v := fp.current(p.maria)
 	var wg sync.WaitGroup
 	statuses := make(chan int, 6)
@@ -352,8 +352,8 @@ func TestEnviosSimultaneosGeramUmSoEnvio(t *testing.T) {
 
 func TestListagemMostraCodigoEFiltraEnviados(t *testing.T) {
 	p := newProjEnv(t)
-	sent := p.completeProject("1000/2026")
-	draft := p.completeProject("1001/2026")
+	sent := p.completeProject("1000-2026")
+	draft := p.completeProject("1001-2026")
 	code := sent.submit(p.maria, true).data()["code"].(string)
 
 	all := p.do("GET", "/api/admin/projects", nil, p.maria).list()
@@ -373,7 +373,7 @@ func TestListagemMostraCodigoEFiltraEnviados(t *testing.T) {
 
 func TestEnvioSoDoTitular(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("1100/2026")
+	fp := p.completeProject("1100-2026")
 	v := fp.current(p.maria)
 	body := map[string]any{"version": v, "declaration": true}
 	assert.Equal(t, 403, p.do("POST", "/api/admin/projects/"+fp.id+"/submit", body, p.joao).Status)

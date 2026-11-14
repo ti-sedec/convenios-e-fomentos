@@ -64,7 +64,7 @@ func TestPedidoDeComplementacao(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("2000/2026")
+	fp := p.submitted("2000-2026")
 
 	body := map[string]any{"message": "Corrija o endereço e reenvie o requerimento.",
 		"items": []any{section("institution", "O CEP não confere."), document("requerimento_apoio", "Faltou a assinatura.")}}
@@ -111,7 +111,7 @@ func TestPedidoDeComplementacao(t *testing.T) {
 	again := p.complement(analyst, fp.id, body)
 	assert.Equal(t, 409, again.Status)
 	assert.Equal(t, "project_stage_invalid", again.errCode(), "já aguarda o proponente")
-	other := p.submitted("2001/2026")
+	other := p.submitted("2001-2026")
 	for name, b := range map[string]map[string]any{
 		"sem itens":                   {"items": []any{}},
 		"seção inexistente":           {"items": []any{section("nada", "")}},
@@ -123,7 +123,7 @@ func TestPedidoDeComplementacao(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) { assert.Equal(t, 422, p.complement(analyst, other.id, b).Status) })
 	}
-	draft := p.completeProject("2002/2026")
+	draft := p.completeProject("2002-2026")
 	assert.Equal(t, "project_not_submitted", p.complement(analyst, draft.id, body).errCode())
 	assert.Equal(t, 403, p.complement(p.maria, other.id, body).Status, "o proponente não pede complementação")
 	assert.Equal(t, 403, p.complement(p.joao, other.id, body).Status)
@@ -134,7 +134,7 @@ func TestProponenteSoAlteraOQueFoiDevolvido(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("2100/2026")
+	fp := p.submitted("2100-2026")
 	require.Equal(t, 200, p.complement(analyst, fp.id, map[string]any{"items": []any{section("institution", "CEP"), document("requerimento_apoio", "assinar")}}).Status)
 	v := fp.current(p.maria)
 
@@ -196,7 +196,7 @@ func TestReenvioComAsCorrecoes(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("2200/2026")
+	fp := p.submitted("2200-2026")
 	code := p.project(p.maria, fp.id).data()["code"].(string)
 
 	// Reenviar sem pedido aberto não é possível.
@@ -213,7 +213,7 @@ func TestReenvioComAsCorrecoes(t *testing.T) {
 	// Corrige a proposta; apagar o arquivo devolvido deixa o documento pendente, e o reenvio é bloqueado.
 	pb := proposalBody(fp.current(p.maria))
 	pb["title"], pb["objectNature"] = "Pavimentação da Rua B", "services"
-	pb["sigconNumber"] = "2200/2026"
+	pb["sigconNumber"] = "2200-2026"
 	require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
 	items, _ := fp.checklist(p.maria)
 	oldFile := items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
@@ -264,7 +264,7 @@ func TestPrazoVencidoArquivaSozinho(t *testing.T) {
 	analyst := p.analyst()
 
 	// 1) Ao abrir o projeto depois do prazo.
-	a := p.submitted("2300/2026")
+	a := p.submitted("2300-2026")
 	require.Equal(t, 200, p.complement(analyst, a.id, map[string]any{"items": []any{section("institution", "")}}).Status)
 	p.setDue(a.id, time.Now().Add(-time.Minute))
 	got := p.project(p.maria, a.id)
@@ -281,7 +281,7 @@ func TestPrazoVencidoArquivaSozinho(t *testing.T) {
 	assert.Len(t, logs, 1)
 
 	// 2) Ao tentar gravar depois do prazo, mesmo que a rotina ainda não tenha rodado.
-	b := p.submitted("2301/2026")
+	b := p.submitted("2301-2026")
 	require.Equal(t, 200, p.complement(analyst, b.id, map[string]any{"items": []any{section("institution", "")}}).Status)
 	v := b.current(p.maria)
 	p.setDue(b.id, time.Now().Add(-time.Second))
@@ -292,7 +292,7 @@ func TestPrazoVencidoArquivaSozinho(t *testing.T) {
 	assert.Equal(t, "archived", p.project(p.maria, b.id).data()["status"])
 
 	// 3) A rotina arquiva em lote e não repete.
-	c, d := p.submitted("2302/2026"), p.submitted("2303/2026")
+	c, d := p.submitted("2302-2026"), p.submitted("2303-2026")
 	for _, x := range []*fundingProject{c, d} {
 		require.Equal(t, 200, p.complement(analyst, x.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 		p.setDue(x.id, time.Now().Add(-time.Hour))
@@ -305,7 +305,7 @@ func TestPrazoVencidoArquivaSozinho(t *testing.T) {
 	assert.Zero(t, n)
 
 	// 4) Prazo ainda no futuro: nada acontece.
-	e := p.submitted("2304/2026")
+	e := p.submitted("2304-2026")
 	require.Equal(t, 200, p.complement(analyst, e.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 	n, err = p.app.Projects.ExpireComplements(context.Background())
 	require.NoError(t, err)
@@ -319,7 +319,7 @@ func TestExpiracaoSimultaneaArquivaUmaVez(t *testing.T) {
 	analyst := p.analyst()
 	var ids []string
 	for i := range 4 {
-		x := p.submitted(fmt.Sprintf("24%02d/2026", i))
+		x := p.submitted(fmt.Sprintf("24%02d-2026", i))
 		require.Equal(t, 200, p.complement(analyst, x.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 		p.setDue(x.id, time.Now().Add(-time.Hour))
 		ids = append(ids, x.id)
@@ -360,7 +360,7 @@ func TestDesistenciaDoProponente(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("2500/2026")
+	fp := p.submitted("2500-2026")
 	withdraw := func(tok, note string) resp {
 		return p.do("POST", "/api/admin/projects/"+fp.id+"/withdraw", map[string]any{"note": note}, tok)
 	}
@@ -401,10 +401,10 @@ func TestDesistenciaDoProponente(t *testing.T) {
 	assert.Len(t, p.do("GET", "/api/admin/projects?status=archived", nil, p.maria).list(), 1)
 
 	// Rascunho não se arquiva (exclui-se); e o número do SIGCon fica livre.
-	draft := p.completeProject("2501/2026")
+	draft := p.completeProject("2501-2026")
 	assert.Equal(t, "project_not_submitted", p.do("POST", "/api/admin/projects/"+draft.id+"/withdraw", map[string]any{"note": "desisti"}, p.maria).errCode())
 	pb := proposalBody(0)
-	pb["sigconNumber"], pb["objectNature"] = "2500/2026", "services"
+	pb["sigconNumber"], pb["objectNature"] = "2500-2026", "services"
 	draft.save("proposal", pb)
 	assert.Equal(t, 200, draft.submit(p.maria, true).Status, "o número do SIGCon do projeto arquivado está livre")
 }
@@ -414,7 +414,7 @@ func TestNegativaEArquivamentoPelaEquipe(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
 	secretary := p.staff("secretario@exemplo.com", "admin::projects.read", "admin::projects.deny")
-	fp := p.submitted("2600/2026")
+	fp := p.submitted("2600-2026")
 
 	archive := func(tok, reason, note string) resp {
 		return p.do("POST", "/api/admin/projects/"+fp.id+"/archive", map[string]any{"reason": reason, "note": note}, tok)
@@ -445,7 +445,7 @@ func TestNegativaEArquivamentoPelaEquipe(t *testing.T) {
 	assert.Equal(t, "denied", logs[0].(map[string]any)["payload"].(map[string]any)["reason"])
 
 	// O analista arquiva por falta de documentos.
-	other := p.submitted("2601/2026")
+	other := p.submitted("2601-2026")
 	r = p.do("POST", "/api/admin/projects/"+other.id+"/archive", map[string]any{"reason": "missing_documents", "note": "Sem a certidão de habilitação."}, analyst)
 	require.Equal(t, 200, r.Status, r.Body)
 	assert.Equal(t, "missing_documents", r.data()["archive"].(map[string]any)["reason"])
@@ -493,7 +493,7 @@ func TestDuplicarProjeto(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "Pavimentação da Rua A", d.data()["proposal"].(map[string]any)["title"])
-	assert.Equal(t, "3216/2026", d.data()["proposal"].(map[string]any)["sigconNumber"])
+	assert.Equal(t, "3216-2026", d.data()["proposal"].(map[string]any)["sigconNumber"])
 	assert.Len(t, d.data()["proposal"].(map[string]any)["municipalities"], 2)
 	assert.Equal(t, "11222333000181", d.data()["institution"].(map[string]any)["cnpj"])
 	assert.NotEmpty(t, d.data()["proponent"].(map[string]any)["name"])
@@ -563,7 +563,7 @@ func TestDuplicarProjetoArquivadoEOSigconDoOriginal(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 
 	// Original ativo: a cópia avisa do número repetido e o envio dela só passa depois de trocá-lo.
-	active := p.submitted("2800/2026")
+	active := p.submitted("2800-2026")
 	code := p.project(p.maria, active.id).data()["code"].(string)
 	d := p.duplicate(p.maria, active.id, false)
 	require.Equal(t, 201, d.Status, d.Body)
@@ -587,7 +587,7 @@ func TestEmendaComDocumentoEnviadoNaoPodeSerRemovida(t *testing.T) {
 	dep := p.parliamentarian("Fulano", "state")
 	year := time.Now().Year()
 
-	fp := p.completeProject("2900/2026")
+	fp := p.completeProject("2900-2026")
 	r := fp.save("funding", map[string]any{"type": "amendment", "amendments": []any{amendment(dep, "1", year, 100_000)}, "counterpartKind": "financial", "counterpartCents": 10_000})
 	am := r.data()["funding"].(map[string]any)["amendments"].([]any)[0].(map[string]any)["id"].(string)
 	items, _ := fp.checklist(p.maria)
@@ -620,7 +620,7 @@ func TestListagemMostraEtapaEPrazoDaComplementacao(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("3000/2026")
+	fp := p.submitted("3000-2026")
 	row := func() map[string]any {
 		return p.do("GET", "/api/admin/projects", nil, p.maria).list()[0].(map[string]any)
 	}

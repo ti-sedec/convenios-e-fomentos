@@ -47,7 +47,7 @@ func TestReprovarItemComJustificativa(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9801/2026")
+	fp := p.submitted("9801-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	file := fileIDOf(reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"])
 
@@ -60,14 +60,14 @@ func TestReprovarItemComJustificativa(t *testing.T) {
 	})
 	t.Run("reprovar exige ter visto o arquivo", func(t *testing.T) {
 		other, _ := p.newAdmin(p.boss, "m.analista3@exemplo.com", "analyst")
-		mine := p.submitted("9802/2026")
+		mine := p.submitted("9802-2026")
 		require.Equal(t, 200, p.startAnalysis(other, mine.id).Status)
 		r := p.reject(other, mine.id, "document", "requerimento_apoio", "Ilegível.")
 		assert.Equal(t, "file_not_opened", r.errCode())
 	})
 	t.Run("só ver basta para reprovar, mas aprovar exige ler até o fim", func(t *testing.T) {
 		other, _ := p.newAdmin(p.boss, "m.analista4@exemplo.com", "analyst")
-		mine := p.submitted("9803/2026")
+		mine := p.submitted("9803-2026")
 		require.Equal(t, 200, p.startAnalysis(other, mine.id).Status)
 		otherFile := fileIDOf(reviewItems(p.project(other, mine.id))["document:requerimento_apoio"])
 		require.Equal(t, 204, p.viewFile(other, mine.id, otherFile))
@@ -136,7 +136,7 @@ func TestDocumentoAdicionalSoPodeSerAprovado(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp, extra := p.submittedWithExtra("9802/2026")
+	fp, extra := p.submittedWithExtra("9802-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	assert.Equal(t, 422, p.reject(staff.analyst, fp.id, "extra", extra, "Não serve.").Status)
 }
@@ -184,7 +184,7 @@ func TestExibicaoDosDocumentos(t *testing.T) {
 	}
 
 	t.Run("PDF é exibido como está, sem baixar e sem conversão", func(t *testing.T) {
-		fp := p.submitted("9811/2026")
+		fp := p.submitted("9811-2026")
 		require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 		file := fileIDOf(reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"])
 		r := previewOf(staff.analyst, fp.id, file)
@@ -198,7 +198,7 @@ func TestExibicaoDosDocumentos(t *testing.T) {
 		assert.Equal(t, "file_not_opened", p.review(staff.analyst, fp.id, "document", "requerimento_apoio", true).errCode())
 	})
 	t.Run("o titular também vê, e o acesso fica na auditoria", func(t *testing.T) {
-		fp := p.submitted("9812/2026")
+		fp := p.submitted("9812-2026")
 		file := fileIDOf(reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"])
 		assert.Equal(t, 200, previewOf(p.maria, fp.id, file).Status)
 		var n int
@@ -206,14 +206,14 @@ func TestExibicaoDosDocumentos(t *testing.T) {
 		assert.Equal(t, 1, n)
 	})
 	t.Run("quem não lê o projeto não vê", func(t *testing.T) {
-		fp := p.submitted("9813/2026")
+		fp := p.submitted("9813-2026")
 		file := fileIDOf(reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"])
 		assert.Equal(t, 404, previewOf(p.joao, fp.id, file).Status)
 		assert.Equal(t, 404, p.do("POST", docsPath(fp.id, "/files/", file, "/viewed"), nil, p.joao).Status)
 	})
 	t.Run("Word é convertido uma vez e o original continua baixável", func(t *testing.T) {
 		before := p.conv.count()
-		fp, file := p.submittedWithDocx("9814/2026")
+		fp, file := p.submittedWithDocx("9814-2026")
 		r := previewOf(staff.analyst, fp.id, file)
 		require.Equal(t, 200, r.Status, r.Body)
 		assert.Equal(t, "pdf", r.data()["kind"])
@@ -229,7 +229,7 @@ func TestExibicaoDosDocumentos(t *testing.T) {
 		assert.Contains(t, d.data()["url"], "requerimento.docx", "o download é do arquivo original")
 	})
 	t.Run("conversão que falha responde 422 e não deixa PDF pela metade", func(t *testing.T) {
-		fp, file := p.submittedWithDocx("9815/2026")
+		fp, file := p.submittedWithDocx("9815-2026")
 		p.conv.mu.Lock()
 		p.conv.fail = true
 		p.conv.mu.Unlock()
@@ -241,7 +241,7 @@ func TestExibicaoDosDocumentos(t *testing.T) {
 	})
 	t.Run("excluir o arquivo apaga o PDF gerado", func(t *testing.T) {
 		// Arquivo do Word ainda em rascunho: a exclusão remove o objeto e o PDF de exibição.
-		fp := p.completeProject("9816/2026")
+		fp := p.completeProject("9816-2026")
 		const docxType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 		docx := append([]byte("PK\x03\x04"), make([]byte, 50)...)
 		r := fp.do("POST", docsPath(fp.id, "/requerimento_apoio/files"), map[string]any{"filename": "r.docx", "contentType": docxType, "sizeBytes": len(docx)}, p.maria)

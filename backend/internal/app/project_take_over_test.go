@@ -42,7 +42,7 @@ func TestSoOResponsavelContinuaAAnalise(t *testing.T) {
 	p.finalistic("Financeiro")
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9501/2026")
+	fp := p.submitted("9501-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.Equal(t, 200, p.review(staff.analyst, fp.id, "section", "institution", true).Status)
 	before := p.project(staff.analyst, fp.id).data()["version"]
@@ -93,7 +93,7 @@ func TestAssumirProjetoDeOutroAnalista(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9502/2026")
+	fp := p.submitted("9502-2026")
 
 	// Antes de iniciar a análise não há de quem assumir.
 	assert.Equal(t, "analysis_not_started", p.takeOver(other, fp.id).errCode())
@@ -107,7 +107,7 @@ func TestAssumirProjetoDeOutroAnalista(t *testing.T) {
 		assert.Equal(t, p.adminID("m.analista@exemplo.com"), analystOf(p.project(other, fp.id))["id"])
 	})
 	t.Run("rascunho não", func(t *testing.T) {
-		assert.Equal(t, 403, p.takeOver(other, p.completeProject("9503/2026").id).Status)
+		assert.Equal(t, 403, p.takeOver(other, p.completeProject("9503-2026").id).Status)
 	})
 
 	p.mail.Msgs = nil
@@ -192,7 +192,7 @@ func TestAssumirAguardandoOProponente(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9504/2026")
+	fp := p.submitted("9504-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.Equal(t, 200, p.complement(staff.analyst, fp.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 
@@ -202,7 +202,7 @@ func TestAssumirAguardandoOProponente(t *testing.T) {
 	assert.Equal(t, p.adminID("m.analista2@exemplo.com"), analystOf(r)["id"])
 	p.assertHistory(fp.id)
 
-	p.resubmitProposal(fp, "9504/2026")
+	p.resubmitProposal(fp, "9504-2026")
 	v := p.project(other, fp.id)
 	assert.Equal(t, "in_analysis", v.data()["stage"])
 	assert.Equal(t, p.adminID("m.analista2@exemplo.com"), analystOf(v)["id"], "o reenvio volta para quem assumiu")
@@ -216,10 +216,10 @@ func TestAssumirMantemOReenvioNaFila(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9505/2026")
+	fp := p.submitted("9505-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.Equal(t, 200, p.complement(staff.analyst, fp.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
-	p.resubmitProposal(fp, "9505/2026")
+	p.resubmitProposal(fp, "9505-2026")
 
 	resubmitted := func(tok string) bool {
 		for _, x := range p.do("GET", "/api/admin/projects/queue/overview", nil, tok).data()["blocks"].(map[string]any)["resubmitted"].(map[string]any)["items"].([]any) {
@@ -237,7 +237,7 @@ func TestAssumirMantemOReenvioNaFila(t *testing.T) {
 }
 
 func TestAssumirNaoVale(t *testing.T) {
-	f := newFramingEnv(t, "9506/2026")
+	f := newFramingEnv(t, "9506-2026")
 	other, _ := f.newAdmin(f.boss, "m.analista2@exemplo.com", "analyst")
 
 	t.Run("com enquadramento pendente", func(t *testing.T) {
@@ -261,7 +261,7 @@ func TestAssumirSimultaneo(t *testing.T) {
 	staff := p.newStaff()
 	b, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
 	c, _ := p.newAdmin(p.boss, "m.analista3@exemplo.com", "analyst")
-	fp := p.submitted("9507/2026")
+	fp := p.submitted("9507-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 
 	var wg sync.WaitGroup
@@ -282,7 +282,7 @@ func TestAssumirDeAnalistaBloqueado(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9508/2026")
+	fp := p.submitted("9508-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	_, err := p.pool.Exec(context.Background(), "UPDATE admins SET blocked = true WHERE email = 'm.analista@exemplo.com'")
 	require.NoError(t, err)

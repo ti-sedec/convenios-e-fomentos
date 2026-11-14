@@ -753,7 +753,7 @@ func (s *Service) SaveProposal(ctx context.Context, actor Actor, id uuid.UUID, v
 
 		if n := strings.ReplaceAll(in.SigconNumber, " ", ""); n != "" {
 			if !sigconRe.MatchString(n) {
-				p.add("sigconNumber", "Use o formato NNNN/AAAA, por exemplo 3216/2026.")
+				p.add("sigconNumber", "Use o formato NNNN-AAAA, por exemplo 3216-2026.")
 			}
 			arg.SigconNumber = &n
 		}

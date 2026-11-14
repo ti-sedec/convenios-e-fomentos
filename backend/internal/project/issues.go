@@ -105,7 +105,7 @@ func institutionIssues(l *issueList, s InstitutionSection, today time.Time) {
 
 func proposalIssues(l *issueList, s ProposalSection, duplicatedSigcon bool) {
 	const sec = "proposal"
-	l.required(sec, "sigconNumber", "Informe o número da proposta no SIGCon (ex.: 3216/2026).", s.SigconNumber == "")
+	l.required(sec, "sigconNumber", "Informe o número da proposta no SIGCon (ex.: 3216-2026).", s.SigconNumber == "")
 	l.required(sec, "sigconRegisteredOn", "Informe a data do cadastro da proposta no SIGCon.", s.SigconRegisteredOn == "")
 	l.required(sec, "title", "Informe o título do projeto.", s.Title == "")
 	l.required(sec, "object", "Descreva o objeto.", s.Object == "")
@@ -114,7 +114,7 @@ func proposalIssues(l *issueList, s ProposalSection, duplicatedSigcon bool) {
 	executionPeriodIssues(l, sec, s.ExecutionPeriods)
 
 	if s.SigconNumber != "" && len(s.SigconRegisteredOn) >= 4 {
-		if _, year, ok := strings.Cut(s.SigconNumber, "/"); ok && year != s.SigconRegisteredOn[:4] {
+		if _, year, ok := strings.Cut(s.SigconNumber, "-"); ok && year != s.SigconRegisteredOn[:4] {
 			l.add(sec, "sigconNumber", "sigcon_year_mismatch", SeverityBlock, "O ano do número da proposta não coincide com o ano da data de cadastro no SIGCon.")
 		}
 	}

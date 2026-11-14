@@ -1206,7 +1206,7 @@ paths:
       summary: Grava a seção Proposta
       description: |
         Grava a seção inteira, com a `version` lida (409 `project_version_conflict` se desatualizada).
-        `sigconNumber` no formato `NNNN/AAAA`; `sigconRegisteredOn` não pode ser futura.
+        `sigconNumber` no formato `NNNN-AAAA`; `sigconRegisteredOn` não pode ser futura.
         `executionPeriods` é a lista de períodos e locais de execução, regravada por inteiro a cada salvamento e na ordem enviada
         (até 50). Cada linha tem `startDate`, `endDate` (não pode ser anterior ao início), `municipalityIbge` (só municípios de MT, senão 422)
         e `placeDetail` (opcional, até 500). O rascunho aceita linhas incompletas; o envio exige ao menos uma linha, e cada uma com
@@ -1227,7 +1227,7 @@ paths:
               required: [version]
               properties:
                 version: {type: integer, minimum: 1}
-                sigconNumber: {type: string, examples: ["3216/2026"]}
+                sigconNumber: {type: string, examples: ["3216-2026"]}
                 sigconRegisteredOn: {type: string, format: date}
                 title: {type: string, maxLength: 200}
                 object: {type: string, maxLength: 5000}

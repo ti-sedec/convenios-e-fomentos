@@ -63,15 +63,15 @@ func TestMatrizDeLeituraDaEquipe(t *testing.T) {
 	type project struct {
 		id, file string
 	}
-	draftFP := p.completeProject("7101/2026")
+	draftFP := p.completeProject("7101-2026")
 	draft := project{draftFP.id, draftFP.upload(p.maria, "requerimento_apoio", "")}
 	fileOf := func(fp *fundingProject) string {
 		items, _ := fp.checklist(p.maria)
 		return items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
 	}
-	sentFP := p.submitted("7102/2026")
+	sentFP := p.submitted("7102-2026")
 	sent := project{sentFP.id, fileOf(sentFP)}
-	archivedFP := p.submitted("7103/2026")
+	archivedFP := p.submitted("7103-2026")
 	archived := project{archivedFP.id, fileOf(archivedFP)}
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+archived.id+"/archive",
 		map[string]any{"reason": "missing_documents", "note": "Faltaram documentos obrigatórios."}, staff.analyst).Status)
@@ -159,7 +159,7 @@ func TestMatrizDeDecisaoDaEquipe(t *testing.T) {
 	staff := p.newStaff()
 	fin := p.deptID("Financeiro")
 
-	shared := p.submitted("7201/2026") // recebe só tentativas que devem ser recusadas, então não muda de estado
+	shared := p.submitted("7201-2026") // recebe só tentativas que devem ser recusadas, então não muda de estado
 	p.setProjectDepartment(shared.id, fin)
 
 	complement := func(tok, id string) int {
@@ -199,16 +199,16 @@ func TestMatrizDeDecisaoDaEquipe(t *testing.T) {
 		assert.Equal(t, 403, archive(staff.secretary, shared.id))
 	})
 	t.Run("o Analista devolve", func(t *testing.T) {
-		assert.Equal(t, 200, complement(staff.analyst, p.submitted("7202/2026").id))
+		assert.Equal(t, 200, complement(staff.analyst, p.submitted("7202-2026").id))
 	})
 	t.Run("o Analista arquiva", func(t *testing.T) {
-		assert.Equal(t, 200, archive(staff.analyst, p.submitted("7203/2026").id))
+		assert.Equal(t, 200, archive(staff.analyst, p.submitted("7203-2026").id))
 	})
 	t.Run("o Secretário nega", func(t *testing.T) {
-		assert.Equal(t, 200, deny(staff.secretary, p.submitted("7204/2026").id))
+		assert.Equal(t, 200, deny(staff.secretary, p.submitted("7204-2026").id))
 	})
 	t.Run("ninguém da equipe age sobre rascunho", func(t *testing.T) {
-		draft := p.completeProject("7205/2026")
+		draft := p.completeProject("7205-2026")
 		assert.Equal(t, 403, complement(staff.analyst, draft.id))
 		assert.Equal(t, 403, archive(staff.analyst, draft.id))
 		assert.Equal(t, 403, deny(staff.secretary, draft.id))
