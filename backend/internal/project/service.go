@@ -68,6 +68,9 @@ type Service struct {
 	// Candidatos do bloco "pronto para indicar" da visão geral da fila (ver SetReadyCandidates); zero usa o padrão.
 	readyCandidates int
 
+	// Relatório completo do projeto (ver SetReports).
+	reportCfg ReportConfig
+
 	// Link dos e-mails para o painel (ver SetNotifier). Os e-mails vão para a caixa de saída (internal/outbox), nunca direto ao SMTP.
 	publicURL string
 }
@@ -233,6 +236,7 @@ func (s *Service) viewWithChecklist(ctx context.Context, q *db.Queries, r db.Pro
 			HasArtisticHiring: r.HasArtisticHiring, Calamity: r.Calamity,
 		},
 	}
+	p.Report = reportAccess(r)
 	p.Proposal.ExecutionPeriods, p.Proposal.StartDate, p.Proposal.EndDate, p.Proposal.Municipalities = executionPeriodsView(periods)
 	access, err := s.accessOf(ctx, q, r.ID, r.CreatedByID, actor)
 	if err != nil {

@@ -114,7 +114,7 @@ func TestSeedAcrescentaAsPermissoesQueFaltamNaRoleDeProponente(t *testing.T) {
 		return n
 	}
 	full := count()
-	require.Equal(t, 13, full)
+	require.Equal(t, 14, full)
 
 	// Instalação anterior às permissões de projeto: o seed completa o que falta, sem duplicar o que já existe.
 	_, err := e.pool.Exec(ctx, `DELETE FROM admin_permissions WHERE action LIKE 'admin::projects.%' OR action LIKE 'admin::proponent-profile.%'`)

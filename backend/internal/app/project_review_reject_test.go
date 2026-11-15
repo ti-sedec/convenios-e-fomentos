@@ -19,6 +19,8 @@ type fakeConverter struct {
 	mu    sync.Mutex
 	calls int
 	fail  bool
+	// pdf, se definido, é o que a conversão devolve (um PDF de verdade, para os testes do relatório completo).
+	pdf []byte
 }
 
 func (c *fakeConverter) ToPDF(_ context.Context, _ string, src io.Reader) ([]byte, error) {
@@ -29,6 +31,9 @@ func (c *fakeConverter) ToPDF(_ context.Context, _ string, src io.Reader) ([]byt
 		return nil, preview.ErrUnavailable
 	}
 	_, _ = io.Copy(io.Discard, src)
+	if c.pdf != nil {
+		return c.pdf, nil
+	}
 	return []byte("%PDF-1.7 convertido"), nil
 }
 

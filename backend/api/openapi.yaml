@@ -1880,6 +1880,104 @@ paths:
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
         "429": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/reports:
+    post:
+      tags: [Projetos]
+      summary: Gera o relatório do projeto (PDF)
+      description: |
+        Gera o relatório com as informações cadastradas no projeto (sem o conteúdo dos documentos anexados), a partir do retrato da **última
+        versão enviada**. Só para projeto **ativo com o enquadramento confirmado**; antes disso, ou arquivado, 409 `report_unavailable` com o motivo
+        (o projeto traz `report: {available, reason}` para a tela). Rascunho ou fora do alcance da permissão: 404.
+        Corpo: `{kind, pageNumbers?, coverSheets?}`. `kind`: `summary` (só as informações) ou `full` (com os documentos juntados). `pageNumbers`
+        (padrão `true`) liga o "Página X de Y"; no completo a numeração é contínua em TODO o PDF, inclusive nos documentos. `coverSheets` (padrão `true`)
+        põe uma folha de rosto antes de cada arquivo e só vale para o completo.
+        **Completo**: entra numa fila e responde `202` com o registro (`status: queued`); a montagem é em segundo plano (o PDF de cada arquivo é
+        saneado: sem JavaScript, abertura de programa nem anexos; imagem e Word viram PDF; arquivo que não puder entrar ganha uma página de aviso e
+        aparece em `warnings`). Acompanhe por `GET /reports` (`status`, `progressDone/progressTotal`, `stats` com o pico de memória). Uma montagem por
+        projeto por vez (409 `report_in_progress`). 422 `report_too_large` se os arquivos somam mais que o limite (menor entre `REPORT_MAX_INPUT_MB` e o
+        que cabe na memória do contêiner). O PDF pronto vence em `expiresAt` (24 h); depois só o registro e os dados usados permanecem.
+        Resposta do resumido: `application/pdf` (fora do envelope JSON), com o id do registro em `X-Report-Id`. O servidor grava o **registro** da geração
+        (quem gerou, quando, o tipo, as opções, a versão e os dados usados, com os CPFs mascarados); o PDF **não** é guardado: é refeito a
+        partir dos dados. Auditoria: `project.report-generate`. Permissão: `admin::projects.report`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: {type: string, enum: [summary, full]}
+                pageNumbers: {type: boolean, default: true}
+                coverSheets: {type: boolean, default: true}
+      responses:
+        "200":
+          description: PDF (relatório resumido)
+          headers:
+            X-Report-Id: {schema: {type: string, format: uuid}}
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        "202": {description: "Relatório completo na fila: o registro (envelope JSON)"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+    get:
+      tags: [Projetos]
+      summary: Histórico dos relatórios gerados
+      description: |
+        Quem gerou cada relatório do projeto, quando, o tipo, as opções, a versão usada, o tamanho, o nº de páginas e o SHA-256, do mais recente
+        para o mais antigo, sem os dados usados (ver `GET /reports/{rid}`). Sem prazo de retenção. Permissão: `admin::projects.report`.
+        Resposta: lista de `{id, kind, versionNumber, pageNumbers, coverSheets, generatedAt, generatedBy, generatedById, generatedByCpf (mascarado), pageCount, sizeBytes, sha256,
+        status (queued|running|done|failed), progressDone, progressTotal, downloadable, expiresAt, startedAt, finishedAt, warnings [{document,file,reason}], error, stats}`.
+        `stats` (relatório completo): `{peakRssBytes, baselineRssBytes, peakHeapBytes, durationMs, files, inputBytes, outputBytes, pages}`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/reports/{rid}:
+    get:
+      tags: [Projetos]
+      summary: Uma geração do histórico, com os dados usados
+      description: "O registro mais `data`: exatamente o que alimentou o relatório naquele momento (identificação, seções, documentos com nome, tamanho e SHA-256, declaração), sem o conteúdo dos documentos e com os CPFs mascarados. Permissão: `admin::projects.report`."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: rid, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/reports/{rid}/download:
+    get:
+      tags: [Projetos]
+      summary: Baixa de novo um relatório do histórico (PDF)
+      description: "Resumido: refaz o PDF a partir dos dados guardados e das opções da geração; sai idêntico ao original (vale também depois do arquivamento). Completo: devolve em fluxo o PDF guardado enquanto não vence (409 `report_not_ready` montando, `report_failed`, `report_expired` vencido). Auditoria: `project.report-download`. Resposta `application/pdf`. Permissão: `admin::projects.report`."
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: rid, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}/complement-requests:
     post:
       tags: [Projetos]

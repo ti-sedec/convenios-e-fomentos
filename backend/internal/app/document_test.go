@@ -104,7 +104,7 @@ func TestSeedIdempotenteEEstrutura(t *testing.T) {
 		}
 	}
 	before := snapshot()
-	assert.Equal(t, []int{8, 58, 2, 9, 1, 11, 2, 2}, before, "8 roles de admin (inclui Proponente, Supervisor, Analista e Secretário), 58 permissões e 9 administradores (o chefe e 8 de desenvolvimento)")
+	assert.Equal(t, []int{8, 63, 2, 9, 1, 11, 2, 2}, before, "8 roles de admin (inclui Proponente, Supervisor, Analista e Secretário), 63 permissões e 9 administradores (o chefe e 8 de desenvolvimento)")
 
 	// Segunda execução: nada novo, e as senhas não são repetidas no log.
 	assert.Empty(t, e.runSeed(true))

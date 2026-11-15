@@ -1,6 +1,7 @@
 package project
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -96,6 +97,10 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(g(ActionDeny)).Post("/admin/projects/{id}/deny", h.deny)
 	r.With(g(ActionCreate), heavy).Post("/admin/projects/{id}/duplicate", h.duplicate)
 	r.With(g(ActionRead), heavy).Get("/admin/projects/{id}/receipt", h.receipt)
+	r.With(g(ActionReport), heavy).Post("/admin/projects/{id}/reports", h.generateReport)
+	r.With(g(ActionReport)).Get("/admin/projects/{id}/reports", h.listReports)
+	r.With(g(ActionReport)).Get("/admin/projects/{id}/reports/{rid}", h.getReport)
+	r.With(g(ActionReport), heavy).Get("/admin/projects/{id}/reports/{rid}/download", h.downloadReport)
 
 	r.With(g(ActionShare)).Get("/admin/projects/{id}/members", h.members)
 	r.With(g(ActionShare), heavy).Post("/admin/projects/{id}/members", h.invite)
@@ -882,6 +887,102 @@ func (h *Handler) receipt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(pdf) //nolint:gosec // PDF gerado pelo servidor, servido como application/pdf (não é HTML)
+}
+
+func writePDF(w http.ResponseWriter, name string, pdf []byte) {
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdf) //nolint:gosec // PDF gerado pelo servidor, servido como application/pdf (não é HTML)
+}
+
+// generateReport gera o relatório. O resumido responde o PDF (não é o envelope JSON padrão), com o id do registro em X-Report-Id. O
+// completo responde 202 com o registro: a montagem é em segundo plano e a tela acompanha pela lista.
+func (h *Handler) generateReport(w http.ResponseWriter, r *http.Request) {
+	in, id, read, ok := decode[ReportInput](w, r)
+	if !ok {
+		return
+	}
+	pdf, rec, err := h.svc.GenerateReport(r.Context(), actorOf(r), id, in, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	if rec.Kind == ReportFull {
+		rec.Data = nil
+		httpapi.JSON(w, http.StatusAccepted, rec, nil)
+		return
+	}
+	w.Header().Set("X-Report-Id", rec.ID.String())
+	writePDF(w, reportFilename(*rec.Data), pdf)
+}
+
+func (h *Handler) listReports(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	read, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.ListReports(r.Context(), id, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) getReport(w http.ResponseWriter, r *http.Request) {
+	id, rid, read, ok := reportParams(w, r)
+	if !ok {
+		return
+	}
+	v, err := h.svc.GetReport(r.Context(), id, rid, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) downloadReport(w http.ResponseWriter, r *http.Request) {
+	id, rid, read, ok := reportParams(w, r)
+	if !ok {
+		return
+	}
+	dl, err := h.svc.DownloadReport(r.Context(), actorOf(r), id, rid, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	if dl.Stream == nil {
+		writePDF(w, dl.Name, dl.PDF)
+		return
+	}
+	defer func() { _ = dl.Stream.Close() }()
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+dl.Name+`"`)
+	w.Header().Set("Content-Length", strconv.FormatInt(dl.Size, 10))
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, dl.Stream) //nolint:gosec // PDF montado pelo servidor, servido como application/pdf; em fluxo, sem carregar na memória
+}
+
+func reportParams(w http.ResponseWriter, r *http.Request) (id, rid uuid.UUID, read authz.Decision, ok bool) {
+	id, err := idParam(r)
+	if err == nil {
+		rid, err = uuid.Parse(chi.URLParam(r, "rid"))
+		if err != nil {
+			err = httpapi.ErrNotFound()
+		}
+	}
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return id, rid, read, false
+	}
+	read, _ = admin.DecisionFrom(r.Context())
+	return id, rid, read, true
 }
 
 // decode lê o corpo e devolve a decisão de permissão da rota; num único passo para os handlers do ciclo de vida.

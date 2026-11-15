@@ -87,7 +87,7 @@ func newEnv(t *testing.T, mutate ...func(*config.Config)) *env {
 	store := storage.NewMemory()
 	signer := mtid.NewMemory()
 	conv := &fakeConverter{}
-	a, err := app.New(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)), pool, mail, app.WithStore(store), app.WithMTID(signer), app.WithPreviewConverter(conv), app.WithoutOutboxWorker())
+	a, err := app.New(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)), pool, mail, app.WithStore(store), app.WithMTID(signer), app.WithPreviewConverter(conv), app.WithoutOutboxWorker(), app.WithoutReportWorker())
 	require.NoError(t, err)
 	require.NoError(t, a.Start(ctx))
 	return &env{store: store, mtid: signer, conv: conv, t: t, h: a.Handler, pool: pool, mail: mail, cfg: cfg, authz: a.Authz, app: a, oidc: oidc}
