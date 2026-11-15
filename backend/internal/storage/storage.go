@@ -47,6 +47,9 @@ type Store interface {
 	// PutObject grava o objeto key com o conteúdo dado, sem passar pelo navegador (arquivos que o próprio servidor gera ou recebe de
 	// outro sistema). Substitui o objeto se já existir.
 	PutObject(ctx context.Context, key, contentType string, data []byte) error
+	// PutObjectStream grava o objeto lendo de r (de tamanho size, conhecido), sem carregá-lo inteiro na memória: serve a arquivos
+	// grandes que o servidor monta em disco (o relatório completo do projeto).
+	PutObjectStream(ctx context.Context, key, contentType string, r io.Reader, size int64) error
 	// Delete remove o objeto; remover um objeto inexistente não é erro.
 	Delete(ctx context.Context, key string) error
 }

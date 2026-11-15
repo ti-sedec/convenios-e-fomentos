@@ -39,6 +39,15 @@ func (m *Memory) PutObject(_ context.Context, key, contentType string, data []by
 	return nil
 }
 
+func (m *Memory) PutObjectStream(_ context.Context, key, contentType string, r io.Reader, _ int64) error {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	m.Put(key, contentType, data)
+	return nil
+}
+
 // Has indica se o objeto existe.
 func (m *Memory) Has(key string) bool {
 	m.mu.Lock()

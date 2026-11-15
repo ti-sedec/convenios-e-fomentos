@@ -174,6 +174,15 @@ func (s *S3) PutObject(ctx context.Context, key, contentType string, data []byte
 	return nil
 }
 
+func (s *S3) PutObjectStream(ctx context.Context, key, contentType string, r io.Reader, size int64) error {
+	// PartSize fixo e pequeno: o cliente guarda uma parte por vez na memória (o padrão é 16 MiB por parte).
+	_, err := s.internal.PutObject(ctx, s.bucket, key, r, size, minio.PutObjectOptions{ContentType: contentType, PartSize: 8 << 20, NumThreads: 1})
+	if err != nil {
+		return fmt.Errorf("storage: gravando: %w", err)
+	}
+	return nil
+}
+
 func (s *S3) Copy(ctx context.Context, src, dst string) error {
 	_, err := s.internal.CopyObject(ctx,
 		minio.CopyDestOptions{Bucket: s.bucket, Object: dst},
