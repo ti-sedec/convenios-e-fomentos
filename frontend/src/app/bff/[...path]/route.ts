@@ -17,7 +17,15 @@ import type { TokenPair } from '@/lib/api/types';
  * necessário.
  */
 
-const FORWARDED_RESPONSE_HEADERS = ['content-type', 'retry-after', 'x-request-id'];
+// content-disposition e content-length: o nome do arquivo e o tamanho dos downloads (relatórios em PDF) vêm da API.
+const FORWARDED_RESPONSE_HEADERS = [
+  'content-type',
+  'content-disposition',
+  'content-length',
+  'retry-after',
+  'x-request-id',
+  'x-report-id'
+];
 
 function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { status, code, message } }, { status });

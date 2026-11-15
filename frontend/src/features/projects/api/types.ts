@@ -15,6 +15,7 @@ export const projectActions = {
   reviewItem: 'admin::projects.review-item',
   assignDepartment: 'admin::projects.assign-department',
   reviewFraming: 'admin::projects.review-framing',
+  report: 'admin::projects.report',
   profileRead: 'admin::proponent-profile.read',
   profileUpdate: 'admin::proponent-profile.update'
 } as const;
@@ -323,6 +324,8 @@ export interface Project {
   /** Rodada de enquadramento em curso (pendente ou confirmada) e o histórico, da mais antiga à mais nova. */
   framing?: Framing;
   framings?: Framing[];
+  /** Se o relatório (PDF) pode ser gerado agora; ausente em rascunho. */
+  report?: ReportAccess;
   originProjectId: string;
   originCode: string;
   createdAt: string;
@@ -668,3 +671,72 @@ export interface Declaration {
   issues: DeclarationIssue[];
   current: DeclarationRecord | null;
 }
+
+/** Se o relatório do projeto pode ser gerado e, se não, por quê (o texto vem pronto do servidor). */
+export interface ReportAccess {
+  available: boolean;
+  reason?: string;
+}
+
+export type ReportKind = 'summary' | 'full';
+
+export type ReportStatus = 'queued' | 'running' | 'done' | 'failed';
+
+/** Arquivo que não entrou no relatório completo (o PDF traz uma página de aviso no lugar). */
+export interface ReportWarning {
+  document: string;
+  file: string;
+  reason: string;
+}
+
+/** Medições de uma montagem do relatório completo. */
+export interface ReportStats {
+  /** Maior uso de memória do processo da API durante a montagem, em bytes. */
+  peakRssBytes: number;
+  baselineRssBytes: number;
+  peakHeapBytes: number;
+  durationMs: number;
+  files: number;
+  inputBytes: number;
+  outputBytes: number;
+  pages: number;
+}
+
+/** Uma geração do histórico de relatórios. O resumido é refeito dos dados; o completo fica guardado por pouco tempo. */
+export interface ProjectReport {
+  id: string;
+  kind: ReportKind;
+  versionNumber: number;
+  pageNumbers: boolean;
+  coverSheets: boolean;
+  generatedAt: string;
+  generatedBy: string;
+  /** Mascarado. */
+  generatedByCpf: string;
+  pageCount: number;
+  sizeBytes: number;
+  sha256: string;
+  status: ReportStatus;
+  progressDone: number;
+  progressTotal: number;
+  /** O PDF ainda pode ser baixado (o completo vence depois de um tempo). */
+  downloadable: boolean;
+  expiresAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  warnings: ReportWarning[];
+  error: string;
+  stats?: ReportStats;
+}
+
+export const reportKindLabels: Record<ReportKind, string> = {
+  summary: 'Resumido',
+  full: 'Completo'
+};
+
+export const reportStatusLabels: Record<ReportStatus, string> = {
+  queued: 'Na fila',
+  running: 'Montando',
+  done: 'Pronto',
+  failed: 'Falhou'
+};

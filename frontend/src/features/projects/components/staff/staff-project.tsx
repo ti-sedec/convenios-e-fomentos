@@ -12,6 +12,7 @@ import {
   statusLabels,
   type Project
 } from '../../api/types';
+import { ProjectReportCard } from '../project-report-card';
 import { ProjectFull, sectionAnchor } from '../project-view/project-full';
 import { ProjectSummary } from '../project-view/project-summary';
 import { staffViewModeOf } from '../project-view/view-mode';
@@ -96,6 +97,7 @@ export function StaffProjectView({ project }: { project: Project }) {
       <ResponsibleNotice project={project} />
       <StaffBanner project={project} />
       <StaffActions project={project} />
+      <ProjectReportCard project={project} />
 
       <Tabs value={current.key} onValueChange={(v) => void setTab(v)}>
         <TabsList className='h-auto flex-wrap justify-start'>

@@ -8,6 +8,7 @@ import {
   getProject,
   getStageHistory,
   listMembers,
+  listReports,
   listProjects,
   type ListProjectsParams
 } from './service';
@@ -22,8 +23,18 @@ export const projectKeys = {
   history: (id: string) => [...projectKeys.all, 'history', id] as const,
   declaration: (id: string, code: string) => [...projectKeys.all, 'declaration', id, code] as const,
   members: (id: string) => [...projectKeys.all, 'members', id] as const,
+  reports: (id: string) => [...projectKeys.all, 'reports', id] as const,
   profile: () => ['proponent-profile'] as const
 };
+
+/** A lista atualiza sozinha enquanto há relatório completo na fila ou sendo montado. */
+export const reportsQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: projectKeys.reports(id),
+    queryFn: () => listReports(id),
+    refetchInterval: (query) =>
+      query.state.data?.some((r) => r.status === 'queued' || r.status === 'running') ? 3000 : false
+  });
 
 export const projectsQueryOptions = (params: ListProjectsParams = {}) =>
   queryOptions({ queryKey: projectKeys.list(params), queryFn: () => listProjects(params) });
