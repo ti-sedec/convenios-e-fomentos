@@ -106,6 +106,18 @@ type Config struct {
 	// Conversão de documentos do Word em PDF para exibição (Gotenberg). Vazio: só PDF e imagem são exibidos.
 	PreviewConverterURL string `env:"PREVIEW_CONVERTER_URL"`
 
+	// Relatório completo do projeto (PDF com os documentos juntados): montado em segundo plano, em arquivos temporários em disco.
+	// ReportTmpDir deve ser um diretório gravável em DISCO (num contêiner somente leitura, um volume; um tmpfs conta na memória).
+	// Vazio usa o diretório temporário do sistema. O limite de entrada protege a memória da API: a montagem usa cerca de duas vezes o
+	// tamanho dos arquivos em RAM (medido; ver docs/planejamento-relatorio-projeto.md). O limite efetivo é o MENOR entre este valor
+	// e o que cabe na memória do contêiner (ver project.inputBudget): com 512 MB de RAM a API foi morta por falta de memória a partir
+	// de ~150 MB de arquivos.
+	ReportTmpDir     string        `env:"REPORT_TMP_DIR"`
+	ReportMaxInputMB int           `env:"REPORT_MAX_INPUT_MB" envDefault:"200"`
+	ReportMaxPages   int           `env:"REPORT_MAX_PAGES" envDefault:"5000"`
+	ReportTimeout    time.Duration `env:"REPORT_TIMEOUT" envDefault:"15m"`
+	ReportRetention  time.Duration `env:"REPORT_RETENTION" envDefault:"24h"`
+
 	// Parâmetros do Argon2id (padrão recomendado pela OWASP: m=19 MiB, t=2, p=1).
 	Argon2MemoryKiB  uint32 `env:"ARGON2_MEMORY_KIB" envDefault:"19456"`
 	Argon2Iterations uint32 `env:"ARGON2_ITERATIONS" envDefault:"2"`

@@ -1,18 +1,33 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_TermoDeFomento" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.53.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
   <bpmn:collaboration id="Collaboration_TermoDeFomento">
-    <bpmn:participant id="Participant_TermoDeFomento" name="TERMO DE FOMENTO" processRef="Process_TermoDeFomento" />
-    <bpmn:participant id="Participant_Supervisor" name="Supervisor Administrador" />
-    <bpmn:messageFlow id="Message_EmailSupervisorRegular" name="E-mail: documentação regular" sourceRef="Task_EmailSupervisorRegular" targetRef="Participant_Supervisor" />
-    <bpmn:messageFlow id="Message_EmailSupervisorRecusa" name="E-mail: enquadramento recusado" sourceRef="Task_EmailSupervisorRecusa" targetRef="Participant_Supervisor" />
-  </bpmn:collaboration>
+    <bpmn:participant id="Participant_TermoDeFomento" name="TERMO DE FOMENTO" processRef="Process_TermoDeFomento"/>
+    <bpmn:participant id="Participant_Supervisor" name="Supervisor Administrador"/>
+    <bpmn:participant id="Participant_Sigadoc" name="SIGADOC (sistema externo)"/><bpmn:messageFlow id="Message_EmailSupervisorRegular" name="E-mail: documentação regular" sourceRef="Task_EmailSupervisorRegular" targetRef="Participant_Supervisor"/>
+    <bpmn:messageFlow id="Message_EmailSupervisorRecusa" name="E-mail: enquadramento recusado" sourceRef="Task_EmailSupervisorRecusa" targetRef="Participant_Supervisor"/>
+  <bpmn:messageFlow id="Msg_Termo" name="Modelo e campos do Termo" sourceRef="Task_PreencherTermo" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_ValidarPin" name="Validar o PIN" sourceRef="Task_ValidarPin" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_AssinarTermo" name="Assinar o Termo" sourceRef="Task_AssinarTermo" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_Autuar" name="Autuar o Termo" sourceRef="Task_AutuarTermo" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_NumeroProcesso" name="Número do processo" sourceRef="Participant_Sigadoc" targetRef="Task_AutuarTermo"/><bpmn:messageFlow id="Msg_CapturarRelatorio" name="Incluir o relatório" sourceRef="Task_CapturarRelatorio" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_AssinarRelatorio" name="Assinar o relatório" sourceRef="Task_AssinarRelatorio" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_CapturarDocumento" name="Incluir o documento" sourceRef="Task_CapturarDocumento" targetRef="Participant_Sigadoc"/><bpmn:messageFlow id="Msg_AssinarDocumento" name="Assinar o documento" sourceRef="Task_AssinarDocumento" targetRef="Participant_Sigadoc"/><bpmn:textAnnotation id="Ann_Fila"><bpmn:text>Antes, o projeto enquadrado ia para 'Aguardando parecer'. Agora ele volta à fila dos analistas e só avança quando um analista o assume.</bpmn:text></bpmn:textAnnotation><bpmn:association id="Assoc_Ann_Fila" sourceRef="Ann_Fila" targetRef="Task_DevolverFila"/><bpmn:textAnnotation id="Ann_Pin"><bpmn:text>O PIN é pedido uma única vez e usado em toda a montagem: assinar o Termo, o relatório e cada documento. Só existe na requisição e na memória da tarefa. Nunca é gravado (banco, fila, cache, logs, auditoria) e é descartado ao fim.</bpmn:text></bpmn:textAnnotation><bpmn:association id="Assoc_Ann_Pin" sourceRef="Ann_Pin" targetRef="Task_RegistrarTarefa"/><bpmn:textAnnotation id="Ann_Retomada"><bpmn:text>Se a API reiniciar ou algo falhar, o PIN se perde. O analista informa o PIN de novo e só o que ficou pendente é refeito: cada item é inserido e assinado uma única vez.</bpmn:text></bpmn:textAnnotation><bpmn:association id="Assoc_Ann_Retomada" sourceRef="Ann_Retomada" targetRef="Task_MarcarInterrompida"/><bpmn:group id="Group_Fase1" categoryValueRef="Value_Fase1"/><bpmn:group id="Group_Fase2" categoryValueRef="Value_Fase2"/><bpmn:group id="Group_Fase3" categoryValueRef="Value_Fase3"/></bpmn:collaboration>
   <bpmn:collaboration id="Collaboration_ArquivarProjeto">
-    <bpmn:participant id="Participant_ArquivarProjeto" name="Arquivar projeto e notificar interessados" processRef="Process_ArquivarProjeto" />
-    <bpmn:participant id="Participant_SupervisorArquivamento" name="Supervisor Administrador" />
-    <bpmn:messageFlow id="Message_ArquivamentoSupervisor" name="E-mail: projeto arquivado" sourceRef="Task_EmailArquivamento" targetRef="Participant_SupervisorArquivamento" />
+    <bpmn:participant id="Participant_ArquivarProjeto" name="Arquivar projeto e notificar interessados" processRef="Process_ArquivarProjeto"/>
+    <bpmn:participant id="Participant_SupervisorArquivamento" name="Supervisor Administrador"/>
+    <bpmn:messageFlow id="Message_ArquivamentoSupervisor" name="E-mail: projeto arquivado" sourceRef="Task_EmailArquivamento" targetRef="Participant_SupervisorArquivamento"/>
   </bpmn:collaboration>
-  <bpmn:process id="Process_TermoDeFomento" name="Cadastro, análise e enquadramento de projeto" isExecutable="false">
-    <bpmn:laneSet id="LaneSet_TermoDeFomento">
+  <bpmn:process id="Process_TermoDeFomento" name="Cadastro, análise, enquadramento e abertura do processo no SIGADOC" isExecutable="false">
+    <bpmn:documentation>Etapa final do fluxo: o projeto enquadrado retorna à fila dos analistas e, depois de assumido, ganha um processo no SIGADOC.
+
+O PIN do analista é pedido UMA ÚNICA VEZ, depois de ele conferir o Termo de Abertura. Com ele, uma tarefa em segundo plano assina o Termo, autua o processo e grava o número, gera o relatório (sem os documentos anexados), insere o relatório como documento capturado e o assina, e então insere cada documento anexado (também como documento capturado) e o assina, sempre com o mesmo PIN. O PIN só existe na requisição e na memória da tarefa e é descartado ao fim.
+
+Estágios propostos (a validar): awaiting_analyst (fila) -&gt; sigadoc_opening (Termo e PIN) -&gt; sigadoc_running (montagem em segundo plano) -&gt; pronto para o parecer técnico.
+
+PONTOS EM ABERTO:
+1. A API documentada em docs/sigadoc não expõe criar/capturar documento nem autuar processo (só PIN, modelos, consulta e assinatura). Confirmar com a MTI os endpoints.
+2. Autenticação no SIGADOC: com qual identidade/token o sistema age em nome do analista (o MT Login serve? /siga/login? x-road-client)?
+3. Quem preenche o Termo: o sistema pré-preenche (assumido) ou o analista?
+4. O relatório também é assinado (assumido: sim)?
+5. Limite de tentativas do PIN no SIGADOC e tamanho/quantidade máxima de arquivos por processo.
+6. Ordem e padrão de descrição dos documentos no processo.
+7. Take-over do projeto enquanto a montagem está em andamento.
+8. Desistência do Proponente e Negação do Secretário de Estado continuam aplicáveis e arquivam o projeto mesmo com processo aberto no SIGADOC: o que fazer com o processo lá?
+9. Retomada: se a montagem for interrompida o PIN se perde; o analista informa de novo e só os itens pendentes são refeitos.</bpmn:documentation><bpmn:laneSet id="LaneSet_TermoDeFomento">
       <bpmn:lane id="Lane_Proponente" name="Proponente">
         <bpmn:flowNodeRef>Start_ProjetoPrecisaSerSubmetido</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_PreencherFormulario</bpmn:flowNodeRef>
@@ -35,7 +50,7 @@
         <bpmn:flowNodeRef>End_SupervisorInformado</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_EncaminharRevisor</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_EmailSupervisorRecusa</bpmn:flowNodeRef>
-      </bpmn:lane>
+      <bpmn:flowNodeRef>Task_DevolverFila</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_PreencherTermo</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_ValidarPin</bpmn:flowNodeRef><bpmn:flowNodeRef>Gateway_PinValido</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_RegistrarTarefa</bpmn:flowNodeRef><bpmn:flowNodeRef>SubProcess_Montagem</bpmn:flowNodeRef><bpmn:flowNodeRef>Boundary_Falha</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_MarcarInterrompida</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_DescartarPin</bpmn:flowNodeRef><bpmn:flowNodeRef>Gateway_TudoAssinado</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_ConcluirEtapa</bpmn:flowNodeRef><bpmn:flowNodeRef>End_SegueParecer</bpmn:flowNodeRef></bpmn:lane>
       <bpmn:lane id="Lane_Analista" name="Analista">
         <bpmn:flowNodeRef>Task_IniciarAnalise</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_UniaoEnvios</bpmn:flowNodeRef>
@@ -44,13 +59,11 @@
         <bpmn:flowNodeRef>Task_DevolverComplementacao</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_ArquivarFaltaDocumentos</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_IndicarDepartamento</bpmn:flowNodeRef>
-      </bpmn:lane>
+      <bpmn:flowNodeRef>Event_AguardandoAnalista</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_AssumirProjeto</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_IniciarAbertura</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_ConferirTermo</bpmn:flowNodeRef><bpmn:flowNodeRef>Task_InformarPin</bpmn:flowNodeRef></bpmn:lane>
       <bpmn:lane id="Lane_RevisorDepartamento" name="Revisor do Departamento">
         <bpmn:flowNodeRef>Task_AnalisarEnquadramento</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_EnquadramentoCorreto</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Event_AguardandoParecer</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>End_SegueParecer</bpmn:flowNodeRef>
-      </bpmn:lane>
+        </bpmn:lane>
       <bpmn:lane id="Lane_SecretarioEstado" name="Secretário de Estado">
         <bpmn:documentation>Visualiza todos os projetos (somente leitura) e pode negar um projeto enviado a qualquer momento.</bpmn:documentation>
         <bpmn:flowNodeRef>SubProcess_Negacao</bpmn:flowNodeRef>
@@ -104,9 +117,9 @@
       <bpmn:endEvent id="End_Complementacao">
         <bpmn:incoming>Flow_ReenviarFim</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="Flow_ComplInicio" sourceRef="Start_Complementacao" targetRef="Task_ComplementarItens" />
-      <bpmn:sequenceFlow id="Flow_ComplementarReenviar" sourceRef="Task_ComplementarItens" targetRef="Task_ReenviarProjeto" />
-      <bpmn:sequenceFlow id="Flow_ReenviarFim" sourceRef="Task_ReenviarProjeto" targetRef="End_Complementacao" />
+      <bpmn:sequenceFlow id="Flow_ComplInicio" sourceRef="Start_Complementacao" targetRef="Task_ComplementarItens"/>
+      <bpmn:sequenceFlow id="Flow_ComplementarReenviar" sourceRef="Task_ComplementarItens" targetRef="Task_ReenviarProjeto"/>
+      <bpmn:sequenceFlow id="Flow_ReenviarFim" sourceRef="Task_ReenviarProjeto" targetRef="End_Complementacao"/>
     </bpmn:subProcess>
     <bpmn:boundaryEvent id="Event_PrazoComplementacao" name="Prazo vencido" attachedToRef="SubProcess_Complementacao">
       <bpmn:documentation>Se o Proponente não reenviar o projeto até o fim do prazo, o sistema arquiva o projeto. Um serviço do sistema confere os prazos a cada 5 minutos, e a conferência também acontece quando alguém consulta o projeto, de modo que o arquivamento não depende do serviço ter rodado.</bpmn:documentation>
@@ -116,10 +129,10 @@
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:subProcess id="SubProcess_Desistencia" name="Desistência do projeto" triggeredByEvent="true">
-      <bpmn:documentation>O Proponente (titular do projeto) pode desistir com confirmação e motivo. A desistência interrompe o processo e arquiva o projeto imediatamente, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
+      <bpmn:documentation>O Proponente (titular do projeto) pode desistir com confirmação e motivo. A desistência interrompe o processo e arquiva o projeto imediatamente, em qualquer etapa depois do envio, inclusive enquanto aguarda um analista assumir, durante a abertura do processo no SIGADOC e enquanto aguarda o parecer. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
       <bpmn:startEvent id="Start_Desistencia" name="Proponente decide desistir do projeto">
         <bpmn:outgoing>Flow_DesistenciaIniciar</bpmn:outgoing>
-        <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Desistencia" />
+        <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Desistencia"/>
       </bpmn:startEvent>
       <bpmn:userTask id="Task_ConfirmarDesistencia" name="Confirmar desistência e informar motivo">
         <bpmn:documentation>O sistema pede a confirmação da desistência e o motivo, ambos obrigatórios.</bpmn:documentation>
@@ -134,9 +147,9 @@
       <bpmn:endEvent id="End_ArquivadoDesistencia" name="Projeto arquivado">
         <bpmn:incoming>Flow_DesistenciaFim</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="Flow_DesistenciaIniciar" sourceRef="Start_Desistencia" targetRef="Task_ConfirmarDesistencia" />
-      <bpmn:sequenceFlow id="Flow_DesistenciaArquivar" sourceRef="Task_ConfirmarDesistencia" targetRef="Call_ArquivarDesistencia" />
-      <bpmn:sequenceFlow id="Flow_DesistenciaFim" sourceRef="Call_ArquivarDesistencia" targetRef="End_ArquivadoDesistencia" />
+      <bpmn:sequenceFlow id="Flow_DesistenciaIniciar" sourceRef="Start_Desistencia" targetRef="Task_ConfirmarDesistencia"/>
+      <bpmn:sequenceFlow id="Flow_DesistenciaArquivar" sourceRef="Task_ConfirmarDesistencia" targetRef="Call_ArquivarDesistencia"/>
+      <bpmn:sequenceFlow id="Flow_DesistenciaFim" sourceRef="Call_ArquivarDesistencia" targetRef="End_ArquivadoDesistencia"/>
     </bpmn:subProcess>
     <bpmn:sendTask id="Task_EmailRecebimento" name="Enviar e-mail de recebimento ao Proponente">
       <bpmn:documentation>O sistema envia um e-mail ao Proponente informando que o projeto foi recebido pela SEDEC, com o código do projeto.</bpmn:documentation>
@@ -233,21 +246,15 @@
       <bpmn:outgoing>Flow_EnquadramentoSim</bpmn:outgoing>
       <bpmn:outgoing>Flow_EnquadramentoNao</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:intermediateCatchEvent id="Event_AguardandoParecer" name="Aguardando parecer">
-      <bpmn:documentation>Etapa do projeto: Aguardando parecer. O projeto enquadrado NÃO está concluído: continua ativo e a Desistência do Proponente e a Negação do Secretário de Estado ainda se aplicam. O que acontece depois (parecer técnico, formalização e prestação de contas) será modelado à parte.</bpmn:documentation>
-      <bpmn:incoming>Flow_EnquadramentoSim</bpmn:incoming>
-      <bpmn:outgoing>Flow_AguardandoParecerFim</bpmn:outgoing>
-      <bpmn:messageEventDefinition id="MessageEventDefinition_Event_AguardandoParecer" />
-    </bpmn:intermediateCatchEvent>
     <bpmn:endEvent id="End_SegueParecer" name="Segue para o parecer técnico">
-      <bpmn:documentation>Fim do escopo deste diagrama.</bpmn:documentation>
-      <bpmn:incoming>Flow_AguardandoParecerFim</bpmn:incoming>
+      <bpmn:documentation>Fim do escopo deste diagrama. Com o processo do SIGADOC pronto (Termo assinado e autuado, relatório e documentos inseridos e assinados), o projeto segue para o parecer técnico, modelado à parte.</bpmn:documentation>
+      <bpmn:incoming>Flow_ConcluirFim</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:subProcess id="SubProcess_Negacao" name="Negação do projeto" triggeredByEvent="true">
-      <bpmn:documentation>O Secretário de Estado pode negar o projeto, sem passar por parecer, em qualquer etapa depois do envio, inclusive enquanto aguarda o parecer. A negação interrompe o processo e arquiva o projeto imediatamente. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
+      <bpmn:documentation>O Secretário de Estado pode negar o projeto, sem passar por parecer, em qualquer etapa depois do envio, inclusive enquanto aguarda um analista assumir, durante a abertura do processo no SIGADOC e enquanto aguarda o parecer. A negação interrompe o processo e arquiva o projeto imediatamente. Vale somente para projeto já enviado: rascunho não é arquivado nem negado, é excluído pelo Proponente (ver "Excluir rascunho").</bpmn:documentation>
       <bpmn:startEvent id="Start_Negacao" name="Secretário de Estado decide negar o projeto">
         <bpmn:outgoing>Flow_NegacaoIniciar</bpmn:outgoing>
-        <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Negacao" />
+        <bpmn:messageEventDefinition id="MessageEventDefinition_Start_Negacao"/>
       </bpmn:startEvent>
       <bpmn:userTask id="Task_NegarProjeto" name="Negar projeto e informar motivo">
         <bpmn:documentation>O motivo da negação é obrigatório.</bpmn:documentation>
@@ -262,41 +269,40 @@
       <bpmn:endEvent id="End_ArquivadoNegacao" name="Projeto arquivado">
         <bpmn:incoming>Flow_NegacaoFim</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="Flow_NegacaoIniciar" sourceRef="Start_Negacao" targetRef="Task_NegarProjeto" />
-      <bpmn:sequenceFlow id="Flow_NegacaoArquivar" sourceRef="Task_NegarProjeto" targetRef="Call_ArquivarNegacao" />
-      <bpmn:sequenceFlow id="Flow_NegacaoFim" sourceRef="Call_ArquivarNegacao" targetRef="End_ArquivadoNegacao" />
+      <bpmn:sequenceFlow id="Flow_NegacaoIniciar" sourceRef="Start_Negacao" targetRef="Task_NegarProjeto"/>
+      <bpmn:sequenceFlow id="Flow_NegacaoArquivar" sourceRef="Task_NegarProjeto" targetRef="Call_ArquivarNegacao"/>
+      <bpmn:sequenceFlow id="Flow_NegacaoFim" sourceRef="Call_ArquivarNegacao" targetRef="End_ArquivadoNegacao"/>
     </bpmn:subProcess>
-    <bpmn:sequenceFlow id="Flow_InicioPreencher" sourceRef="Start_ProjetoPrecisaSerSubmetido" targetRef="Task_PreencherFormulario" />
-    <bpmn:sequenceFlow id="Flow_PreencherDecidir" sourceRef="Task_PreencherFormulario" targetRef="Gateway_EnviarOuExcluir" />
-    <bpmn:sequenceFlow id="Flow_DecidirEnviar" name="Enviar" sourceRef="Gateway_EnviarOuExcluir" targetRef="Task_EnviarProjeto" />
-    <bpmn:sequenceFlow id="Flow_DecidirExcluir" name="Excluir" sourceRef="Gateway_EnviarOuExcluir" targetRef="Task_ExcluirRascunho" />
-    <bpmn:sequenceFlow id="Flow_ExcluirFim" sourceRef="Task_ExcluirRascunho" targetRef="End_RascunhoExcluido" />
-    <bpmn:sequenceFlow id="Flow_EnviarEmail" sourceRef="Task_EnviarProjeto" targetRef="Task_EmailRecebimento" />
-    <bpmn:sequenceFlow id="Flow_EmailRecebimentoIniciar" sourceRef="Task_EmailRecebimento" targetRef="Task_IniciarAnalise" />
-    <bpmn:sequenceFlow id="Flow_IniciarUniao" sourceRef="Task_IniciarAnalise" targetRef="Gateway_UniaoEnvios" />
-    <bpmn:sequenceFlow id="Flow_ComplementacaoEmail" sourceRef="SubProcess_Complementacao" targetRef="Task_EmailCorrecoes" />
-    <bpmn:sequenceFlow id="Flow_EmailCorrecoesUniao" sourceRef="Task_EmailCorrecoes" targetRef="Gateway_UniaoEnvios" />
-    <bpmn:sequenceFlow id="Flow_UniaoAnalisar" sourceRef="Gateway_UniaoEnvios" targetRef="Task_AnalisarInformacoes" />
-    <bpmn:sequenceFlow id="Flow_AnalisarResultado" sourceRef="Task_AnalisarInformacoes" targetRef="Gateway_ResultadoAnalise" />
-    <bpmn:sequenceFlow id="Flow_ResultadoComplementar" name="Itens a complementar" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_DevolverComplementacao" />
-    <bpmn:sequenceFlow id="Flow_ResultadoFaltaDocumentos" name="Falta documento obrigatório" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_ArquivarFaltaDocumentos" />
-    <bpmn:sequenceFlow id="Flow_ResultadoRegular" name="Regular" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_IndicarDepartamento" />
-    <bpmn:sequenceFlow id="Flow_DevolverEmail" sourceRef="Task_DevolverComplementacao" targetRef="Task_EmailProponente" />
-    <bpmn:sequenceFlow id="Flow_EmailComplementar" sourceRef="Task_EmailProponente" targetRef="SubProcess_Complementacao" />
-    <bpmn:sequenceFlow id="Flow_PrazoArquivar" sourceRef="Event_PrazoComplementacao" targetRef="Call_ArquivarProjeto" />
-    <bpmn:sequenceFlow id="Flow_FaltaDocumentosArquivar" sourceRef="Task_ArquivarFaltaDocumentos" targetRef="Call_ArquivarProjeto" />
-    <bpmn:sequenceFlow id="Flow_ArquivarFim" sourceRef="Call_ArquivarProjeto" targetRef="End_ProjetoArquivado" />
-    <bpmn:sequenceFlow id="Flow_IndicarDividir" sourceRef="Task_IndicarDepartamento" targetRef="Gateway_DividirEncaminhamento" />
-    <bpmn:sequenceFlow id="Flow_DividirEmailRegular" sourceRef="Gateway_DividirEncaminhamento" targetRef="Task_EmailSupervisorRegular" />
-    <bpmn:sequenceFlow id="Flow_DividirEncaminhar" sourceRef="Gateway_DividirEncaminhamento" targetRef="Task_EncaminharRevisor" />
-    <bpmn:sequenceFlow id="Flow_EmailRegularFim" sourceRef="Task_EmailSupervisorRegular" targetRef="End_SupervisorInformado" />
-    <bpmn:sequenceFlow id="Flow_EncaminharAnalisarEnquadramento" sourceRef="Task_EncaminharRevisor" targetRef="Task_AnalisarEnquadramento" />
-    <bpmn:sequenceFlow id="Flow_AnalisarEnquadramentoGateway" sourceRef="Task_AnalisarEnquadramento" targetRef="Gateway_EnquadramentoCorreto" />
-    <bpmn:sequenceFlow id="Flow_EnquadramentoSim" name="Sim" sourceRef="Gateway_EnquadramentoCorreto" targetRef="Event_AguardandoParecer" />
-    <bpmn:sequenceFlow id="Flow_EnquadramentoNao" name="Não" sourceRef="Gateway_EnquadramentoCorreto" targetRef="Task_EmailSupervisorRecusa" />
-    <bpmn:sequenceFlow id="Flow_RecusaAnalisar" sourceRef="Task_EmailSupervisorRecusa" targetRef="Task_AnalisarInformacoes" />
-    <bpmn:sequenceFlow id="Flow_AguardandoParecerFim" sourceRef="Event_AguardandoParecer" targetRef="End_SegueParecer" />
-  </bpmn:process>
+    <bpmn:sequenceFlow id="Flow_InicioPreencher" sourceRef="Start_ProjetoPrecisaSerSubmetido" targetRef="Task_PreencherFormulario"/>
+    <bpmn:sequenceFlow id="Flow_PreencherDecidir" sourceRef="Task_PreencherFormulario" targetRef="Gateway_EnviarOuExcluir"/>
+    <bpmn:sequenceFlow id="Flow_DecidirEnviar" name="Enviar" sourceRef="Gateway_EnviarOuExcluir" targetRef="Task_EnviarProjeto"/>
+    <bpmn:sequenceFlow id="Flow_DecidirExcluir" name="Excluir" sourceRef="Gateway_EnviarOuExcluir" targetRef="Task_ExcluirRascunho"/>
+    <bpmn:sequenceFlow id="Flow_ExcluirFim" sourceRef="Task_ExcluirRascunho" targetRef="End_RascunhoExcluido"/>
+    <bpmn:sequenceFlow id="Flow_EnviarEmail" sourceRef="Task_EnviarProjeto" targetRef="Task_EmailRecebimento"/>
+    <bpmn:sequenceFlow id="Flow_EmailRecebimentoIniciar" sourceRef="Task_EmailRecebimento" targetRef="Task_IniciarAnalise"/>
+    <bpmn:sequenceFlow id="Flow_IniciarUniao" sourceRef="Task_IniciarAnalise" targetRef="Gateway_UniaoEnvios"/>
+    <bpmn:sequenceFlow id="Flow_ComplementacaoEmail" sourceRef="SubProcess_Complementacao" targetRef="Task_EmailCorrecoes"/>
+    <bpmn:sequenceFlow id="Flow_EmailCorrecoesUniao" sourceRef="Task_EmailCorrecoes" targetRef="Gateway_UniaoEnvios"/>
+    <bpmn:sequenceFlow id="Flow_UniaoAnalisar" sourceRef="Gateway_UniaoEnvios" targetRef="Task_AnalisarInformacoes"/>
+    <bpmn:sequenceFlow id="Flow_AnalisarResultado" sourceRef="Task_AnalisarInformacoes" targetRef="Gateway_ResultadoAnalise"/>
+    <bpmn:sequenceFlow id="Flow_ResultadoComplementar" name="Itens a complementar" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_DevolverComplementacao"/>
+    <bpmn:sequenceFlow id="Flow_ResultadoFaltaDocumentos" name="Falta documento obrigatório" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_ArquivarFaltaDocumentos"/>
+    <bpmn:sequenceFlow id="Flow_ResultadoRegular" name="Regular" sourceRef="Gateway_ResultadoAnalise" targetRef="Task_IndicarDepartamento"/>
+    <bpmn:sequenceFlow id="Flow_DevolverEmail" sourceRef="Task_DevolverComplementacao" targetRef="Task_EmailProponente"/>
+    <bpmn:sequenceFlow id="Flow_EmailComplementar" sourceRef="Task_EmailProponente" targetRef="SubProcess_Complementacao"/>
+    <bpmn:sequenceFlow id="Flow_PrazoArquivar" sourceRef="Event_PrazoComplementacao" targetRef="Call_ArquivarProjeto"/>
+    <bpmn:sequenceFlow id="Flow_FaltaDocumentosArquivar" sourceRef="Task_ArquivarFaltaDocumentos" targetRef="Call_ArquivarProjeto"/>
+    <bpmn:sequenceFlow id="Flow_ArquivarFim" sourceRef="Call_ArquivarProjeto" targetRef="End_ProjetoArquivado"/>
+    <bpmn:sequenceFlow id="Flow_IndicarDividir" sourceRef="Task_IndicarDepartamento" targetRef="Gateway_DividirEncaminhamento"/>
+    <bpmn:sequenceFlow id="Flow_DividirEmailRegular" sourceRef="Gateway_DividirEncaminhamento" targetRef="Task_EmailSupervisorRegular"/>
+    <bpmn:sequenceFlow id="Flow_DividirEncaminhar" sourceRef="Gateway_DividirEncaminhamento" targetRef="Task_EncaminharRevisor"/>
+    <bpmn:sequenceFlow id="Flow_EmailRegularFim" sourceRef="Task_EmailSupervisorRegular" targetRef="End_SupervisorInformado"/>
+    <bpmn:sequenceFlow id="Flow_EncaminharAnalisarEnquadramento" sourceRef="Task_EncaminharRevisor" targetRef="Task_AnalisarEnquadramento"/>
+    <bpmn:sequenceFlow id="Flow_AnalisarEnquadramentoGateway" sourceRef="Task_AnalisarEnquadramento" targetRef="Gateway_EnquadramentoCorreto"/>
+    <bpmn:sequenceFlow id="Flow_EnquadramentoSim" name="Sim" sourceRef="Gateway_EnquadramentoCorreto" targetRef="Task_DevolverFila"/>
+    <bpmn:sequenceFlow id="Flow_EnquadramentoNao" name="Não" sourceRef="Gateway_EnquadramentoCorreto" targetRef="Task_EmailSupervisorRecusa"/>
+    <bpmn:sequenceFlow id="Flow_RecusaAnalisar" sourceRef="Task_EmailSupervisorRecusa" targetRef="Task_AnalisarInformacoes"/>
+    <bpmn:serviceTask id="Task_DevolverFila" name="Devolver o projeto à fila dos analistas"><bpmn:documentation>Novo estágio proposto: 'Aguardando analista' (ex.: awaiting_analyst). O projeto fica sem responsável e visível na fila da equipe. O responsável da análise anterior é liberado.</bpmn:documentation><bpmn:incoming>Flow_EnquadramentoSim</bpmn:incoming><bpmn:outgoing>Flow_DevolverAguardando</bpmn:outgoing></bpmn:serviceTask><bpmn:intermediateCatchEvent id="Event_AguardandoAnalista" name="Aguardando um analista assumir"><bpmn:documentation>Fila da equipe. Mesma regra de assumir/take-over que já existe na análise (planejamento-responsavel-pela-analise.md). A Desistência do Proponente e a Negação do Secretário de Estado continuam valendo nesta etapa.</bpmn:documentation><bpmn:incoming>Flow_DevolverAguardando</bpmn:incoming><bpmn:outgoing>Flow_AguardandoAssumir</bpmn:outgoing><bpmn:messageEventDefinition id="MessageEventDefinition_Event_AguardandoAnalista"/></bpmn:intermediateCatchEvent><bpmn:userTask id="Task_AssumirProjeto" name="Assumir o projeto"><bpmn:documentation>Só o analista responsável age a partir daqui. Outro analista só entra por take-over registrado no histórico.</bpmn:documentation><bpmn:incoming>Flow_AguardandoAssumir</bpmn:incoming><bpmn:outgoing>Flow_AssumirIniciar</bpmn:outgoing></bpmn:userTask><bpmn:userTask id="Task_IniciarAbertura" name="Iniciar a abertura do processo no SIGADOC"><bpmn:documentation>Ação explícita do analista; só para o responsável e enquanto não houver número de processo gravado.</bpmn:documentation><bpmn:incoming>Flow_AssumirIniciar</bpmn:incoming><bpmn:outgoing>Flow_IniciarPreencher</bpmn:outgoing></bpmn:userTask><bpmn:serviceTask id="Task_PreencherTermo" name="Preencher o Termo de Abertura (modelo SIGADOC)"><bpmn:documentation>PRESSUPOSTO a confirmar: o sistema pré-preenche os campos do modelo TERMO DE ABERTURA DE EXPEDIENTE/PROCESSO NO SIGADOC com os dados do projeto (GET /sigaex/modelos + POST /sigaex/modelos/{id}/processar-entrevista) e mostra o resultado para conferência. O Termo ainda NÃO é gravado, assinado nem autuado nesta etapa.</bpmn:documentation><bpmn:incoming>Flow_IniciarPreencher</bpmn:incoming><bpmn:outgoing>Flow_PreencherConferir</bpmn:outgoing></bpmn:serviceTask><bpmn:userTask id="Task_ConferirTermo" name="Conferir e ajustar o Termo"><bpmn:documentation>O analista revisa o conteúdo gerado antes de assinar.</bpmn:documentation><bpmn:incoming>Flow_PreencherConferir</bpmn:incoming><bpmn:outgoing>Flow_ConferirPin</bpmn:outgoing></bpmn:userTask><bpmn:userTask id="Task_InformarPin" name="Informar o PIN (uma única vez)"><bpmn:documentation>O PIN é digitado UMA ÚNICA VEZ e vale para toda a montagem: assinar o Termo, assinar o relatório e assinar cada documento inserido. Nunca é gravado (banco, fila, cache, logs, auditoria): vive só na requisição e na memória da tarefa em segundo plano e é descartado ao fim.</bpmn:documentation><bpmn:incoming>Flow_ConferirPin</bpmn:incoming><bpmn:incoming>Flow_PinNao</bpmn:incoming><bpmn:incoming>Flow_TudoNao</bpmn:incoming><bpmn:outgoing>Flow_PinValidar</bpmn:outgoing></bpmn:userTask><bpmn:serviceTask id="Task_ValidarPin" name="Validar o PIN no SIGADOC"><bpmn:documentation>POST /siga/pin/validar (pinBasicAuth = Base64(CPF:PIN)). Validar ANTES de iniciar a tarefa evita gastar tentativas do PIN dentro da montagem.</bpmn:documentation><bpmn:incoming>Flow_PinValidar</bpmn:incoming><bpmn:outgoing>Flow_ValidarGateway</bpmn:outgoing></bpmn:serviceTask><bpmn:exclusiveGateway id="Gateway_PinValido" name="PIN válido?"><bpmn:incoming>Flow_ValidarGateway</bpmn:incoming><bpmn:outgoing>Flow_PinSim</bpmn:outgoing><bpmn:outgoing>Flow_PinNao</bpmn:outgoing></bpmn:exclusiveGateway><bpmn:serviceTask id="Task_RegistrarTarefa" name="Registrar a tarefa e iniciá-la em segundo plano"><bpmn:documentation>Cria o registro da tarefa (sem o PIN): total de itens, concluídos, falhas, status em execução, início e responsável. Dispara a execução em memória (sem fila persistente) e responde de imediato ao analista, que acompanha o andamento e pode sair da tela.</bpmn:documentation><bpmn:incoming>Flow_PinSim</bpmn:incoming><bpmn:outgoing>Flow_RegistrarMontagem</bpmn:outgoing></bpmn:serviceTask><bpmn:subProcess id="SubProcess_Montagem" name="Montagem em segundo plano"><bpmn:documentation>Roda em segundo plano, UMA vez, com o PIN que o analista informou e que fica só na memória desta tarefa. A ordem é fixa: assinar o Termo, autuar e gravar o número do processo, gerar e inserir o relatório e então inserir cada documento anexado, assinando todos com o mesmo PIN. O andamento (n de N, falhas) fica visível ao analista. Se o processo da API morrer, o PIN se perde: a tarefa NÃO é retomada sozinha; o analista informa o PIN de novo e só o que ficou pendente é refeito (cada item é capturado e assinado uma única vez).</bpmn:documentation><bpmn:incoming>Flow_RegistrarMontagem</bpmn:incoming><bpmn:outgoing>Flow_MontagemDescartar</bpmn:outgoing><bpmn:startEvent id="Start_Montagem"><bpmn:outgoing>Flow_StartAssinarTermo</bpmn:outgoing></bpmn:startEvent><bpmn:serviceTask id="Task_AssinarTermo" name="Assinar o Termo com o PIN"><bpmn:documentation>POST /sigaex/documentos/{sigla}/assinar-com-pin com o PIN mantido só em memória.</bpmn:documentation><bpmn:incoming>Flow_StartAssinarTermo</bpmn:incoming><bpmn:outgoing>Flow_AssinarAutuar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_AutuarTermo" name="Autuar o Termo e obter o número do processo"><bpmn:documentation>ATENÇÃO: a API documentada em docs/sigadoc NÃO traz o endpoint de autuar (só lista os modelos em que se pode autuar: modelos-para-autuar). Precisa ser confirmado com a MTI. A resposta traz o número do processo.</bpmn:documentation><bpmn:incoming>Flow_AssinarAutuar</bpmn:incoming><bpmn:outgoing>Flow_AutuarGateway</bpmn:outgoing></bpmn:serviceTask><bpmn:exclusiveGateway id="Gateway_Autuado" name="Processo autuado?"><bpmn:incoming>Flow_AutuarGateway</bpmn:incoming><bpmn:outgoing>Flow_AutuadoSim</bpmn:outgoing><bpmn:outgoing>Flow_AutuadoNao</bpmn:outgoing></bpmn:exclusiveGateway><bpmn:serviceTask id="Task_GravarNumero" name="Gravar o número do processo SIGADOC"><bpmn:documentation>Grava o número no projeto (campo próprio, único, imutável depois de gravado) e registra no histórico de etapas. Com o número gravado, 'Iniciar a abertura' deixa de estar disponível (idempotência): numa nova tentativa a montagem pula esta parte.</bpmn:documentation><bpmn:incoming>Flow_AutuadoSim</bpmn:incoming><bpmn:outgoing>Flow_GravarGerar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_GerarRelatorio" name="Gerar o relatório (sem os documentos anexados)"><bpmn:documentation>Relatório resumido em PDF, gerado pelo sistema com as informações cadastradas no projeto, SEM os documentos anexados (docs/planejamento-relatorio-projeto.md).</bpmn:documentation><bpmn:incoming>Flow_GravarGerar</bpmn:incoming><bpmn:outgoing>Flow_GerarCapturar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_CapturarRelatorio" name="Capturar o relatório (modelo: documento capturado)"><bpmn:documentation>O relatório entra no processo como DOCUMENTO CAPTURADO: o modelo é escolhido em GET /sigaex/modelos (nomemodelo) e conferido em /sigaex/documentos/{sigla}/modelos-para-incluir. QUESTÃO: o endpoint de criar/capturar o documento não consta em docs/sigadoc.</bpmn:documentation><bpmn:incoming>Flow_GerarCapturar</bpmn:incoming><bpmn:outgoing>Flow_CapturarAssinar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_AssinarRelatorio" name="Assinar o relatório com o PIN"><bpmn:documentation>Mesmo PIN, mesma regra do Termo. PRESSUPOSTO: o relatório também é assinado (confirmar).</bpmn:documentation><bpmn:incoming>Flow_CapturarAssinar</bpmn:incoming><bpmn:outgoing>Flow_RelatorioDocs</bpmn:outgoing></bpmn:serviceTask><bpmn:subProcess id="SubProcess_Documentos" name="Para cada documento anexado"><bpmn:documentation>Multi-instância sequencial: preserva a ordem no processo e permite retomar do ponto onde parou. Ordem: a do checklist (emendas agrupadas), depois os documentos adicionais. A descrição de cada documento segue um padrão para facilitar a busca no SIGADOC: «&lt;Tipo do documento&gt; — &lt;proponente ou emenda&gt; — &lt;referência/vigência&gt;».</bpmn:documentation><bpmn:incoming>Flow_RelatorioDocs</bpmn:incoming><bpmn:outgoing>Flow_DocsEnd</bpmn:outgoing><bpmn:multiInstanceLoopCharacteristics isSequential="true"/><bpmn:startEvent id="Start_Doc"><bpmn:outgoing>Flow_StartDocObter</bpmn:outgoing></bpmn:startEvent><bpmn:serviceTask id="Task_ObterArquivo" name="Obter o arquivo guardado"><bpmn:documentation>Lê do MinIO. Word e imagem são convertidos para PDF antes (a mesma conversão do relatório completo).</bpmn:documentation><bpmn:incoming>Flow_StartDocObter</bpmn:incoming><bpmn:outgoing>Flow_ObterCapturar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_CapturarDocumento" name="Capturar o documento (modelo: documento capturado)"><bpmn:documentation>O documento é incluído como DOCUMENTO CAPTURADO, com a descrição padronizada. QUESTÃO: o endpoint de criar/capturar o documento não consta em docs/sigadoc.</bpmn:documentation><bpmn:incoming>Flow_ObterCapturar</bpmn:incoming><bpmn:outgoing>Flow_CapturarDocAssinar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_AssinarDocumento" name="Assinar o documento com o PIN"><bpmn:documentation>POST /sigaex/documentos/{sigla}/assinar-com-pin com o mesmo PIN, mantido só em memória. Cada documento é assinado logo depois de inserido.</bpmn:documentation><bpmn:incoming>Flow_CapturarDocAssinar</bpmn:incoming><bpmn:outgoing>Flow_AssinarDocRegistrar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_RegistrarDocumento" name="Registrar a sigla e o resultado"><bpmn:documentation>Guarda a sigla devolvida pelo SIGADOC e o estado do item (inserido, assinado ou falhou). Uma falha num documento não interrompe os demais.</bpmn:documentation><bpmn:incoming>Flow_AssinarDocRegistrar</bpmn:incoming><bpmn:outgoing>Flow_RegistrarEndDoc</bpmn:outgoing></bpmn:serviceTask><bpmn:endEvent id="End_Doc"><bpmn:incoming>Flow_RegistrarEndDoc</bpmn:incoming></bpmn:endEvent><bpmn:sequenceFlow id="Flow_StartDocObter" sourceRef="Start_Doc" targetRef="Task_ObterArquivo"/><bpmn:sequenceFlow id="Flow_ObterCapturar" sourceRef="Task_ObterArquivo" targetRef="Task_CapturarDocumento"/><bpmn:sequenceFlow id="Flow_CapturarDocAssinar" sourceRef="Task_CapturarDocumento" targetRef="Task_AssinarDocumento"/><bpmn:sequenceFlow id="Flow_AssinarDocRegistrar" sourceRef="Task_AssinarDocumento" targetRef="Task_RegistrarDocumento"/><bpmn:sequenceFlow id="Flow_RegistrarEndDoc" sourceRef="Task_RegistrarDocumento" targetRef="End_Doc"/></bpmn:subProcess><bpmn:endEvent id="End_Montagem"><bpmn:incoming>Flow_DocsEnd</bpmn:incoming></bpmn:endEvent><bpmn:endEvent id="End_FalhaAbertura" name="Falha na abertura do processo"><bpmn:documentation>O SIGADOC recusou assinar ou autuar o Termo (PIN recusado, modelo inativo, serviço fora do ar). Nada foi gravado como número de processo.</bpmn:documentation><bpmn:incoming>Flow_AutuadoNao</bpmn:incoming><bpmn:errorEventDefinition id="ErrorEventDefinition_End_FalhaAbertura" errorRef="Error_FalhaAbertura"/></bpmn:endEvent><bpmn:sequenceFlow id="Flow_StartAssinarTermo" sourceRef="Start_Montagem" targetRef="Task_AssinarTermo"/><bpmn:sequenceFlow id="Flow_AssinarAutuar" sourceRef="Task_AssinarTermo" targetRef="Task_AutuarTermo"/><bpmn:sequenceFlow id="Flow_AutuarGateway" sourceRef="Task_AutuarTermo" targetRef="Gateway_Autuado"/><bpmn:sequenceFlow id="Flow_AutuadoSim" sourceRef="Gateway_Autuado" targetRef="Task_GravarNumero"/><bpmn:sequenceFlow id="Flow_AutuadoNao" sourceRef="Gateway_Autuado" targetRef="End_FalhaAbertura"/><bpmn:sequenceFlow id="Flow_GravarGerar" sourceRef="Task_GravarNumero" targetRef="Task_GerarRelatorio"/><bpmn:sequenceFlow id="Flow_GerarCapturar" sourceRef="Task_GerarRelatorio" targetRef="Task_CapturarRelatorio"/><bpmn:sequenceFlow id="Flow_CapturarAssinar" sourceRef="Task_CapturarRelatorio" targetRef="Task_AssinarRelatorio"/><bpmn:sequenceFlow id="Flow_RelatorioDocs" sourceRef="Task_AssinarRelatorio" targetRef="SubProcess_Documentos"/><bpmn:sequenceFlow id="Flow_DocsEnd" sourceRef="SubProcess_Documentos" targetRef="End_Montagem"/></bpmn:subProcess><bpmn:boundaryEvent id="Boundary_Falha" name="Falha do SIGADOC ou do servidor" cancelActivity="true" attachedToRef="SubProcess_Montagem"><bpmn:documentation>Pega qualquer erro da montagem: falha na abertura do processo, SIGADOC fora do ar, API reiniciada ou memória do servidor esgotada. Como o PIN só existe em memória, a tarefa NÃO é retomada sozinha.</bpmn:documentation><bpmn:outgoing>Flow_FalhaMarcar</bpmn:outgoing><bpmn:errorEventDefinition id="ErrorEventDefinition_Boundary_Falha"/></bpmn:boundaryEvent><bpmn:serviceTask id="Task_MarcarInterrompida" name="Marcar a tarefa como interrompida"><bpmn:documentation>Registra no andamento o que já foi concluído (número do processo, itens inseridos e assinados) para a retomada refazer só o que falta.</bpmn:documentation><bpmn:incoming>Flow_FalhaMarcar</bpmn:incoming><bpmn:outgoing>Flow_MarcarDescartar</bpmn:outgoing></bpmn:serviceTask><bpmn:serviceTask id="Task_DescartarPin" name="Descartar o PIN da memória e de qualquer cache"><bpmn:documentation>Executa SEMPRE ao fim da tarefa (sucesso, falha ou interrupção). O PIN nunca vai para banco, fila, cache, log, trilha de auditoria ou mensagem de erro; o buffer em memória é zerado.</bpmn:documentation><bpmn:incoming>Flow_MontagemDescartar</bpmn:incoming><bpmn:incoming>Flow_MarcarDescartar</bpmn:incoming><bpmn:outgoing>Flow_DescartarGateway</bpmn:outgoing></bpmn:serviceTask><bpmn:exclusiveGateway id="Gateway_TudoAssinado" name="Tudo inserido e assinado?"><bpmn:incoming>Flow_DescartarGateway</bpmn:incoming><bpmn:outgoing>Flow_TudoSim</bpmn:outgoing><bpmn:outgoing>Flow_TudoNao</bpmn:outgoing></bpmn:exclusiveGateway><bpmn:serviceTask id="Task_ConcluirEtapa" name="Concluir a etapa e liberar para o parecer técnico"><bpmn:documentation>Marca o processo SIGADOC como pronto, registra no histórico e avança o projeto. O parecer técnico será modelado à parte.</bpmn:documentation><bpmn:incoming>Flow_TudoSim</bpmn:incoming><bpmn:outgoing>Flow_ConcluirFim</bpmn:outgoing></bpmn:serviceTask><bpmn:sequenceFlow id="Flow_DevolverAguardando" sourceRef="Task_DevolverFila" targetRef="Event_AguardandoAnalista"/><bpmn:sequenceFlow id="Flow_AguardandoAssumir" sourceRef="Event_AguardandoAnalista" targetRef="Task_AssumirProjeto"/><bpmn:sequenceFlow id="Flow_AssumirIniciar" sourceRef="Task_AssumirProjeto" targetRef="Task_IniciarAbertura"/><bpmn:sequenceFlow id="Flow_IniciarPreencher" sourceRef="Task_IniciarAbertura" targetRef="Task_PreencherTermo"/><bpmn:sequenceFlow id="Flow_PreencherConferir" sourceRef="Task_PreencherTermo" targetRef="Task_ConferirTermo"/><bpmn:sequenceFlow id="Flow_ConferirPin" sourceRef="Task_ConferirTermo" targetRef="Task_InformarPin"/><bpmn:sequenceFlow id="Flow_PinValidar" sourceRef="Task_InformarPin" targetRef="Task_ValidarPin"/><bpmn:sequenceFlow id="Flow_ValidarGateway" sourceRef="Task_ValidarPin" targetRef="Gateway_PinValido"/><bpmn:sequenceFlow id="Flow_PinSim" sourceRef="Gateway_PinValido" targetRef="Task_RegistrarTarefa" name="Sim"/><bpmn:sequenceFlow id="Flow_PinNao" sourceRef="Gateway_PinValido" targetRef="Task_InformarPin" name="Não"/><bpmn:sequenceFlow id="Flow_RegistrarMontagem" sourceRef="Task_RegistrarTarefa" targetRef="SubProcess_Montagem"/><bpmn:sequenceFlow id="Flow_MontagemDescartar" sourceRef="SubProcess_Montagem" targetRef="Task_DescartarPin"/><bpmn:sequenceFlow id="Flow_FalhaMarcar" sourceRef="Boundary_Falha" targetRef="Task_MarcarInterrompida"/><bpmn:sequenceFlow id="Flow_MarcarDescartar" sourceRef="Task_MarcarInterrompida" targetRef="Task_DescartarPin"/><bpmn:sequenceFlow id="Flow_DescartarGateway" sourceRef="Task_DescartarPin" targetRef="Gateway_TudoAssinado"/><bpmn:sequenceFlow id="Flow_TudoSim" sourceRef="Gateway_TudoAssinado" targetRef="Task_ConcluirEtapa" name="Sim"/><bpmn:sequenceFlow id="Flow_TudoNao" sourceRef="Gateway_TudoAssinado" targetRef="Task_InformarPin" name="Não — retomar os pendentes"/><bpmn:sequenceFlow id="Flow_ConcluirFim" sourceRef="Task_ConcluirEtapa" targetRef="End_SegueParecer"/></bpmn:process>
   <bpmn:process id="Process_ArquivarProjeto" name="Arquivar projeto e notificar interessados" isExecutable="false">
     <bpmn:startEvent id="Start_ArquivamentoSolicitado" name="Arquivamento solicitado">
       <bpmn:documentation>Quem solicitou (sistema, Analista, Proponente ou Secretário de Estado) já informou o motivo.</bpmn:documentation>
@@ -315,459 +321,441 @@
     <bpmn:endEvent id="End_ProjetoArquivadoNotificado" name="Projeto arquivado">
       <bpmn:incoming>Flow_ArqNotificar</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_ArqIniciar" sourceRef="Start_ArquivamentoSolicitado" targetRef="Task_ArquivarProjetoSistema" />
-    <bpmn:sequenceFlow id="Flow_ArqArquivar" sourceRef="Task_ArquivarProjetoSistema" targetRef="Task_EmailArquivamento" />
-    <bpmn:sequenceFlow id="Flow_ArqNotificar" sourceRef="Task_EmailArquivamento" targetRef="End_ProjetoArquivadoNotificado" />
+    <bpmn:sequenceFlow id="Flow_ArqIniciar" sourceRef="Start_ArquivamentoSolicitado" targetRef="Task_ArquivarProjetoSistema"/>
+    <bpmn:sequenceFlow id="Flow_ArqArquivar" sourceRef="Task_ArquivarProjetoSistema" targetRef="Task_EmailArquivamento"/>
+    <bpmn:sequenceFlow id="Flow_ArqNotificar" sourceRef="Task_EmailArquivamento" targetRef="End_ProjetoArquivadoNotificado"/>
   </bpmn:process>
-  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+  <bpmn:error id="Error_FalhaAbertura" name="Falha na abertura do processo" errorCode="SIGADOC_ABERTURA"/><bpmn:category id="Category_FasesSigadoc"><bpmn:categoryValue id="Value_Fase1" value="1. Fila e Termo de Abertura"/><bpmn:categoryValue id="Value_Fase2" value="2. PIN (uma única vez)"/><bpmn:categoryValue id="Value_Fase3" value="3. Processo no SIGADOC (em segundo plano)"/></bpmn:category><bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_TermoDeFomento">
       <bpmndi:BPMNShape id="Participant_TermoDeFomento_di" bpmnElement="Participant_TermoDeFomento" isHorizontal="true">
-        <dc:Bounds x="130" y="160" width="2370" height="1240" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="130" y="160" width="6352" height="1450"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_SecretarioEstado_di" bpmnElement="Lane_SecretarioEstado" isHorizontal="true">
-        <dc:Bounds x="160" y="1220" width="2340" height="180" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="1430" width="6322" height="180"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_RevisorDepartamento_di" bpmnElement="Lane_RevisorDepartamento" isHorizontal="true">
-        <dc:Bounds x="160" y="1040" width="2340" height="180" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="1250" width="6322" height="180"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Analista_di" bpmnElement="Lane_Analista" isHorizontal="true">
-        <dc:Bounds x="160" y="680" width="2340" height="360" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="890" width="6322" height="360"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Sistema_di" bpmnElement="Lane_Sistema" isHorizontal="true">
-        <dc:Bounds x="160" y="420" width="2340" height="260" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="420" width="6322" height="470"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Proponente_di" bpmnElement="Lane_Proponente" isHorizontal="true">
-        <dc:Bounds x="160" y="160" width="2340" height="260" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="160" width="6322" height="260"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_ProjetoPrecisaSerSubmetido_di" bpmnElement="Start_ProjetoPrecisaSerSubmetido">
-        <dc:Bounds x="232" y="232" width="36" height="36" />
+        <dc:Bounds x="232" y="232" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="205" y="273" width="85" height="54" />
+          <dc:Bounds x="190" y="273" width="85" height="54"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_PreencherFormulario_di" bpmnElement="Task_PreencherFormulario">
-        <dc:Bounds x="290" y="210" width="100" height="80" />
+        <dc:Bounds x="290" y="210" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_EnviarOuExcluir_di" bpmnElement="Gateway_EnviarOuExcluir" isMarkerVisible="true">
-        <dc:Bounds x="415" y="225" width="50" height="50" />
+        <dc:Bounds x="415" y="225" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="402" y="195" width="76" height="27" />
+          <dc:Bounds x="402" y="195" width="76" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EnviarProjeto_di" bpmnElement="Task_EnviarProjeto">
-        <dc:Bounds x="510" y="210" width="100" height="80" />
+        <dc:Bounds x="510" y="210" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ExcluirRascunho_di" bpmnElement="Task_ExcluirRascunho">
-        <dc:Bounds x="290" y="320" width="100" height="80" />
+        <dc:Bounds x="290" y="320" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_RascunhoExcluido_di" bpmnElement="End_RascunhoExcluido">
-        <dc:Bounds x="232" y="342" width="36" height="36" />
+        <dc:Bounds x="232" y="342" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="210" y="381" width="80" height="27" />
+          <dc:Bounds x="210" y="381" width="80" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Complementacao_di" bpmnElement="SubProcess_Complementacao" isExpanded="true">
-        <dc:Bounds x="700" y="185" width="500" height="130" />
+        <dc:Bounds x="700" y="185" width="500" height="130"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_Complementacao_di" bpmnElement="Start_Complementacao">
-        <dc:Bounds x="722" y="232" width="36" height="36" />
+        <dc:Bounds x="722" y="232" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ComplementarItens_di" bpmnElement="Task_ComplementarItens">
-        <dc:Bounds x="790" y="210" width="100" height="80" />
+        <dc:Bounds x="790" y="210" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ReenviarProjeto_di" bpmnElement="Task_ReenviarProjeto">
-        <dc:Bounds x="960" y="210" width="100" height="80" />
+        <dc:Bounds x="960" y="210" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_Complementacao_di" bpmnElement="End_Complementacao">
-        <dc:Bounds x="1112" y="232" width="36" height="36" />
+        <dc:Bounds x="1112" y="232" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_ComplInicio_di" bpmnElement="Flow_ComplInicio">
-        <di:waypoint x="758" y="250" />
-        <di:waypoint x="790" y="250" />
+        <di:waypoint x="758" y="250"/>
+        <di:waypoint x="790" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ComplementarReenviar_di" bpmnElement="Flow_ComplementarReenviar">
-        <di:waypoint x="890" y="250" />
-        <di:waypoint x="960" y="250" />
+        <di:waypoint x="890" y="250"/>
+        <di:waypoint x="960" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ReenviarFim_di" bpmnElement="Flow_ReenviarFim">
-        <di:waypoint x="1060" y="250" />
-        <di:waypoint x="1112" y="250" />
+        <di:waypoint x="1060" y="250"/>
+        <di:waypoint x="1112" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="SubProcess_Desistencia_di" bpmnElement="SubProcess_Desistencia" isExpanded="true">
-        <dc:Bounds x="1990" y="180" width="470" height="150" />
+        <dc:Bounds x="1990" y="180" width="470" height="150"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_Desistencia_di" bpmnElement="Start_Desistencia">
-        <dc:Bounds x="2012" y="237" width="36" height="36" />
+        <dc:Bounds x="2012" y="237" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1995" y="276" width="80" height="40" />
+          <dc:Bounds x="1995" y="276" width="80" height="40"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ConfirmarDesistencia_di" bpmnElement="Task_ConfirmarDesistencia">
-        <dc:Bounds x="2100" y="215" width="100" height="80" />
+        <dc:Bounds x="2100" y="215" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Call_ArquivarDesistencia_di" bpmnElement="Call_ArquivarDesistencia">
-        <dc:Bounds x="2240" y="215" width="100" height="80" />
+        <dc:Bounds x="2240" y="215" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ArquivadoDesistencia_di" bpmnElement="End_ArquivadoDesistencia">
-        <dc:Bounds x="2402" y="237" width="36" height="36" />
+        <dc:Bounds x="2402" y="237" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="2392" y="276" width="60" height="27" />
+          <dc:Bounds x="2365" y="276" width="60" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_DesistenciaIniciar_di" bpmnElement="Flow_DesistenciaIniciar">
-        <di:waypoint x="2048" y="255" />
-        <di:waypoint x="2100" y="255" />
+        <di:waypoint x="2048" y="255"/>
+        <di:waypoint x="2100" y="255"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DesistenciaArquivar_di" bpmnElement="Flow_DesistenciaArquivar">
-        <di:waypoint x="2200" y="255" />
-        <di:waypoint x="2240" y="255" />
+        <di:waypoint x="2200" y="255"/>
+        <di:waypoint x="2240" y="255"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DesistenciaFim_di" bpmnElement="Flow_DesistenciaFim">
-        <di:waypoint x="2340" y="255" />
-        <di:waypoint x="2402" y="255" />
+        <di:waypoint x="2340" y="255"/>
+        <di:waypoint x="2402" y="255"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Task_EmailRecebimento_di" bpmnElement="Task_EmailRecebimento">
-        <dc:Bounds x="510" y="450" width="100" height="80" />
+        <dc:Bounds x="510" y="450" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EmailCorrecoes_di" bpmnElement="Task_EmailCorrecoes">
-        <dc:Bounds x="670" y="450" width="100" height="80" />
+        <dc:Bounds x="670" y="450" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EmailProponente_di" bpmnElement="Task_EmailProponente">
-        <dc:Bounds x="1100" y="450" width="100" height="80" />
+        <dc:Bounds x="1100" y="450" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Call_ArquivarProjeto_di" bpmnElement="Call_ArquivarProjeto">
-        <dc:Bounds x="1230" y="450" width="100" height="80" />
+        <dc:Bounds x="1230" y="450" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ProjetoArquivado_di" bpmnElement="End_ProjetoArquivado">
-        <dc:Bounds x="1390" y="472" width="36" height="36" />
+        <dc:Bounds x="1390" y="472" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1378" y="513" width="60" height="27" />
+          <dc:Bounds x="1378" y="513" width="60" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_DividirEncaminhamento_di" bpmnElement="Gateway_DividirEncaminhamento">
-        <dc:Bounds x="1595" y="565" width="50" height="50" />
+        <dc:Bounds x="1595" y="565" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EmailSupervisorRegular_di" bpmnElement="Task_EmailSupervisorRegular">
-        <dc:Bounds x="1680" y="450" width="100" height="80" />
+        <dc:Bounds x="1680" y="450" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_SupervisorInformado_di" bpmnElement="End_SupervisorInformado">
-        <dc:Bounds x="1832" y="472" width="36" height="36" />
+        <dc:Bounds x="1832" y="472" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1810" y="513" width="80" height="40" />
+          <dc:Bounds x="1810" y="513" width="80" height="40"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EncaminharRevisor_di" bpmnElement="Task_EncaminharRevisor">
-        <dc:Bounds x="1680" y="550" width="100" height="80" />
+        <dc:Bounds x="1680" y="550" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EmailSupervisorRecusa_di" bpmnElement="Task_EmailSupervisorRecusa">
-        <dc:Bounds x="1390" y="550" width="100" height="80" />
+        <dc:Bounds x="1390" y="550" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_IniciarAnalise_di" bpmnElement="Task_IniciarAnalise">
-        <dc:Bounds x="510" y="800" width="100" height="80" />
+        <dc:Bounds x="510" y="1010" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_UniaoEnvios_di" bpmnElement="Gateway_UniaoEnvios" isMarkerVisible="true">
-        <dc:Bounds x="695" y="815" width="50" height="50" />
+        <dc:Bounds x="695" y="1025" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_AnalisarInformacoes_di" bpmnElement="Task_AnalisarInformacoes">
-        <dc:Bounds x="800" y="800" width="100" height="80" />
+        <dc:Bounds x="800" y="1010" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_ResultadoAnalise_di" bpmnElement="Gateway_ResultadoAnalise" isMarkerVisible="true">
-        <dc:Bounds x="945" y="815" width="50" height="50" />
+        <dc:Bounds x="945" y="1025" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="880" y="763" width="85" height="27" />
+          <dc:Bounds x="880" y="973" width="85" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_DevolverComplementacao_di" bpmnElement="Task_DevolverComplementacao">
-        <dc:Bounds x="1100" y="690" width="100" height="80" />
+        <dc:Bounds x="1100" y="900" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ArquivarFaltaDocumentos_di" bpmnElement="Task_ArquivarFaltaDocumentos">
-        <dc:Bounds x="1100" y="800" width="100" height="80" />
+        <dc:Bounds x="1100" y="1010" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_IndicarDepartamento_di" bpmnElement="Task_IndicarDepartamento">
-        <dc:Bounds x="1100" y="910" width="100" height="80" />
+        <dc:Bounds x="1100" y="1120" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_AnalisarEnquadramento_di" bpmnElement="Task_AnalisarEnquadramento">
-        <dc:Bounds x="1680" y="1090" width="100" height="80" />
+        <dc:Bounds x="1680" y="1300" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_EnquadramentoCorreto_di" bpmnElement="Gateway_EnquadramentoCorreto" isMarkerVisible="true">
-        <dc:Bounds x="1415" y="1105" width="50" height="50" />
+        <dc:Bounds x="1415" y="1315" width="50" height="50"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1395" y="1163" width="90" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_AguardandoParecer_di" bpmnElement="Event_AguardandoParecer">
-        <dc:Bounds x="1304" y="1112" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1282" y="1153" width="80" height="27" />
+          <dc:Bounds x="1315" y="1327" width="90" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_SegueParecer_di" bpmnElement="End_SegueParecer">
-        <dc:Bounds x="1202" y="1112" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1170" y="1153" width="100" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
+        <dc:Bounds x="6314" y="547" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="6290.15" y="586" width="83.7078" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="SubProcess_Negacao_di" bpmnElement="SubProcess_Negacao" isExpanded="true">
-        <dc:Bounds x="260" y="1245" width="470" height="150" />
+        <dc:Bounds x="260" y="1455" width="470" height="150"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_Negacao_di" bpmnElement="Start_Negacao">
-        <dc:Bounds x="282" y="1302" width="36" height="36" />
+        <dc:Bounds x="282" y="1512" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="265" y="1341" width="80" height="40" />
+          <dc:Bounds x="265" y="1551" width="80" height="40"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_NegarProjeto_di" bpmnElement="Task_NegarProjeto">
-        <dc:Bounds x="370" y="1280" width="100" height="80" />
+        <dc:Bounds x="370" y="1490" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Call_ArquivarNegacao_di" bpmnElement="Call_ArquivarNegacao">
-        <dc:Bounds x="510" y="1280" width="100" height="80" />
+        <dc:Bounds x="510" y="1490" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ArquivadoNegacao_di" bpmnElement="End_ArquivadoNegacao">
-        <dc:Bounds x="672" y="1302" width="36" height="36" />
+        <dc:Bounds x="672" y="1512" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="662" y="1341" width="60" height="27" />
+          <dc:Bounds x="640" y="1551" width="60" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_NegacaoIniciar_di" bpmnElement="Flow_NegacaoIniciar">
-        <di:waypoint x="318" y="1320" />
-        <di:waypoint x="370" y="1320" />
+        <di:waypoint x="318" y="1530"/>
+        <di:waypoint x="370" y="1530"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_NegacaoArquivar_di" bpmnElement="Flow_NegacaoArquivar">
-        <di:waypoint x="470" y="1320" />
-        <di:waypoint x="510" y="1320" />
+        <di:waypoint x="470" y="1530"/>
+        <di:waypoint x="510" y="1530"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_NegacaoFim_di" bpmnElement="Flow_NegacaoFim">
-        <di:waypoint x="610" y="1320" />
-        <di:waypoint x="672" y="1320" />
+        <di:waypoint x="610" y="1530"/>
+        <di:waypoint x="672" y="1530"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Event_PrazoComplementacao_di" bpmnElement="Event_PrazoComplementacao">
-        <dc:Bounds x="1182" y="232" width="36" height="36" />
+        <dc:Bounds x="1182" y="232" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1222" y="222" width="70" height="27" />
+          <dc:Bounds x="1222" y="222" width="70" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_InicioPreencher_di" bpmnElement="Flow_InicioPreencher">
-        <di:waypoint x="268" y="250" />
-        <di:waypoint x="290" y="250" />
+        <di:waypoint x="268" y="250"/>
+        <di:waypoint x="290" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_PreencherDecidir_di" bpmnElement="Flow_PreencherDecidir">
-        <di:waypoint x="390" y="250" />
-        <di:waypoint x="415" y="250" />
+        <di:waypoint x="390" y="250"/>
+        <di:waypoint x="415" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DecidirEnviar_di" bpmnElement="Flow_DecidirEnviar">
-        <di:waypoint x="465" y="250" />
-        <di:waypoint x="510" y="250" />
+        <di:waypoint x="465" y="250"/>
+        <di:waypoint x="510" y="250"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="468" y="230" width="40" height="14" />
+          <dc:Bounds x="468" y="230" width="40" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DecidirExcluir_di" bpmnElement="Flow_DecidirExcluir">
-        <di:waypoint x="440" y="275" />
-        <di:waypoint x="440" y="360" />
-        <di:waypoint x="390" y="360" />
+        <di:waypoint x="440" y="275"/>
+        <di:waypoint x="440" y="360"/>
+        <di:waypoint x="390" y="360"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="446" y="300" width="45" height="14" />
+          <dc:Bounds x="446" y="300" width="45" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ExcluirFim_di" bpmnElement="Flow_ExcluirFim">
-        <di:waypoint x="290" y="360" />
-        <di:waypoint x="268" y="360" />
+        <di:waypoint x="290" y="360"/>
+        <di:waypoint x="268" y="360"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EnviarEmail_di" bpmnElement="Flow_EnviarEmail">
-        <di:waypoint x="560" y="290" />
-        <di:waypoint x="560" y="450" />
+        <di:waypoint x="560" y="290"/>
+        <di:waypoint x="560" y="450"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EmailRecebimentoIniciar_di" bpmnElement="Flow_EmailRecebimentoIniciar">
-        <di:waypoint x="560" y="530" />
-        <di:waypoint x="560" y="800" />
+        <di:waypoint x="560" y="530"/>
+        <di:waypoint x="560" y="1010"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_IniciarUniao_di" bpmnElement="Flow_IniciarUniao">
-        <di:waypoint x="610" y="840" />
-        <di:waypoint x="695" y="840" />
+        <di:waypoint x="610" y="1050"/>
+        <di:waypoint x="695" y="1050"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ComplementacaoEmail_di" bpmnElement="Flow_ComplementacaoEmail">
-        <di:waypoint x="720" y="315" />
-        <di:waypoint x="720" y="450" />
+        <di:waypoint x="720" y="315"/>
+        <di:waypoint x="720" y="450"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EmailCorrecoesUniao_di" bpmnElement="Flow_EmailCorrecoesUniao">
-        <di:waypoint x="720" y="530" />
-        <di:waypoint x="720" y="815" />
+        <di:waypoint x="720" y="530"/>
+        <di:waypoint x="720" y="1025"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_UniaoAnalisar_di" bpmnElement="Flow_UniaoAnalisar">
-        <di:waypoint x="745" y="840" />
-        <di:waypoint x="800" y="840" />
+        <di:waypoint x="745" y="1050"/>
+        <di:waypoint x="800" y="1050"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_AnalisarResultado_di" bpmnElement="Flow_AnalisarResultado">
-        <di:waypoint x="900" y="840" />
-        <di:waypoint x="945" y="840" />
+        <di:waypoint x="900" y="1050"/>
+        <di:waypoint x="945" y="1050"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ResultadoComplementar_di" bpmnElement="Flow_ResultadoComplementar">
-        <di:waypoint x="970" y="815" />
-        <di:waypoint x="970" y="730" />
-        <di:waypoint x="1100" y="730" />
+        <di:waypoint x="970" y="1025"/>
+        <di:waypoint x="970" y="940"/>
+        <di:waypoint x="1100" y="940"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="976" y="734" width="120" height="14" />
+          <dc:Bounds x="976" y="944" width="120" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ResultadoFaltaDocumentos_di" bpmnElement="Flow_ResultadoFaltaDocumentos">
-        <di:waypoint x="995" y="840" />
-        <di:waypoint x="1100" y="840" />
+        <di:waypoint x="995" y="1050"/>
+        <di:waypoint x="1100" y="1050"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1000" y="844" width="95" height="27" />
+          <dc:Bounds x="1000" y="1054" width="95" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ResultadoRegular_di" bpmnElement="Flow_ResultadoRegular">
-        <di:waypoint x="970" y="865" />
-        <di:waypoint x="970" y="950" />
-        <di:waypoint x="1100" y="950" />
+        <di:waypoint x="970" y="1075"/>
+        <di:waypoint x="970" y="1160"/>
+        <di:waypoint x="1100" y="1160"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="976" y="932" width="50" height="14" />
+          <dc:Bounds x="976" y="1142" width="50" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DevolverEmail_di" bpmnElement="Flow_DevolverEmail">
-        <di:waypoint x="1150" y="690" />
-        <di:waypoint x="1150" y="530" />
+        <di:waypoint x="1150" y="900"/>
+        <di:waypoint x="1150" y="530"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EmailComplementar_di" bpmnElement="Flow_EmailComplementar">
-        <di:waypoint x="1150" y="450" />
-        <di:waypoint x="1150" y="315" />
+        <di:waypoint x="1150" y="450"/>
+        <di:waypoint x="1150" y="315"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_PrazoArquivar_di" bpmnElement="Flow_PrazoArquivar">
-        <di:waypoint x="1218" y="250" />
-        <di:waypoint x="1280" y="250" />
-        <di:waypoint x="1280" y="450" />
+        <di:waypoint x="1218" y="250"/>
+        <di:waypoint x="1280" y="250"/>
+        <di:waypoint x="1280" y="450"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_FaltaDocumentosArquivar_di" bpmnElement="Flow_FaltaDocumentosArquivar">
-        <di:waypoint x="1200" y="840" />
-        <di:waypoint x="1280" y="840" />
-        <di:waypoint x="1280" y="530" />
+        <di:waypoint x="1200" y="1050"/>
+        <di:waypoint x="1280" y="1050"/>
+        <di:waypoint x="1280" y="530"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ArquivarFim_di" bpmnElement="Flow_ArquivarFim">
-        <di:waypoint x="1330" y="490" />
-        <di:waypoint x="1390" y="490" />
+        <di:waypoint x="1330" y="490"/>
+        <di:waypoint x="1390" y="490"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_IndicarDividir_di" bpmnElement="Flow_IndicarDividir">
-        <di:waypoint x="1200" y="950" />
-        <di:waypoint x="1620" y="950" />
-        <di:waypoint x="1620" y="615" />
+        <di:waypoint x="1200" y="1160"/>
+        <di:waypoint x="1620" y="1160"/>
+        <di:waypoint x="1620" y="615"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DividirEmailRegular_di" bpmnElement="Flow_DividirEmailRegular">
-        <di:waypoint x="1620" y="565" />
-        <di:waypoint x="1620" y="490" />
-        <di:waypoint x="1680" y="490" />
+        <di:waypoint x="1620" y="565"/>
+        <di:waypoint x="1620" y="490"/>
+        <di:waypoint x="1680" y="490"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_DividirEncaminhar_di" bpmnElement="Flow_DividirEncaminhar">
-        <di:waypoint x="1645" y="590" />
-        <di:waypoint x="1680" y="590" />
+        <di:waypoint x="1645" y="590"/>
+        <di:waypoint x="1680" y="590"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EmailRegularFim_di" bpmnElement="Flow_EmailRegularFim">
-        <di:waypoint x="1780" y="490" />
-        <di:waypoint x="1832" y="490" />
+        <di:waypoint x="1780" y="490"/>
+        <di:waypoint x="1832" y="490"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EncaminharAnalisarEnquadramento_di" bpmnElement="Flow_EncaminharAnalisarEnquadramento">
-        <di:waypoint x="1730" y="630" />
-        <di:waypoint x="1730" y="1090" />
+        <di:waypoint x="1730" y="630"/>
+        <di:waypoint x="1730" y="1300"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_AnalisarEnquadramentoGateway_di" bpmnElement="Flow_AnalisarEnquadramentoGateway">
-        <di:waypoint x="1680" y="1130" />
-        <di:waypoint x="1465" y="1130" />
+        <di:waypoint x="1680" y="1340"/>
+        <di:waypoint x="1465" y="1340"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EnquadramentoSim_di" bpmnElement="Flow_EnquadramentoSim">
-        <di:waypoint x="1415" y="1130" />
-        <di:waypoint x="1340" y="1130" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1362" y="1112" width="20" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
+        <di:waypoint x="1440" y="1365"/><di:waypoint x="1440" y="1400"/><di:waypoint x="2570" y="1400"/><di:waypoint x="2570" y="565"/><di:waypoint x="2600" y="565"/><bpmndi:BPMNLabel><dc:Bounds x="1445" y="1368" width="28" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_EnquadramentoNao_di" bpmnElement="Flow_EnquadramentoNao">
-        <di:waypoint x="1440" y="1105" />
-        <di:waypoint x="1440" y="630" />
+        <di:waypoint x="1440" y="1315"/>
+        <di:waypoint x="1440" y="630"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1446" y="1060" width="24" height="14" />
+          <dc:Bounds x="1446" y="1270" width="24" height="14"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_RecusaAnalisar_di" bpmnElement="Flow_RecusaAnalisar">
-        <di:waypoint x="1390" y="590" />
-        <di:waypoint x="1350" y="590" />
-        <di:waypoint x="1350" y="1010" />
-        <di:waypoint x="850" y="1010" />
-        <di:waypoint x="850" y="880" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_AguardandoParecerFim_di" bpmnElement="Flow_AguardandoParecerFim">
-        <di:waypoint x="1304" y="1130" />
-        <di:waypoint x="1238" y="1130" />
+        <di:waypoint x="1390" y="590"/>
+        <di:waypoint x="1350" y="590"/>
+        <di:waypoint x="1350" y="1220"/>
+        <di:waypoint x="850" y="1220"/>
+        <di:waypoint x="850" y="1090"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Participant_Supervisor_di" bpmnElement="Participant_Supervisor" isHorizontal="true">
-        <dc:Bounds x="1300" y="40" width="700" height="60" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="1300" y="40" width="700" height="60"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Message_EmailSupervisorRegular_di" bpmnElement="Message_EmailSupervisorRegular">
-        <di:waypoint x="1730" y="450" />
-        <di:waypoint x="1730" y="100" />
+        <di:waypoint x="1730" y="450"/>
+        <di:waypoint x="1730" y="100"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1736" y="190" width="90" height="40" />
+          <dc:Bounds x="1736" y="190" width="90" height="40"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Message_EmailSupervisorRecusa_di" bpmnElement="Message_EmailSupervisorRecusa">
-        <di:waypoint x="1460" y="550" />
-        <di:waypoint x="1460" y="100" />
+        <di:waypoint x="1460" y="550"/>
+        <di:waypoint x="1460" y="100"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1466" y="190" width="90" height="40" />
+          <dc:Bounds x="1466" y="190" width="90" height="40"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-    </bpmndi:BPMNPlane>
+    <bpmndi:BPMNShape id="Participant_Sigadoc_di" bpmnElement="Participant_Sigadoc" isHorizontal="true"><dc:Bounds x="2560" y="40" width="3922" height="60"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_DevolverFila_di" bpmnElement="Task_DevolverFila"><dc:Bounds x="2600" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Event_AguardandoAnalista_di" bpmnElement="Event_AguardandoAnalista"><dc:Bounds x="2770" y="1052" width="36" height="36"/><bpmndi:BPMNLabel><dc:Bounds x="2743.88" y="1091" width="88.2318" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_AssumirProjeto_di" bpmnElement="Task_AssumirProjeto"><dc:Bounds x="2860" y="1030" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_IniciarAbertura_di" bpmnElement="Task_IniciarAbertura"><dc:Bounds x="3010" y="1030" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_PreencherTermo_di" bpmnElement="Task_PreencherTermo"><dc:Bounds x="3160" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_ConferirTermo_di" bpmnElement="Task_ConferirTermo"><dc:Bounds x="3320" y="1030" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_InformarPin_di" bpmnElement="Task_InformarPin"><dc:Bounds x="3470" y="1030" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_ValidarPin_di" bpmnElement="Task_ValidarPin"><dc:Bounds x="3620" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Gateway_PinValido_di" bpmnElement="Gateway_PinValido" isMarkerVisible="true"><dc:Bounds x="3770" y="540" width="50" height="50"/><bpmndi:BPMNLabel><dc:Bounds x="3763.19" y="521.5" width="63.6176" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_RegistrarTarefa_di" bpmnElement="Task_RegistrarTarefa"><dc:Bounds x="3870" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="SubProcess_Montagem_di" bpmnElement="SubProcess_Montagem" isExpanded="true"><dc:Bounds x="4040" y="470" width="1804" height="260"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Start_Montagem_di" bpmnElement="Start_Montagem"><dc:Bounds x="4065" y="547" width="36" height="36"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_AssinarTermo_di" bpmnElement="Task_AssinarTermo"><dc:Bounds x="4131" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_AutuarTermo_di" bpmnElement="Task_AutuarTermo"><dc:Bounds x="4261" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Gateway_Autuado_di" bpmnElement="Gateway_Autuado" isMarkerVisible="true"><dc:Bounds x="4391" y="540" width="50" height="50"/><bpmndi:BPMNLabel><dc:Bounds x="4389.69" y="508" width="52.6222" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_GravarNumero_di" bpmnElement="Task_GravarNumero"><dc:Bounds x="4471" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_GerarRelatorio_di" bpmnElement="Task_GerarRelatorio"><dc:Bounds x="4601" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_CapturarRelatorio_di" bpmnElement="Task_CapturarRelatorio"><dc:Bounds x="4831" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_AssinarRelatorio_di" bpmnElement="Task_AssinarRelatorio"><dc:Bounds x="4961" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="SubProcess_Documentos_di" bpmnElement="SubProcess_Documentos" isExpanded="true"><dc:Bounds x="5091" y="495" width="662" height="140"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Start_Doc_di" bpmnElement="Start_Doc"><dc:Bounds x="5111" y="547" width="36" height="36"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_ObterArquivo_di" bpmnElement="Task_ObterArquivo"><dc:Bounds x="5177" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_CapturarDocumento_di" bpmnElement="Task_CapturarDocumento"><dc:Bounds x="5307" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_AssinarDocumento_di" bpmnElement="Task_AssinarDocumento"><dc:Bounds x="5437" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_RegistrarDocumento_di" bpmnElement="Task_RegistrarDocumento"><dc:Bounds x="5567" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="End_Doc_di" bpmnElement="End_Doc"><dc:Bounds x="5697" y="547" width="36" height="36"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="End_Montagem_di" bpmnElement="End_Montagem"><dc:Bounds x="5783" y="547" width="36" height="36"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="End_FalhaAbertura_di" bpmnElement="End_FalhaAbertura"><dc:Bounds x="4398" y="657" width="36" height="36"/><bpmndi:BPMNLabel><dc:Bounds x="4367.98" y="696" width="96.0324" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Boundary_Falha_di" bpmnElement="Boundary_Falha"><dc:Bounds x="4924" y="712" width="36" height="36"/><bpmndi:BPMNLabel><dc:Bounds x="4896.9" y="666.5" width="90.1907" height="42.5"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_MarcarInterrompida_di" bpmnElement="Task_MarcarInterrompida"><dc:Bounds x="4892" y="785" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_DescartarPin_di" bpmnElement="Task_DescartarPin"><dc:Bounds x="5914" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="Gateway_TudoAssinado_di" bpmnElement="Gateway_TudoAssinado" isMarkerVisible="true"><dc:Bounds x="6064" y="540" width="50" height="50"/><bpmndi:BPMNLabel><dc:Bounds x="6046.82" y="508" width="84.3607" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Task_ConcluirEtapa_di" bpmnElement="Task_ConcluirEtapa"><dc:Bounds x="6164" y="525" width="100" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNEdge id="Flow_DevolverAguardando_di" bpmnElement="Flow_DevolverAguardando"><di:waypoint x="2700" y="565"/><di:waypoint x="2735" y="565"/><di:waypoint x="2735" y="1070"/><di:waypoint x="2770" y="1070"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AguardandoAssumir_di" bpmnElement="Flow_AguardandoAssumir"><di:waypoint x="2806" y="1070"/><di:waypoint x="2860" y="1070"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AssumirIniciar_di" bpmnElement="Flow_AssumirIniciar"><di:waypoint x="2960" y="1070"/><di:waypoint x="3010" y="1070"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_IniciarPreencher_di" bpmnElement="Flow_IniciarPreencher"><di:waypoint x="3110" y="1070"/><di:waypoint x="3135" y="1070"/><di:waypoint x="3135" y="565"/><di:waypoint x="3160" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_PreencherConferir_di" bpmnElement="Flow_PreencherConferir"><di:waypoint x="3260" y="565"/><di:waypoint x="3290" y="565"/><di:waypoint x="3290" y="1070"/><di:waypoint x="3320" y="1070"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_ConferirPin_di" bpmnElement="Flow_ConferirPin"><di:waypoint x="3420" y="1070"/><di:waypoint x="3470" y="1070"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_PinValidar_di" bpmnElement="Flow_PinValidar"><di:waypoint x="3570" y="1070"/><di:waypoint x="3595" y="1070"/><di:waypoint x="3595" y="565"/><di:waypoint x="3620" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_ValidarGateway_di" bpmnElement="Flow_ValidarGateway"><di:waypoint x="3720" y="565"/><di:waypoint x="3770" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_PinSim_di" bpmnElement="Flow_PinSim"><di:waypoint x="3820" y="565"/><di:waypoint x="3870" y="565"/><bpmndi:BPMNLabel><dc:Bounds x="3822" y="545.5" width="24.0785" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_PinNao_di" bpmnElement="Flow_PinNao"><di:waypoint x="3795" y="590"/><di:waypoint x="3795" y="700"/><di:waypoint x="3500" y="700"/><di:waypoint x="3500" y="1030"/><bpmndi:BPMNLabel><dc:Bounds x="3800" y="592" width="25.3844" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_RegistrarMontagem_di" bpmnElement="Flow_RegistrarMontagem"><di:waypoint x="3970" y="565"/><di:waypoint x="4040" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_StartAssinarTermo_di" bpmnElement="Flow_StartAssinarTermo"><di:waypoint x="4101" y="565"/><di:waypoint x="4131" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AssinarAutuar_di" bpmnElement="Flow_AssinarAutuar"><di:waypoint x="4231" y="565"/><di:waypoint x="4261" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AutuarGateway_di" bpmnElement="Flow_AutuarGateway"><di:waypoint x="4361" y="565"/><di:waypoint x="4391" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AutuadoSim_di" bpmnElement="Flow_AutuadoSim"><di:waypoint x="4441" y="565"/><di:waypoint x="4471" y="565"/><bpmndi:BPMNLabel><dc:Bounds x="4443" y="545.5" width="24.0785" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AutuadoNao_di" bpmnElement="Flow_AutuadoNao"><di:waypoint x="4416" y="590"/><di:waypoint x="4416" y="657"/><bpmndi:BPMNLabel><dc:Bounds x="4421" y="592" width="25.3844" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_GravarGerar_di" bpmnElement="Flow_GravarGerar"><di:waypoint x="4571" y="565"/><di:waypoint x="4601" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_GerarCapturar_di" bpmnElement="Flow_GerarCapturar"><di:waypoint x="4701" y="565"/><di:waypoint x="4831" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_CapturarAssinar_di" bpmnElement="Flow_CapturarAssinar"><di:waypoint x="4931" y="565"/><di:waypoint x="4961" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_RelatorioDocs_di" bpmnElement="Flow_RelatorioDocs"><di:waypoint x="5061" y="565"/><di:waypoint x="5091" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_StartDocObter_di" bpmnElement="Flow_StartDocObter"><di:waypoint x="5147" y="565"/><di:waypoint x="5177" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_ObterCapturar_di" bpmnElement="Flow_ObterCapturar"><di:waypoint x="5277" y="565"/><di:waypoint x="5307" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_CapturarDocAssinar_di" bpmnElement="Flow_CapturarDocAssinar"><di:waypoint x="5407" y="565"/><di:waypoint x="5437" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_AssinarDocRegistrar_di" bpmnElement="Flow_AssinarDocRegistrar"><di:waypoint x="5537" y="565"/><di:waypoint x="5567" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_RegistrarEndDoc_di" bpmnElement="Flow_RegistrarEndDoc"><di:waypoint x="5667" y="565"/><di:waypoint x="5697" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_DocsEnd_di" bpmnElement="Flow_DocsEnd"><di:waypoint x="5753" y="565"/><di:waypoint x="5783" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_MontagemDescartar_di" bpmnElement="Flow_MontagemDescartar"><di:waypoint x="5844" y="565"/><di:waypoint x="5914" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_FalhaMarcar_di" bpmnElement="Flow_FalhaMarcar"><di:waypoint x="4942" y="748"/><di:waypoint x="4942" y="785"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_MarcarDescartar_di" bpmnElement="Flow_MarcarDescartar"><di:waypoint x="4992" y="825"/><di:waypoint x="5964" y="825"/><di:waypoint x="5964" y="605"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_DescartarGateway_di" bpmnElement="Flow_DescartarGateway"><di:waypoint x="6014" y="565"/><di:waypoint x="6064" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_TudoSim_di" bpmnElement="Flow_TudoSim"><di:waypoint x="6114" y="565"/><di:waypoint x="6164" y="565"/><bpmndi:BPMNLabel><dc:Bounds x="6116" y="545.5" width="24.0785" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_TudoNao_di" bpmnElement="Flow_TudoNao"><di:waypoint x="6089" y="590"/><di:waypoint x="6089" y="1150"/><di:waypoint x="3540" y="1150"/><di:waypoint x="3540" y="1110"/><bpmndi:BPMNLabel><dc:Bounds x="6094" y="612" width="99.2505" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Flow_ConcluirFim_di" bpmnElement="Flow_ConcluirFim"><di:waypoint x="6264" y="565"/><di:waypoint x="6314" y="565"/></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_Termo_di" bpmnElement="Msg_Termo"><di:waypoint x="3210" y="525"/><di:waypoint x="3210" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="3216" y="176" width="96.0207" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_ValidarPin_di" bpmnElement="Msg_ValidarPin"><di:waypoint x="3670" y="525"/><di:waypoint x="3670" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="3676" y="176" width="72.6891" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_AssinarTermo_di" bpmnElement="Msg_AssinarTermo"><di:waypoint x="4181" y="525"/><di:waypoint x="4181" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="4187" y="176" width="89.5261" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_Autuar_di" bpmnElement="Msg_Autuar"><di:waypoint x="4289" y="525"/><di:waypoint x="4289" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="4198" y="204" width="85.002" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_NumeroProcesso_di" bpmnElement="Msg_NumeroProcesso"><di:waypoint x="4333" y="100"/><di:waypoint x="4333" y="525"/><bpmndi:BPMNLabel><dc:Bounds x="4339" y="176" width="61.6704" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_CapturarRelatorio_di" bpmnElement="Msg_CapturarRelatorio"><di:waypoint x="4843" y="525"/><di:waypoint x="4843" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="4849" y="176" width="90.1791" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_AssinarRelatorio_di" bpmnElement="Msg_AssinarRelatorio"><di:waypoint x="5049" y="525"/><di:waypoint x="5049" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="5055" y="176" width="97.9563" height="15.5"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_CapturarDocumento_di" bpmnElement="Msg_CapturarDocumento"><di:waypoint x="5319" y="525"/><di:waypoint x="5319" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="5325" y="176" width="61.682" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNEdge id="Msg_AssinarDocumento_di" bpmnElement="Msg_AssinarDocumento"><di:waypoint x="5525" y="525"/><di:waypoint x="5525" y="100"/><bpmndi:BPMNLabel><dc:Bounds x="5531" y="176" width="61.682" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge><bpmndi:BPMNShape id="Ann_Fila_di" bpmnElement="Ann_Fila"><dc:Bounds x="2600" y="440" width="250" height="56"/></bpmndi:BPMNShape><bpmndi:BPMNEdge id="Assoc_Ann_Fila_di" bpmnElement="Assoc_Ann_Fila"><di:waypoint x="2650" y="496"/><di:waypoint x="2650" y="525"/></bpmndi:BPMNEdge><bpmndi:BPMNShape id="Ann_Pin_di" bpmnElement="Ann_Pin"><dc:Bounds x="3610" y="775" width="375" height="86"/></bpmndi:BPMNShape><bpmndi:BPMNEdge id="Assoc_Ann_Pin_di" bpmnElement="Assoc_Ann_Pin"><di:waypoint x="3920" y="775"/><di:waypoint x="3920" y="605"/></bpmndi:BPMNEdge><bpmndi:BPMNShape id="Ann_Retomada_di" bpmnElement="Ann_Retomada"><dc:Bounds x="4752" y="1005" width="380" height="62"/></bpmndi:BPMNShape><bpmndi:BPMNEdge id="Assoc_Ann_Retomada_di" bpmnElement="Assoc_Ann_Retomada"><di:waypoint x="4942" y="1005"/><di:waypoint x="4942" y="865"/></bpmndi:BPMNEdge><bpmndi:BPMNShape id="Group_Fase1_di" bpmnElement="Group_Fase1"><dc:Bounds x="2540" y="430" width="900" height="815"/><bpmndi:BPMNLabel><dc:Bounds x="2584" y="1208" width="90" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Group_Fase2_di" bpmnElement="Group_Fase2"><dc:Bounds x="3450" y="430" width="540" height="815"/><bpmndi:BPMNLabel><dc:Bounds x="3462" y="1208" width="90" height="29"/></bpmndi:BPMNLabel></bpmndi:BPMNShape><bpmndi:BPMNShape id="Group_Fase3_di" bpmnElement="Group_Fase3"><dc:Bounds x="4010" y="430" width="2402" height="815"/><bpmndi:BPMNLabel><dc:Bounds x="4022" y="1194.5" width="90" height="42.5"/></bpmndi:BPMNLabel></bpmndi:BPMNShape></bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
   <bpmndi:BPMNDiagram id="BPMNDiagram_Arquivar">
     <bpmndi:BPMNPlane id="BPMNPlane_Arquivar" bpmnElement="Collaboration_ArquivarProjeto">
       <bpmndi:BPMNShape id="Participant_ArquivarProjeto_di" bpmnElement="Participant_ArquivarProjeto" isHorizontal="true">
-        <dc:Bounds x="160" y="120" width="700" height="160" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="160" y="120" width="700" height="160"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Participant_SupervisorArquivamento_di" bpmnElement="Participant_SupervisorArquivamento" isHorizontal="true">
-        <dc:Bounds x="350" y="10" width="400" height="60" />
-        <bpmndi:BPMNLabel />
+        <dc:Bounds x="350" y="10" width="400" height="60"/>
+        <bpmndi:BPMNLabel/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Start_ArquivamentoSolicitado_di" bpmnElement="Start_ArquivamentoSolicitado">
-        <dc:Bounds x="232" y="182" width="36" height="36" />
+        <dc:Bounds x="232" y="182" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="200" y="223" width="100" height="27" />
+          <dc:Bounds x="200" y="223" width="100" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ArquivarProjetoSistema_di" bpmnElement="Task_ArquivarProjetoSistema">
-        <dc:Bounds x="340" y="160" width="100" height="80" />
+        <dc:Bounds x="340" y="160" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_EmailArquivamento_di" bpmnElement="Task_EmailArquivamento">
-        <dc:Bounds x="500" y="160" width="100" height="80" />
+        <dc:Bounds x="500" y="160" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="End_ProjetoArquivadoNotificado_di" bpmnElement="End_ProjetoArquivadoNotificado">
-        <dc:Bounds x="652" y="182" width="36" height="36" />
+        <dc:Bounds x="652" y="182" width="36" height="36"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="640" y="223" width="60" height="27" />
+          <dc:Bounds x="640" y="223" width="60" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_ArqIniciar_di" bpmnElement="Flow_ArqIniciar">
-        <di:waypoint x="268" y="200" />
-        <di:waypoint x="340" y="200" />
+        <di:waypoint x="268" y="200"/>
+        <di:waypoint x="340" y="200"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ArqArquivar_di" bpmnElement="Flow_ArqArquivar">
-        <di:waypoint x="440" y="200" />
-        <di:waypoint x="500" y="200" />
+        <di:waypoint x="440" y="200"/>
+        <di:waypoint x="500" y="200"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ArqNotificar_di" bpmnElement="Flow_ArqNotificar">
-        <di:waypoint x="600" y="200" />
-        <di:waypoint x="652" y="200" />
+        <di:waypoint x="600" y="200"/>
+        <di:waypoint x="652" y="200"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Message_ArquivamentoSupervisor_di" bpmnElement="Message_ArquivamentoSupervisor">
-        <di:waypoint x="550" y="160" />
-        <di:waypoint x="550" y="70" />
+        <di:waypoint x="550" y="160"/>
+        <di:waypoint x="550" y="70"/>
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="556" y="85" width="90" height="27" />
+          <dc:Bounds x="556" y="85" width="90" height="27"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>

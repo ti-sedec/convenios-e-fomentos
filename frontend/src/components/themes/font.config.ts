@@ -4,7 +4,6 @@ import {
   Fira_Code,
   Geist,
   Geist_Mono,
-  Google_Sans_Flex,
   Instrument_Sans,
   Inter,
   JetBrains_Mono,
@@ -16,6 +15,7 @@ import {
   Source_Code_Pro,
   Space_Mono
 } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import { cn } from '@/lib/utils';
 
@@ -29,8 +29,15 @@ const fontMono = Geist_Mono({
   variable: '--font-mono'
 });
 
-const fontGoogleSansFlex = Google_Sans_Flex({
-  subsets: ['latin'],
+// Hospedada localmente (subconjunto latin, fonte variável, OFL): o Google_Sans_Flex de next/font/google
+// ainda não está na tabela de métricas do Next e gerava "Failed to find font override values".
+// Com next/font/local o Next calcula as métricas do próprio arquivo e gera o fallback ajustado.
+const fontGoogleSansFlex = localFont({
+  src: '../../assets/fonts/GoogleSansFlex-latin.woff2',
+  weight: '100 1000',
+  style: 'normal',
+  display: 'swap',
+  adjustFontFallback: 'Arial',
   variable: '--font-google-sans-flex'
 });
 

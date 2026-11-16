@@ -73,7 +73,7 @@ func institutionBody(version int, typeID string) map[string]any {
 
 func proposalBody(version int) map[string]any {
 	return map[string]any{
-		"version": version, "sigconNumber": "3216/2026", "sigconRegisteredOn": "2026-02-10", "title": "Pavimentação da Rua A",
+		"version": version, "sigconNumber": "3216-2026", "sigconRegisteredOn": "2026-02-10", "title": "Pavimentação da Rua A",
 		"object": "Pavimentar 2 km da Rua A.", "justification": "A rua está intransitável.", "objectNature": "works",
 		"executionPeriods": []any{
 			map[string]any{"startDate": "2026-11-01", "endDate": "2026-12-15", "municipalityIbge": "5103403", "placeDetail": "Av. Principal"},
@@ -392,7 +392,7 @@ func TestSecaoProposta(t *testing.T) {
 	r := put(v, nil)
 	require.Equal(t, 200, r.Status, r.Body)
 	prop := r.data()["proposal"].(map[string]any)
-	assert.Equal(t, "3216/2026", prop["sigconNumber"])
+	assert.Equal(t, "3216-2026", prop["sigconNumber"])
 	assert.Equal(t, "works", prop["objectNature"])
 	// Os dados derivados (vigência e municípios) saem das linhas.
 	assert.Equal(t, "2026-11-01", prop["startDate"])
@@ -459,7 +459,7 @@ func TestSecaoProposta(t *testing.T) {
 	v++
 
 	// O ano do número tem que bater com o da data de cadastro (pendência, não erro de gravação).
-	r = put(v, func(b map[string]any) { b["sigconNumber"] = "3216/2025" })
+	r = put(v, func(b map[string]any) { b["sigconNumber"] = "3216-2025" })
 	require.Equal(t, 200, r.Status)
 	assert.Equal(t, "sigcon_year_mismatch", issueFields(r)["proposal.sigconNumber"])
 	v++
@@ -469,7 +469,7 @@ func TestSecaoProposta(t *testing.T) {
 	}
 	future := time.Now().AddDate(0, 0, 2).Format(time.DateOnly)
 	for name, mutate := range map[string]func(map[string]any){
-		"número fora do formato":  func(b map[string]any) { b["sigconNumber"] = "3216-2026" },
+		"número fora do formato":  func(b map[string]any) { b["sigconNumber"] = "3216/2026" },
 		"número sem ano":          func(b map[string]any) { b["sigconNumber"] = "3216" },
 		"cadastro no futuro":      func(b map[string]any) { b["sigconRegisteredOn"] = future },
 		"data inválida":           period(map[string]any{"startDate": "01/11/2026"}),
@@ -619,7 +619,7 @@ func TestListagemDeProjetos(t *testing.T) {
 	assert.Equal(t, []string{a}, ids("/api/admin/projects?q=sinop"))
 	assert.Equal(t, []string{a}, ids("/api/admin/projects?q=00.000.000"), "busca por CNPJ com ou sem pontuação")
 	assert.Equal(t, []string{b}, ids("/api/admin/projects?q=ESCOLA"))
-	assert.Equal(t, []string{b}, ids("/api/admin/projects?q=3216%2F2026"))
+	assert.Equal(t, []string{b}, ids("/api/admin/projects?q=3216-2026"))
 	assert.Empty(t, ids("/api/admin/projects?q=%25"), "% é literal, não coringa")
 }
 

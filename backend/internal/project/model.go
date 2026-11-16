@@ -31,6 +31,8 @@ const (
 	ActionAssignDepartment = "admin::projects.assign-department"
 	ActionReviewFraming    = "admin::projects.review-framing"
 	ActionDeny             = "admin::projects.deny"
+	// ActionReport gera o relatório do projeto (PDF) depois do enquadramento confirmado.
+	ActionReport = "admin::projects.report"
 
 	ActionProfileRead   = "admin::proponent-profile.read"
 	ActionProfileUpdate = "admin::proponent-profile.update"
@@ -121,6 +123,7 @@ func Register(reg *authz.Registry) {
 		proj(ActionAssignDepartment, "Indicar o departamento de enquadramento de um projeto", true),
 		proj(ActionReviewFraming, "Confirmar ou recusar o enquadramento de um projeto no departamento", true),
 		proj(ActionDeny, "Negar projetos (decisão do Secretário)", true),
+		proj(ActionReport, "Gerar o relatório do projeto (depois do enquadramento confirmado)", true),
 		proj(ActionShare, "Gerir o acesso aos projetos (convidar por CPF e revogar)", true),
 		profile(ActionProfileRead, "Ler o próprio perfil de proponente"),
 		profile(ActionProfileUpdate, "Atualizar o próprio perfil de proponente"),
@@ -309,12 +312,14 @@ type Project struct {
 	Analyst *AnalystInfo `json:"analyst,omitempty"`
 	Review  *Review      `json:"review,omitempty"`
 	// Framing é a rodada de enquadramento em curso (pendente ou confirmada); Framings é o histórico, da mais antiga à mais nova.
-	Framing         *Framing  `json:"framing,omitempty"`
-	Framings        []Framing `json:"framings,omitempty"`
-	OriginProjectID string    `json:"originProjectId"`
-	OriginCode      string    `json:"originCode"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	Framing  *Framing  `json:"framing,omitempty"`
+	Framings []Framing `json:"framings,omitempty"`
+	// Report diz se o relatório (PDF) pode ser gerado agora. Ausente em rascunho.
+	Report          *ReportAccess `json:"report,omitempty"`
+	OriginProjectID string        `json:"originProjectId"`
+	OriginCode      string        `json:"originCode"`
+	CreatedAt       time.Time     `json:"createdAt"`
+	UpdatedAt       time.Time     `json:"updatedAt"`
 
 	Proponent   ProponentSection   `json:"proponent"`
 	Institution InstitutionSection `json:"institution"`

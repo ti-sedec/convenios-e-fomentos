@@ -86,8 +86,8 @@ export function ProposalStep({
                 <f.TextField
                   label='Nº da proposta no SIGCon'
                   required
-                  placeholder='3216/2026'
-                  description='Número da proposta/termo, no formato NNNN/AAAA.'
+                  placeholder='3216-2026'
+                  description='Número da proposta/termo, no formato NNNN-AAAA.'
                 />
               )}
             />

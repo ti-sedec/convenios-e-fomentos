@@ -495,6 +495,36 @@ type ProjectMember struct {
 	Email       *string    `json:"email"`
 }
 
+type ProjectReport struct {
+	ID              uuid.UUID  `json:"id"`
+	ProjectID       uuid.UUID  `json:"project_id"`
+	Kind            string     `json:"kind"`
+	VersionNumber   int32      `json:"version_number"`
+	PageNumbers     bool       `json:"page_numbers"`
+	CoverSheets     bool       `json:"cover_sheets"`
+	GeneratedByID   *uuid.UUID `json:"generated_by_id"`
+	GeneratedByName string     `json:"generated_by_name"`
+	GeneratedByCpf  string     `json:"generated_by_cpf"`
+	GeneratedAt     time.Time  `json:"generated_at"`
+	PageCount       int32      `json:"page_count"`
+	SizeBytes       int64      `json:"size_bytes"`
+	Sha256          string     `json:"sha256"`
+	Data            []byte     `json:"data"`
+	CreatedAt       time.Time  `json:"created_at"`
+	Status          string     `json:"status"`
+	RequestedAt     time.Time  `json:"requested_at"`
+	StartedAt       *time.Time `json:"started_at"`
+	FinishedAt      *time.Time `json:"finished_at"`
+	HeartbeatAt     *time.Time `json:"heartbeat_at"`
+	ProgressDone    int32      `json:"progress_done"`
+	ProgressTotal   int32      `json:"progress_total"`
+	ObjectKey       *string    `json:"object_key"`
+	ExpiresAt       *time.Time `json:"expires_at"`
+	Warnings        []byte     `json:"warnings"`
+	Error           string     `json:"error"`
+	Stats           []byte     `json:"stats"`
+}
+
 type ProjectStageHistory struct {
 	ID                   uuid.UUID  `json:"id"`
 	ProjectID            uuid.UUID  `json:"project_id"`

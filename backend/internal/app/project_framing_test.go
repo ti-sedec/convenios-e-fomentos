@@ -86,7 +86,7 @@ func TestIndicarDepartamento(t *testing.T) {
 	p.finalistic("Financeiro", "Jurídico")
 	staff := p.newStaff()
 	fin := p.deptID("Financeiro")
-	fp := p.submitted("7001/2026")
+	fp := p.submitted("7001-2026")
 
 	// Antes de assumir e antes de aprovar tudo.
 	assert.Equal(t, "analysis_not_started", p.assign(staff.analyst, fp.id, fin).errCode())
@@ -145,17 +145,17 @@ func TestIndicarDepartamento(t *testing.T) {
 		assert.Empty(t, p.mailsBy("m.revisor.fin@exemplo.com", "encaminhado"))
 	})
 	t.Run("só o Analista indica", func(t *testing.T) {
-		other := p.submitted("7002/2026")
+		other := p.submitted("7002-2026")
 		for name, tok := range map[string]string{"supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame, "proponente": p.maria} {
 			assert.Equal(t, 403, p.assign(tok, other.id, fin).Status, name)
 		}
-		draft := p.completeProject("7003/2026")
+		draft := p.completeProject("7003-2026")
 		assert.Equal(t, 403, p.assign(staff.analyst, draft.id, fin).Status)
 	})
 }
 
 func TestRevisorSoEnxergaOQueFoiIndicadoAoDepartamento(t *testing.T) {
-	f := newFramingEnv(t, "7101/2026")
+	f := newFramingEnv(t, "7101-2026")
 	path := "/api/admin/projects/" + f.fp.id
 
 	// Antes da indicação, nenhum Revisor enxerga o projeto.
@@ -180,7 +180,7 @@ func TestRevisorSoEnxergaOQueFoiIndicadoAoDepartamento(t *testing.T) {
 }
 
 func TestConfirmarEnquadramento(t *testing.T) {
-	f := newFramingEnv(t, "7201/2026")
+	f := newFramingEnv(t, "7201-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 	f.mail.Msgs = nil
 
@@ -221,7 +221,7 @@ func TestConfirmarEnquadramento(t *testing.T) {
 }
 
 func TestRecusarEnquadramento(t *testing.T) {
-	f := newFramingEnv(t, "7301/2026")
+	f := newFramingEnv(t, "7301-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 	f.mail.Msgs = nil
 
@@ -263,7 +263,7 @@ func TestRecusarEnquadramento(t *testing.T) {
 }
 
 func TestRecusasSemLimiteDeRodadas(t *testing.T) {
-	f := newFramingEnv(t, "7401/2026")
+	f := newFramingEnv(t, "7401-2026")
 	for round := 1; round <= 5; round++ {
 		dept, rev := f.fin, f.staff.reviewerSame
 		if round%2 == 0 {
@@ -302,7 +302,7 @@ func TestDecisoesSimultaneas(t *testing.T) {
 			},
 		} {
 			t.Run(name, func(t *testing.T) {
-				f := newFramingEnv(t, "7501/2026")
+				f := newFramingEnv(t, "7501-2026")
 				colleague := f.reviewerOf("m.revisor.fin2@exemplo.com", f.fin)
 				require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 
@@ -331,7 +331,7 @@ func TestDecisoesSimultaneas(t *testing.T) {
 		}
 	})
 	t.Run("recusou e o colega confirma logo depois: 409, não 403", func(t *testing.T) {
-		f := newFramingEnv(t, "7502/2026")
+		f := newFramingEnv(t, "7502-2026")
 		colleague := f.reviewerOf("m.revisor.fin2@exemplo.com", f.fin)
 		require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 		require.Equal(t, 200, f.refuse(f.staff.reviewerSame, f.fp.id, 1, "Não é daqui.").Status)
@@ -342,7 +342,7 @@ func TestDecisoesSimultaneas(t *testing.T) {
 		assert.Equal(t, 403, f.confirm(f.staff.reviewerOther, f.fp.id, 1).Status)
 	})
 	t.Run("o Analista indica duas vezes ao mesmo tempo: uma indicação", func(t *testing.T) {
-		f := newFramingEnv(t, "7503/2026")
+		f := newFramingEnv(t, "7503-2026")
 		var wg sync.WaitGroup
 		codes := make(chan string, 2)
 		for _, tok := range []string{f.staff.analyst, f.staff.analyst} {
@@ -368,7 +368,7 @@ func TestDecisoesSimultaneas(t *testing.T) {
 }
 
 func TestEnquadramentoPendenteBloqueiaAConferencia(t *testing.T) {
-	f := newFramingEnv(t, "7601/2026")
+	f := newFramingEnv(t, "7601-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 	id := f.fp.id
 
@@ -385,14 +385,14 @@ func TestEnquadramentoPendenteBloqueiaAConferencia(t *testing.T) {
 		assert.Equal(t, "project_not_submitted", f.confirm(f.staff.reviewerSame, id, 1).errCode(), "arquivado não se decide")
 	})
 	t.Run("desistência do proponente", func(t *testing.T) {
-		g := newFramingEnv(t, "7602/2026")
+		g := newFramingEnv(t, "7602-2026")
 		require.Equal(t, 200, g.assign(g.staff.analyst, g.fp.id, g.fin).Status)
 		assert.Equal(t, 200, g.do("POST", "/api/admin/projects/"+g.fp.id+"/withdraw", map[string]any{"note": "Desistimos."}, g.maria).Status)
 	})
 }
 
 func TestDepoisDeConfirmadoSoRestaDesistirOuNegar(t *testing.T) {
-	f := newFramingEnv(t, "7701/2026")
+	f := newFramingEnv(t, "7701-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 	require.Equal(t, 200, f.confirm(f.staff.reviewerSame, f.fp.id, 1).Status)
 	id := f.fp.id
@@ -411,8 +411,8 @@ func TestDepoisDeConfirmadoSoRestaDesistirOuNegar(t *testing.T) {
 }
 
 func TestFiltrosDaListagemDaEquipe(t *testing.T) {
-	f := newFramingEnv(t, "7801/2026")
-	waiting := f.submitted("7802/2026") // aguardando análise de checklist
+	f := newFramingEnv(t, "7801-2026")
+	waiting := f.submitted("7802-2026") // aguardando análise de checklist
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 
 	ids := func(query string) []string {
@@ -439,7 +439,7 @@ func TestFiltrosDaListagemDaEquipe(t *testing.T) {
 }
 
 func TestDepartamentoComProjetoEContadores(t *testing.T) {
-	f := newFramingEnv(t, "7901/2026")
+	f := newFramingEnv(t, "7901-2026")
 	dept := func(id string) map[string]any {
 		return f.do("GET", "/api/admin/departments/"+id, nil, f.boss).data()
 	}
@@ -465,7 +465,7 @@ func TestDepartamentoComProjetoEContadores(t *testing.T) {
 }
 
 func TestEnquadramentoFicaNaAuditoriaSemTextoLivre(t *testing.T) {
-	f := newFramingEnv(t, "7951/2026")
+	f := newFramingEnv(t, "7951-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
 	require.Equal(t, 200, f.refuse(f.staff.reviewerSame, f.fp.id, 1, "Justificativa que não deve ir para a auditoria.").Status)
 	for _, action := range []string{"project.assign-department", "project.framing-refuse"} {

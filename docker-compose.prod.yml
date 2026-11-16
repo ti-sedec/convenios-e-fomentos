@@ -40,7 +40,17 @@ x-api-env: &api-env
   HTTP_PORT: "8080"
   LOG_LEVEL: ${LOG_LEVEL:-info}
   # Limite de memória do runtime Go um pouco abaixo do limite do contêiner: o coletor age antes do OOM kill.
-  GOMEMLIMIT: ${API_GOMEMLIMIT:-400MiB}
+  GOMEMLIMIT: ${API_GOMEMLIMIT:-800MiB}
+  # Relatório completo (PDF com os documentos juntados): montado em segundo plano em arquivos temporários DENTRO do volume
+  # report-tmp (disco, não tmpfs). O limite de arquivos é o menor entre este valor e o que cabe na memória do contêiner
+  # (~236 MB com 1 GB de RAM). Medido: a montagem usa ~2,2x o tamanho dos arquivos em memória e, com 512 MB, a API foi morta por falta
+  # de memória a partir de ~150 MB (docs/planejamento-relatorio-projeto.md §12). A API roda com 1 GB (API_MEM_LIMIT) e o GOMEMLIMIT em
+  # ~80% dele. Para aceitar mais, aumente os dois.
+  REPORT_TMP_DIR: /var/lib/relatorios
+  REPORT_MAX_INPUT_MB: ${REPORT_MAX_INPUT_MB:-200}
+  REPORT_MAX_PAGES: ${REPORT_MAX_PAGES:-5000}
+  REPORT_TIMEOUT: ${REPORT_TIMEOUT:-15m}
+  REPORT_RETENTION: ${REPORT_RETENTION:-24h}
   DATABASE_URL: postgres://${POSTGRES_USER:-convenios}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD (use hexadecimal, gerada com openssl rand -hex 24)}@db:5432/${POSTGRES_DB:-convenios}?sslmode=disable
   # Origem pública (https, sem barra final). Os links de e-mail abrem o frontend; o CORS vale só para esta origem.
   PUBLIC_URL: ${APP_URL:?Defina APP_URL, por exemplo https://convenios.exemplo.gov.br}
@@ -208,6 +218,8 @@ services:
     read_only: true
     cap_drop: [ALL]
     environment: *api-env
+    volumes:
+      - report-tmp:/var/lib/relatorios
     # O encerramento da API leva até ~35 s (15 s de requisições + 20 s do envio de e-mail em andamento).
     stop_grace_period: 40s
     healthcheck:
@@ -230,7 +242,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${API_MEM_LIMIT:-512m}
+          memory: ${API_MEM_LIMIT:-1g}
     networks: [app, egress]
 
   convenios-web:
@@ -443,6 +455,7 @@ networks:
     name: ${PROXY_NETWORK:-proxy}
 
 volumes:
+  report-tmp:
   pgdata:
   minio-data:
   clamav-db:

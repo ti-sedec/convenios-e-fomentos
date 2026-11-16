@@ -102,7 +102,7 @@ func TestDocumentoAdicionalAposOEnvio(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("2300/2026")
+	fp := p.submitted("2300-2026")
 
 	// Enviado e sem complementação aberta: nada de adicionar.
 	_, r := fp.createExtra(p.maria, "Tarde demais", "")
@@ -120,7 +120,7 @@ func TestDocumentoAdicionalEnviadoFicaTravado(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.completeProject("2400/2026")
+	fp := p.completeProject("2400-2026")
 	id, _ := fp.createExtra(p.maria, "Anexo", "")
 	require.Equal(t, 201, fp.uploadExtra(p.maria, id).Status)
 	require.Equal(t, 200, fp.submit(p.maria, true).Status)
@@ -138,7 +138,7 @@ func TestDocumentoAdicionalDevolvidoPodeTrocarOArquivo(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.completeProject("2500/2026")
+	fp := p.completeProject("2500-2026")
 	id, _ := fp.createExtra(p.maria, "Anexo", "")
 	require.Equal(t, 201, fp.uploadExtra(p.maria, id).Status)
 	require.Equal(t, 200, fp.submit(p.maria, true).Status)

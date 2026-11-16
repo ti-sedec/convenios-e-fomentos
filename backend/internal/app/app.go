@@ -66,6 +66,7 @@ type App struct {
 	log            *slog.Logger
 	pool           *pgxpool.Pool
 	noOutboxWorker bool
+	noReportWorker bool
 	// outboxDone fecha quando o worker de e-mail termina (ver Wait). Nulo se o worker não foi iniciado.
 	outboxDone chan struct{}
 }
@@ -78,6 +79,7 @@ type options struct {
 	mtid           mtid.Client
 	converter      preview.Converter
 	noOutboxWorker bool
+	noReportWorker bool
 }
 
 // WithStore usa o armazenamento dado em vez de criar o S3 a partir da configuração.
@@ -93,6 +95,10 @@ func WithPreviewConverter(c preview.Converter) Option { return func(o *options) 
 // WithoutOutboxWorker não inicia o envio de e-mails em segundo plano. Os testes usam para controlar quando a caixa de saída é
 // esvaziada (App.DrainOutbox) e assim ler os e-mails de forma determinística.
 func WithoutOutboxWorker() Option { return func(o *options) { o.noOutboxWorker = true } }
+
+// WithoutReportWorker não inicia a montagem do relatório completo em segundo plano. Os testes usam para controlar quando a fila é
+// processada (App.Projects.ProcessNextReport).
+func WithoutReportWorker() Option { return func(o *options) { o.noReportWorker = true } }
 
 // NewStore cria o armazenamento S3 da configuração; devolve nil quando STORAGE_ENDPOINT não está definido.
 func NewStore(cfg *config.Config) (storage.Store, error) {
@@ -184,6 +190,8 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 			conv = preview.NewGotenberg(cfg.PreviewConverterURL, 90*time.Second)
 		}
 		projectSvc.SetPreview(conv, cfg.StoragePreviewTTL, log)
+		projectSvc.SetReports(project.ReportConfig{TmpDir: cfg.ReportTmpDir, MaxInputBytes: int64(cfg.ReportMaxInputMB) << 20, MaxPages: cfg.ReportMaxPages,
+			Timeout: cfg.ReportTimeout, Retention: cfg.ReportRetention})
 	}
 	cepSvc := cep.NewService(cfg.CEPAPIBaseURL, cfg.CEPTimeout)
 	cepLimit := func(next http.Handler) http.Handler { return next }
@@ -213,7 +221,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 		},
 	})
 	mux := r.(*chi.Mux)
-	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Identifier: identifier, EndUsers: endUserSvc, APITokens: tokenSvc, Documents: documentSvc, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker}, nil
+	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Identifier: identifier, EndUsers: endUserSvc, APITokens: tokenSvc, Documents: documentSvc, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker, noReportWorker: o.noReportWorker}, nil
 }
 
 // Start sincroniza o registro de ações com o banco e passa a escutar as
@@ -238,6 +246,9 @@ func (a *App) Start(ctx context.Context) error {
 		return err
 	}
 	go a.expireComplements(ctx)
+	if !a.noReportWorker {
+		go a.Projects.RunReportWorker(ctx)
+	}
 	if !a.noOutboxWorker {
 		a.outboxDone = make(chan struct{})
 		go func() {

@@ -34,8 +34,8 @@ func TestVisaoGeralDoProponente(t *testing.T) {
 	analyst := p.analyst()
 
 	draft, _ := p.create(p.maria)
-	sent := p.submitted("8001/2026")
-	returned := p.submitted("8002/2026")
+	sent := p.submitted("8001-2026")
+	returned := p.submitted("8002-2026")
 	require.Equal(t, 200, p.complement(analyst, returned.id, map[string]any{"message": "Corrija e reenvie.",
 		"items": []any{section("institution", "O CEP não confere."), document("requerimento_apoio", "Faltou a assinatura.")}}).Status)
 
@@ -93,7 +93,7 @@ func TestVisaoGeralDoMembro(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
 
-	returned := p.submitted("8101/2026")
+	returned := p.submitted("8101-2026")
 	require.Equal(t, 200, p.complement(analyst, returned.id, map[string]any{"message": "Corrija e reenvie.", "items": []any{section("institution", "CEP.")}}).Status)
 	sharedDraft, _ := p.create(p.maria)
 	readOnlyDraft, _ := p.create(p.maria)
@@ -149,7 +149,7 @@ func TestVisaoGeralNaoViraPainelDaEquipe(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	p.create(p.maria)
-	p.submitted("8201/2026")
+	p.submitted("8201-2026")
 
 	tok, _ := p.newAdmin(p.boss, "analista-resumo@exemplo.com", "analyst")
 	require.NotEmpty(t, p.do("GET", "/api/admin/projects", nil, tok).list(), "o analista vê o projeto enviado")
@@ -206,7 +206,7 @@ func TestAtividadeRecenteDoProponente(t *testing.T) {
 	p.finalistic("Financeiro")
 	staff := p.newStaff()
 	fin := p.deptID("Financeiro")
-	fp := p.submitted("8301/2026")
+	fp := p.submitted("8301-2026")
 	const secret = "JUSTIFICATIVA-INTERNA-DA-RECUSA"
 
 	// Carla é convidada (edição) depois do envio; o convite é de antes dos demais marcos.
@@ -216,7 +216,7 @@ func TestAtividadeRecenteDoProponente(t *testing.T) {
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.Equal(t, 200, p.complement(staff.analyst, fp.id, map[string]any{"message": "Corrija o título.", "items": []any{section("proposal", "Título.")}}).Status)
 	pb := proposalBody(fp.current(p.maria))
-	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "8301/2026"
+	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "8301-2026"
 	require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+fp.id+"/resubmit", map[string]any{"version": fp.current(p.maria), "declaration": true}, p.maria).Status)
 	require.True(t, allApproved(p.approveAll(staff.analyst, fp.id)))

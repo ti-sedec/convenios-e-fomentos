@@ -179,7 +179,7 @@ func signerWithPersonalData() (Project, declEnv) {
 	p.Institution.CNPJ = "11222333000181"
 	p.Proponent.Personal = PersonalData{Nationality: "brasileira", MaritalStatus: MaritalMarried, Street: "Rua das Flores", Number: "100",
 		District: "Centro", UF: "MT", MunicipalityIBGE: "5107925"}
-	p.Proposal = ProposalSection{Title: "Festival de Inverno", SigconNumber: "3216/2026", ExecutionPeriods: []ExecutionPeriod{
+	p.Proposal = ProposalSection{Title: "Festival de Inverno", SigconNumber: "3216-2026", ExecutionPeriods: []ExecutionPeriod{
 		{StartDate: "2026-11-01", EndDate: "2027-05-01", MunicipalityIBGE: "5107925", Municipality: &Municipality{IBGECode: "5107925", Name: "Sorriso", UF: "MT"}}}}
 	return p, declEnv{Place: "Sorriso/MT", SignerCPF: testCPF, HomePlace: "Sorriso/MT"}
 }
@@ -301,19 +301,19 @@ func TestCompatibilidadeDePrecosCitaAProposta(t *testing.T) {
 	assert.True(t, d.Ready, d.Issues)
 	assert.Equal(t, "Anexo V", d.Annex)
 	assert.Equal(t, "Declaro para os devidos fins, perante a Secretaria de Estado de Desenvolvimento Econômico/SEDEC (SEDEC-MT), que as propostas orçamentárias "+
-		"apresentadas por Prefeitura Municipal de Sorriso, referentes à proposta do convênio n.º 3216/2026, contemplam preços compatíveis aos praticados no "+
+		"apresentadas por Prefeitura Municipal de Sorriso, referentes à proposta do convênio n.º 3216-2026, contemplam preços compatíveis aos praticados no "+
 		"mercado local, sob pena de responsabilidade civil, penal e administrativa.", d.Paragraphs[0])
 
 	p.Institution.Instrument = InstrumentFomento
 	d = buildDeclaration(declarationSpecs["declaracao_compatibilidade_precos"], p, e)
 	assert.Equal(t, "Anexo IV", d.Annex)
-	assert.Contains(t, d.Paragraphs[0], "referentes à proposta do termo de fomento n.º 3216/2026")
+	assert.Contains(t, d.Paragraphs[0], "referentes à proposta do termo de fomento n.º 3216-2026")
 
 	p.Proposal.SigconNumber = ""
 	assert.Contains(t, issueCodes(buildDeclaration(declarationSpecs["declaracao_compatibilidade_precos"], p, e)), "decl_sigcon")
 	// Não depende dos dados pessoais.
 	p.Proponent.Personal = PersonalData{}
-	p.Proposal.SigconNumber = "1/2026"
+	p.Proposal.SigconNumber = "1-2026"
 	assert.True(t, buildDeclaration(declarationSpecs["declaracao_compatibilidade_precos"], p, e).Ready)
 }
 

@@ -101,7 +101,7 @@ func TestHistoricoDeEtapas(t *testing.T) {
 	p.finalistic("Financeiro", "Jurídico")
 	staff := p.newStaff()
 	fin, jur := p.deptID("Financeiro"), p.deptID("Jurídico")
-	fp := p.submitted("8001/2026")
+	fp := p.submitted("8001-2026")
 
 	t.Run("o envio abre o primeiro trecho", func(t *testing.T) {
 		h := p.assertHistory(fp.id)
@@ -135,7 +135,7 @@ func TestHistoricoDeEtapas(t *testing.T) {
 		assert.Equal(t, "awaiting_proponent", h[2].Stage)
 
 		pb := proposalBody(fp.current(p.maria))
-		pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "8001/2026"
+		pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "8001-2026"
 		require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
 		r := p.do("POST", "/api/admin/projects/"+fp.id+"/resubmit", map[string]any{"version": fp.current(p.maria), "declaration": true}, p.maria)
 		require.Equal(t, 200, r.Status, r.Body)
@@ -194,7 +194,7 @@ func TestHistoricoNaExpiracaoDoPrazo(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
-	fp := p.submitted("8002/2026")
+	fp := p.submitted("8002-2026")
 	require.Equal(t, 200, p.complement(analyst, fp.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 	p.setDue(fp.id, time.Now().Add(-time.Hour))
 	n, err := p.app.Projects.ExpireComplements(context.Background())
@@ -210,7 +210,7 @@ func TestHistoricoNaExpiracaoDoPrazo(t *testing.T) {
 func TestHistoricoDeEtapasEImutavel(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.submitted("8003/2026")
+	fp := p.submitted("8003-2026")
 	staff := p.newStaff()
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	ctx := context.Background()
@@ -244,23 +244,23 @@ func TestMigracaoDoHistoricoInicial(t *testing.T) {
 	fin := p.deptID("Financeiro")
 	ctx := context.Background()
 
-	team := p.submitted("8101/2026")
-	analyst := p.submitted("8102/2026")
+	team := p.submitted("8101-2026")
+	analyst := p.submitted("8102-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, analyst.id).Status)
-	proponent := p.submitted("8103/2026")
+	proponent := p.submitted("8103-2026")
 	require.Equal(t, 200, p.complement(staff.analyst, proponent.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
-	pending := p.submitted("8104/2026")
+	pending := p.submitted("8104-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, pending.id).Status)
 	require.True(t, allApproved(p.approveAll(staff.analyst, pending.id)))
 	require.Equal(t, 200, p.assign(staff.analyst, pending.id, fin).Status)
-	opinion := p.submitted("8105/2026")
+	opinion := p.submitted("8105-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, opinion.id).Status)
 	require.True(t, allApproved(p.approveAll(staff.analyst, opinion.id)))
 	require.Equal(t, 200, p.assign(staff.analyst, opinion.id, fin).Status)
 	require.Equal(t, 200, p.confirm(p.reviewerOf("mig.rev@exemplo.com", fin), opinion.id, 1).Status)
-	archived := p.submitted("8106/2026")
+	archived := p.submitted("8106-2026")
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+archived.id+"/withdraw", map[string]any{"note": "Desistimos do projeto."}, p.maria).Status)
-	draft := p.completeProject("8107/2026")
+	draft := p.completeProject("8107-2026")
 
 	all := []*fundingProject{team, analyst, proponent, pending, opinion, archived}
 	want := map[string]string{}
@@ -323,7 +323,7 @@ func TestHistoricoPelaAPI(t *testing.T) {
 	p.finalistic("Financeiro")
 	staff := p.newStaff()
 	fin := p.deptID("Financeiro")
-	fp := p.submitted("8201/2026")
+	fp := p.submitted("8201-2026")
 	hist := func(tok string) resp { return p.do("GET", "/api/admin/projects/"+fp.id+"/history", nil, tok) }
 
 	t.Run("só a equipe vê", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestHistoricoPelaAPI(t *testing.T) {
 	assert.Contains(t, sum["byStage"], "in_analysis")
 
 	t.Run("rascunho não tem histórico", func(t *testing.T) {
-		d := p.completeProject("8202/2026")
+		d := p.completeProject("8202-2026")
 		r := p.do("GET", "/api/admin/projects/"+d.id+"/history", nil, p.maria)
 		assert.Equal(t, 404, r.Status, "o titular não vê, nem do rascunho")
 		assert.Equal(t, 404, p.do("GET", "/api/admin/projects/00000000-0000-0000-0000-000000000000/history", nil, staff.analyst).Status)
@@ -370,7 +370,7 @@ func TestTravaDoHistoricoDeEtapas(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("8301/2026")
+	fp := p.submitted("8301-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	ctx := context.Background()
 
@@ -402,13 +402,13 @@ func TestTravaDoHistoricoDeEtapas(t *testing.T) {
 	t.Run("campos que não são estado e rascunhos não são afetados", func(t *testing.T) {
 		_, err := p.pool.Exec(ctx, "UPDATE projects SET updated_at = now() WHERE id = $1", fp.id)
 		assert.NoError(t, err)
-		d := p.completeProject("8302/2026")
+		d := p.completeProject("8302-2026")
 		_, err = p.pool.Exec(ctx, "UPDATE projects SET department_id = $2 WHERE id = $1", d.id, p.deptID("Financeiro"))
 		assert.NoError(t, err)
 	})
 
 	t.Run("a exclusão do analista não é bloqueada", func(t *testing.T) {
-		other := p.submitted("8303/2026")
+		other := p.submitted("8303-2026")
 		an, anID := p.newAdmin(p.boss, "hist.analista.excluido@exemplo.com", "analyst")
 		require.Equal(t, 200, p.startAnalysis(an, other.id).Status)
 		_, err := p.pool.Exec(ctx, "DELETE FROM admins WHERE id = $1", anID)
@@ -474,17 +474,17 @@ func TestFilaPorTempoNaEtapa(t *testing.T) {
 	fin := p.deptID("Financeiro")
 
 	// A: envio, análise e enquadramento pendente. A etapa de hoje (em análise) vale desde o trecho 2: 10 dias.
-	a := p.submitted("8401/2026")
+	a := p.submitted("8401-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, a.id).Status)
 	require.True(t, allApproved(p.approveAll(staff.analyst, a.id)))
 	require.Equal(t, 200, p.assign(staff.analyst, a.id, fin).Status)
 	p.age(a.id, 20, 10, 2)
 	// B: só enviado, há 5 dias. C: acabou de ser enviado.
-	b := p.submitted("8402/2026")
+	b := p.submitted("8402-2026")
 	p.age(b.id, 5)
-	c := p.submitted("8403/2026")
+	c := p.submitted("8403-2026")
 	// D: arquivado: não conta tempo na etapa.
-	d := p.submitted("8404/2026")
+	d := p.submitted("8404-2026")
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+d.id+"/withdraw", map[string]any{"note": "Desistimos do projeto."}, p.maria).Status)
 
 	list := func(tok, query string) []map[string]any {

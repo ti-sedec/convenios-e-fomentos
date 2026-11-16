@@ -120,3 +120,7 @@ RETURNING *;
 
 -- name: GetProjectVersion :one
 SELECT * FROM project_versions WHERE project_id = $1 AND number = $2;
+
+-- A versão enviada mais recente: de onde vêm os dados do relatório do projeto.
+-- name: GetLatestProjectVersion :one
+SELECT * FROM project_versions WHERE project_id = $1 ORDER BY number DESC LIMIT 1;

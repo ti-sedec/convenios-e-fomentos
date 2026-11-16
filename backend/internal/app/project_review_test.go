@@ -91,7 +91,7 @@ func TestAssumirAAnalise(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9001/2026")
+	fp := p.submitted("9001-2026")
 	assert.Equal(t, "awaiting_checklist", p.project(staff.analyst, fp.id).data()["stage"])
 	assert.Nil(t, p.project(staff.analyst, fp.id).data()["analyst"], "ninguém assumiu ainda")
 
@@ -119,22 +119,22 @@ func TestAssumirAAnalise(t *testing.T) {
 	assert.Equal(t, 1, n, "só a primeira chamada muda algo e entra na auditoria")
 
 	t.Run("só o Analista assume", func(t *testing.T) {
-		fresh := p.submitted("9002/2026")
+		fresh := p.submitted("9002-2026")
 		for name, tok := range map[string]string{"supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame, "proponente": p.maria} {
 			assert.Equal(t, 403, p.startAnalysis(tok, fresh.id).Status, name)
 		}
 	})
 	t.Run("rascunho não", func(t *testing.T) {
-		draft := p.completeProject("9003/2026")
+		draft := p.completeProject("9003-2026")
 		assert.Equal(t, 403, p.startAnalysis(staff.analyst, draft.id).Status)
 	})
 	t.Run("aguardando o proponente não", func(t *testing.T) {
-		waiting := p.submitted("9004/2026")
+		waiting := p.submitted("9004-2026")
 		require.Equal(t, 200, p.complement(staff.analyst, waiting.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 		assert.Equal(t, "project_stage_invalid", p.startAnalysis(staff.analyst, waiting.id).errCode())
 	})
 	t.Run("duas pessoas ao mesmo tempo: uma assume, a outra é recusada", func(t *testing.T) {
-		race := p.submitted("9005/2026")
+		race := p.submitted("9005-2026")
 		var wg sync.WaitGroup
 		codes := make(chan int, 2)
 		for _, tok := range []string{staff.analyst, other} {
@@ -153,14 +153,14 @@ func TestAssumirAAnalise(t *testing.T) {
 		assert.Equal(t, 1, c)
 	})
 	t.Run("devolver sem responsável faz de quem devolveu o responsável", func(t *testing.T) {
-		orphan := p.submitted("9006/2026")
+		orphan := p.submitted("9006-2026")
 		require.Equal(t, 200, p.complement(staff.analyst, orphan.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
 		a := p.project(staff.analyst, orphan.id).data()["analyst"].(map[string]any)
 		assert.Equal(t, p.adminID("m.analista@exemplo.com"), a["id"])
 		assert.Equal(t, 409, p.complement(other, orphan.id, map[string]any{"items": []any{section("institution", "")}}).Status, "o outro Analista não age nele")
 	})
 	t.Run("em análise sem responsável (responsável excluído): o primeiro a iniciar vira o responsável", func(t *testing.T) {
-		orphan := p.submitted("9007/2026")
+		orphan := p.submitted("9007-2026")
 		gone, _ := p.newAdmin(p.boss, "m.analista.saiu@exemplo.com", "analyst")
 		require.Equal(t, 200, p.startAnalysis(gone, orphan.id).Status)
 		_, err := p.pool.Exec(context.Background(), "DELETE FROM admins WHERE email = 'm.analista.saiu@exemplo.com'")
@@ -177,7 +177,7 @@ func TestConferenciaExigeAssumirAAnalise(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9101/2026")
+	fp := p.submitted("9101-2026")
 	assert.Equal(t, "analysis_not_started", p.review(staff.analyst, fp.id, "section", "proponent", true).errCode())
 
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
@@ -192,7 +192,7 @@ func TestAprovarDocumentoExigeAbrirOArquivo(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
 	other, _ := p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
-	fp := p.submitted("9201/2026")
+	fp := p.submitted("9201-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 
 	doc := reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"]
@@ -246,7 +246,7 @@ func TestConferenciaTudoAprovadoEImpedimento(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9301/2026")
+	fp := p.submitted("9301-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	assert.False(t, allApproved(p.project(staff.analyst, fp.id)))
 
@@ -260,7 +260,7 @@ func TestConferenciaTudoAprovadoEImpedimento(t *testing.T) {
 	assert.False(t, allApproved(p.review(staff.analyst, fp.id, "section", "funding", false)))
 
 	t.Run("obrigatório sem arquivo nem justificativa é impedimento", func(t *testing.T) {
-		blocked := p.submitted("9302/2026")
+		blocked := p.submitted("9302-2026")
 		require.Equal(t, 200, p.startAnalysis(staff.analyst, blocked.id).Status)
 		_, err := p.pool.Exec(context.Background(),
 			"UPDATE project_document_items SET justification = '' WHERE project_id = $1 AND requirement_code = (SELECT requirement_code FROM project_document_items WHERE project_id = $1 AND requirement_code IS NOT NULL AND justification <> '' LIMIT 1)", blocked.id)
@@ -314,7 +314,7 @@ func TestDocumentoAdicionalNaConferencia(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp, extra := p.submittedWithExtra("9401/2026")
+	fp, extra := p.submittedWithExtra("9401-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 
 	it := reviewItems(p.project(staff.analyst, fp.id))["extra:"+extra]
@@ -346,7 +346,7 @@ func TestDevolverZeraSoOsItensDevolvidos(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9501/2026")
+	fp := p.submitted("9501-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.True(t, allApproved(p.approveAll(staff.analyst, fp.id)))
 
@@ -361,7 +361,7 @@ func TestDevolverZeraSoOsItensDevolvidos(t *testing.T) {
 
 	// O proponente corrige e reenvia; os não devolvidos seguem aprovados e só os devolvidos precisam de nova conferência.
 	pb := proposalBody(fp.current(p.maria))
-	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "9501/2026"
+	pb["title"], pb["objectNature"], pb["sigconNumber"] = "Pavimentação da Rua B", "services", "9501-2026"
 	require.Equal(t, 200, p.do("PUT", "/api/admin/projects/"+fp.id+"/proposal", pb, p.maria).Status)
 	items, _ := fp.checklist(p.maria)
 	old := items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
@@ -385,7 +385,7 @@ func TestAberturaDeArquivosFicaRegistrada(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9601/2026")
+	fp := p.submitted("9601-2026")
 	file := fileIDOf(reviewItems(p.project(staff.analyst, fp.id))["document:requerimento_apoio"])
 	views := func() int {
 		var n int
@@ -409,7 +409,7 @@ func TestVisaoDaConferenciaSoParaAEquipe(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9701/2026")
+	fp := p.submitted("9701-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 
 	for name, tok := range map[string]string{"analista": staff.analyst, "supervisor": staff.supervisor, "secretário": staff.secretary} {
@@ -427,7 +427,7 @@ func TestVisaoDaConferenciaSoParaAEquipe(t *testing.T) {
 	for name, tok := range map[string]string{"supervisor": staff.supervisor, "secretário": staff.secretary, "revisor": staff.reviewerSame, "proponente": p.maria, "estranho": p.joao} {
 		assert.Equal(t, 403, p.review(tok, fp.id, "section", "proponent", true).Status, name)
 	}
-	draft := p.completeProject("9702/2026")
+	draft := p.completeProject("9702-2026")
 	assert.Equal(t, 403, p.review(staff.analyst, draft.id, "section", "proponent", true).Status, "rascunho")
 }
 
@@ -438,7 +438,7 @@ func TestArquivamentoAvisaOAnalistaResponsavel(t *testing.T) {
 	staff := p.newStaff()
 	p.newAdmin(p.boss, "m.analista2@exemplo.com", "analyst")
 
-	with := p.submitted("9801/2026")
+	with := p.submitted("9801-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, with.id).Status)
 	p.mail.Msgs = nil
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+with.id+"/deny", map[string]any{"note": "Negado."}, staff.secretary).Status)
@@ -446,14 +446,14 @@ func TestArquivamentoAvisaOAnalistaResponsavel(t *testing.T) {
 	assert.Contains(t, got, "m.analista@exemplo.com", "o responsável recebe")
 	assert.NotContains(t, got, "m.analista2@exemplo.com", "os outros Analistas não")
 
-	without := p.submitted("9802/2026")
+	without := p.submitted("9802-2026")
 	p.mail.Msgs = nil
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+without.id+"/deny", map[string]any{"note": "Negado."}, staff.secretary).Status)
 	got = p.archivedMails()
 	assert.Contains(t, got, "m.analista@exemplo.com")
 	assert.Contains(t, got, "m.analista2@exemplo.com", "sem responsável, todos os Analistas")
 
-	bloqueado := p.submitted("9803/2026")
+	bloqueado := p.submitted("9803-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, bloqueado.id).Status)
 	_, err := p.pool.Exec(context.Background(), "UPDATE admins SET blocked = true WHERE email = 'm.analista@exemplo.com'")
 	require.NoError(t, err)
@@ -468,7 +468,7 @@ func TestConferenciaFicaNaAuditoriaSemTextoLivre(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	staff := p.newStaff()
-	fp := p.submitted("9901/2026")
+	fp := p.submitted("9901-2026")
 	require.Equal(t, 200, p.startAnalysis(staff.analyst, fp.id).Status)
 	require.Equal(t, 200, p.review(staff.analyst, fp.id, "section", "proponent", true).Status)
 

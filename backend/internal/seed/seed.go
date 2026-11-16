@@ -134,6 +134,7 @@ func adminRoles() []roleSpec {
 				{Action: project.ActionSubmit, Conditions: []string{"admin::is-creator", project.ConditionEditor}},
 				{Action: project.ActionWithdraw, Conditions: []string{"admin::is-creator"}},
 				{Action: project.ActionShare, Conditions: []string{"admin::is-creator"}},
+				{Action: project.ActionReport, Conditions: []string{"admin::is-creator", project.ConditionMember}},
 			},
 		},
 		{
@@ -141,6 +142,7 @@ func adminRoles() []roleSpec {
 			perms: append([]authz.Permission{
 				{Action: project.ActionRead, Conditions: []string{project.ConditionSubmittedSameDepartment}},
 				{Action: project.ActionReviewFraming, Conditions: []string{project.ConditionSubmittedSameDepartment}},
+				{Action: project.ActionReport, Conditions: []string{project.ConditionSubmittedSameDepartment}},
 			}, staffReference()...),
 		},
 		{
@@ -153,18 +155,19 @@ func adminRoles() []roleSpec {
 				{Action: project.ActionStartAnalysis, Conditions: []string{project.ConditionSubmitted}},
 				{Action: project.ActionReviewItem, Conditions: []string{project.ConditionSubmitted}},
 				{Action: project.ActionAssignDepartment, Conditions: []string{project.ConditionSubmitted}},
+				{Action: project.ActionReport, Conditions: []string{project.ConditionSubmitted}},
 				{Action: actionDepartmentsRead}, {Action: actionDepartmentsUpdate}, {Action: actionDepartmentsDelete},
 			}, staffReference()...),
 		},
 		{
 			code: RoleSupervisor, name: "Supervisor Administrador", system: true,
 			description: "Acompanha todos os projetos enviados, somente leitura. Recebe e-mails sobre documentação regular, enquadramento recusado e arquivamento.",
-			perms:       append([]authz.Permission{staffRead}, staffReference()...),
+			perms:       append([]authz.Permission{staffRead, {Action: project.ActionReport, Conditions: []string{project.ConditionSubmitted}}}, staffReference()...),
 		},
 		{
 			code: RoleSecretary, name: "Secretário de Estado", system: true,
 			description: "Vê todos os projetos enviados e pode negá-los a qualquer momento, arquivando-os na hora.",
-			perms:       append([]authz.Permission{staffRead, {Action: project.ActionDeny, Conditions: []string{project.ConditionSubmitted}}}, staffReference()...),
+			perms:       append([]authz.Permission{staffRead, {Action: project.ActionDeny, Conditions: []string{project.ConditionSubmitted}}, {Action: project.ActionReport, Conditions: []string{project.ConditionSubmitted}}}, staffReference()...),
 		},
 	}
 }

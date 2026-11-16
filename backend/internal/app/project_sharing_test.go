@@ -61,7 +61,7 @@ func TestConvitePendenteValeNoPrimeiroLogin(t *testing.T) {
 
 func TestNiveisDeAcessoDoMembro(t *testing.T) {
 	p := newProjEnv(t)
-	fp := p.completeProject("5000/2026")
+	fp := p.completeProject("5000-2026")
 	p.mustInvite(fp.id, "leitor@exemplo.com", "read")
 	p.mustInvite(fp.id, "editor@exemplo.com", "edit")
 	reader, editor := p.login("leitor@exemplo.com"), p.login("editor@exemplo.com")
@@ -94,7 +94,7 @@ func TestNiveisDeAcessoDoMembro(t *testing.T) {
 	// Edição: altera, anexa e envia.
 	fp.upload(editor, "requerimento_apoio", "")
 	pb := proposalBody(version)
-	pb["sigconNumber"], pb["objectNature"], pb["title"] = "5000/2026", "services", "Título pelo editor"
+	pb["sigconNumber"], pb["objectNature"], pb["title"] = "5000-2026", "services", "Título pelo editor"
 	r := p.do("PUT", base+"/proposal", pb, editor)
 	require.Equal(t, 200, r.Status, r.Body)
 	assert.Equal(t, "Título pelo editor", p.project(p.maria, fp.id).data()["proposal"].(map[string]any)["title"], "o titular vê o que o editor gravou")
@@ -271,7 +271,7 @@ func TestAuditoriaDoCompartilhamento(t *testing.T) {
 func TestMembroEditaDuranteAComplementacao(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.submitted("5100/2026")
+	fp := p.submitted("5100-2026")
 	p.mustInvite(fp.id, "editor@exemplo.com", "edit")
 	p.mustInvite(fp.id, "leitor@exemplo.com", "read")
 	editor, reader := p.login("editor@exemplo.com"), p.login("leitor@exemplo.com")
@@ -279,7 +279,7 @@ func TestMembroEditaDuranteAComplementacao(t *testing.T) {
 
 	base := "/api/admin/projects/" + fp.id
 	b := proposalBody(fp.current(editor))
-	b["sigconNumber"], b["objectNature"], b["title"] = "5100/2026", "services", "Corrigido pelo editor"
+	b["sigconNumber"], b["objectNature"], b["title"] = "5100-2026", "services", "Corrigido pelo editor"
 	assert.Equal(t, 403, p.do("PUT", base+"/proposal", b, reader).Status)
 	r := p.do("PUT", base+"/proposal", b, editor)
 	require.Equal(t, 200, r.Status, r.Body)
@@ -444,7 +444,7 @@ func TestFiltroDeAcessoDaListagem(t *testing.T) {
 	}
 
 	// A equipe enxerga os projetos enviados de todo mundo, mas com access só o que é dela (nada).
-	sent := p.submitted("7101/2026")
+	sent := p.submitted("7101-2026")
 	tok, _ := p.newAdmin(p.boss, "analista-acesso@exemplo.com", "analyst")
 	assert.Contains(t, ids(tok, ""), sent.id)
 	for _, a := range []string{"owner", "member", "all"} {

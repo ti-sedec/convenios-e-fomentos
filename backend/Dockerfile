@@ -19,6 +19,9 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 FROM alpine:3.22.8 AS tools
 RUN addgroup -S -g 65532 app && adduser -S -u 65532 -G app app
 COPY --from=build /out/cli /usr/local/bin/cli
+# Diretório dos arquivos temporários do relatório completo (REPORT_TMP_DIR): a API roda com o sistema de arquivos somente leitura,
+# então ele é montado como VOLUME em disco (um tmpfs contaria na memória do contêiner). O dono vai junto para o volume novo.
+RUN mkdir -p /var/lib/relatorios && chown 65532:65532 /var/lib/relatorios
 USER app
 ENTRYPOINT ["/usr/local/bin/cli"]
 
@@ -27,6 +30,7 @@ FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c
 COPY --from=build /out/api /out/cli /out/healthcheck /
 # Certificados públicos de CA/servidor (ex.: X-Via, X_VIA_CA_FILE=/app/certs/xvia-dev.crt). Nunca chaves privadas.
 COPY certs/ /app/certs/
+COPY --from=tools --chown=65532:65532 /var/lib/relatorios /var/lib/relatorios
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]

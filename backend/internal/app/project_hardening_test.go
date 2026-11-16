@@ -57,7 +57,7 @@ func TestIDORDeTodasAsRotasDeProjeto(t *testing.T) {
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
 	analyst := p.analyst()
 	draft := p.newFundingProject("convenio", "municipal_government", nil)
-	sent := p.submitted("4000/2026")
+	sent := p.submitted("4000-2026")
 	items, _ := sent.checklist(p.maria)
 	file := items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
 	require.Equal(t, 200, p.complement(analyst, sent.id, map[string]any{"items": []any{section("proposal", "")}}).Status)
@@ -114,7 +114,7 @@ func (e *env) rawBody(method, path string, body any, token string) (int, http.He
 
 func TestEntradasHostisNaoQuebramAListagem(t *testing.T) {
 	p := newProjEnv(t)
-	p.completeProject("4100/2026")
+	p.completeProject("4100-2026")
 	for _, q := range []string{"' OR 1=1 --", "%", "_", `\`, "'; DROP TABLE projects; --", "日本語 😀", strings.Repeat("a", 5000)} {
 		r := p.do("GET", "/api/admin/projects?q="+urlEscape(q), nil, p.maria)
 		assert.Equal(t, 200, r.Status, "q=%q", q)
@@ -179,9 +179,9 @@ func TestEntradasHostisNosCamposDoProjeto(t *testing.T) {
 func TestPDFDoComprovanteComTextoHostil(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.completeProject("4200/2026")
+	fp := p.completeProject("4200-2026")
 	pb := proposalBody(0)
-	pb["sigconNumber"], pb["objectNature"] = "4200/2026", "services"
+	pb["sigconNumber"], pb["objectNature"] = "4200-2026", "services"
 	pb["title"] = "Título com 日本語, emoji 😀 e (parênteses) \\ barra"
 	pb["object"] = strings.Repeat("Parágrafo longo com acentuação.\n", 150)
 	fp.save("proposal", pb)
@@ -417,7 +417,7 @@ func TestConfirmacaoUsaOTamanhoEOHashDoObjetoReal(t *testing.T) {
 func TestCPFSoApareceCompletoParaODono(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.completeProject("4300/2026")
+	fp := p.completeProject("4300-2026")
 	b := proponentBody(fp.current(p.maria))
 	b["isLegalRepresentative"] = false
 	b["legalRepName"], b["legalRepCpf"], b["legalRepJobTitle"] = "José da Silva", cpfFor("jose@exemplo.com"), "Prefeito"
@@ -440,7 +440,7 @@ func TestCPFSoApareceCompletoParaODono(t *testing.T) {
 func TestDownloadsFicamRegistradosNaAuditoria(t *testing.T) {
 	p := newProjEnv(t)
 	p.setElectoralDeadline(time.Now().AddDate(0, 0, 30))
-	fp := p.submitted("4400/2026")
+	fp := p.submitted("4400-2026")
 	items, _ := fp.checklist(p.maria)
 	fileID := items["requerimento_apoio"]["files"].([]any)[0].(map[string]any)["id"].(string)
 	require.Equal(t, 200, p.do("GET", docsPath(fp.id, "/files/", fileID, "/download"), nil, p.maria).Status)
@@ -467,7 +467,7 @@ func TestRetencaoDeRascunhosAbandonados(t *testing.T) {
 	old.upload(p.maria, "requerimento_apoio", "")
 	recent := p.newFundingProject("convenio", "municipal_government", nil)
 	recent.upload(p.maria, "termo_referencia", "")
-	sent := p.submitted("4500/2026")
+	sent := p.submitted("4500-2026")
 	require.Equal(t, 3, p.store.Len())
 	// Todos parecem antigos, mas só o rascunho antigo é apagado: o recente foi mexido agora e o enviado nunca expira.
 	_, err := p.pool.Exec(context.Background(), "UPDATE projects SET updated_at = now() - interval '400 days' WHERE id = ANY($1)", []string{old.id, sent.id})

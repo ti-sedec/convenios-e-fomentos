@@ -46,13 +46,13 @@ func TestVisaoGeralDoRevisor(t *testing.T) {
 		require.True(t, allApproved(p.approveAll(an, fp.id)))
 		return fp
 	}
-	old := ready("9101/2026")       // com o Financeiro há 6 dias (limite 5)
-	recent := ready("9102/2026")    // com o Financeiro agora
-	other := ready("9103/2026")     // com o Jurídico
-	confirmed := ready("9104/2026") // confirmado por Regina
-	refused := ready("9105/2026")   // recusado: sai do alcance, mas conta como decisão
-	archived := ready("9106/2026")  // negado pelo Secretário enquanto esperava
-	noDept := ready("9107/2026")    // ainda sem departamento
+	old := ready("9101-2026")       // com o Financeiro há 6 dias (limite 5)
+	recent := ready("9102-2026")    // com o Financeiro agora
+	other := ready("9103-2026")     // com o Jurídico
+	confirmed := ready("9104-2026") // confirmado por Regina
+	refused := ready("9105-2026")   // recusado: sai do alcance, mas conta como decisão
+	archived := ready("9106-2026")  // negado pelo Secretário enquanto esperava
+	noDept := ready("9107-2026")    // ainda sem departamento
 	p.create(p.maria)               // rascunho: nunca entra
 
 	for _, fp := range []*fundingProject{old, recent, confirmed, refused, archived} {
@@ -186,8 +186,8 @@ func TestAtividadeDoDepartamentoDoRevisor(t *testing.T) {
 		require.True(t, allApproved(p.approveAll(an, fp.id)))
 		return fp
 	}
-	confirmed, refused, other := ready("9201/2026"), ready("9202/2026"), ready("9203/2026")
-	denied, withdrawn := ready("9204/2026"), ready("9205/2026")
+	confirmed, refused, other := ready("9201-2026"), ready("9202-2026"), ready("9203-2026")
+	denied, withdrawn := ready("9204-2026"), ready("9205-2026")
 	p.create(p.maria) // rascunho: nada dele entra
 	for _, fp := range []*fundingProject{confirmed, refused, denied, withdrawn} {
 		require.Equal(t, 200, p.assign(an, fp.id, fin).Status)
@@ -322,7 +322,7 @@ func TestMinhasDecisoesDoRevisor(t *testing.T) {
 		require.Equal(t, 200, p.assign(an, fp.id, fin).Status)
 		return fp
 	}
-	a, b, c, pending := ready("9301/2026"), ready("9302/2026"), ready("9303/2026"), ready("9304/2026")
+	a, b, c, pending := ready("9301-2026"), ready("9302-2026"), ready("9303-2026"), ready("9304-2026")
 	require.Equal(t, 200, p.confirm(staff.reviewerSame, a.id, 1).Status)
 	require.Equal(t, 200, p.refuse(staff.reviewerSame, b.id, 1, "Não é da nossa área.").Status)
 	require.Equal(t, 200, p.confirm(colleague, c.id, 1).Status)

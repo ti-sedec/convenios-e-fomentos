@@ -24,6 +24,7 @@ import {
   type SectionKey
 } from '../api/types';
 import { formatBrl, formatCnpj } from '../format';
+import { ProjectReportCard } from './project-report-card';
 import { AmendmentRows, ExecutionRows, documentsLine } from './project-view/parts';
 import { ViewRow as Row } from './project-view/primitives';
 
@@ -128,6 +129,7 @@ function Submitted({ project }: { project: Project }) {
           </AlertDescription>
         </Alert>
       )}
+      <ProjectReportCard project={project} />
       <Summary project={project} />
     </div>
   );

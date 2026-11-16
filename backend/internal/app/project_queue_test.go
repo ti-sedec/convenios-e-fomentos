@@ -53,16 +53,16 @@ func TestVisaoGeralDaFilaDoAnalista(t *testing.T) {
 	}
 	p.create(p.maria) // rascunho: nunca entra
 
-	entryOld := p.submitted("8501/2026")         // fila de entrada, há 3 dias (limite 2)
-	entryNew := p.submitted("8502/2026")         // fila de entrada, agora
-	stalled := assume(p.submitted("8503/2026"))  // em análise há 8 dias (limite 7)
-	due40 := assume(p.submitted("8504/2026"))    // complementação que vence em 40 horas
-	due60 := assume(p.submitted("8505/2026"))    // a que vence em 60 horas
-	resub := assume(p.submitted("8506/2026"))    // reenviado, sem conferência depois
-	reviewed := assume(p.submitted("8507/2026")) // reenviado e já conferido
-	refused := assume(p.submitted("8508/2026"))  // enquadramento recusado, sem nova indicação
-	again := assume(p.submitted("8509/2026"))    // recusado e indicado de novo (no Revisor há 6 dias)
-	archived := assume(p.submitted("8510/2026")) // arquivado pelo Analista
+	entryOld := p.submitted("8501-2026")         // fila de entrada, há 3 dias (limite 2)
+	entryNew := p.submitted("8502-2026")         // fila de entrada, agora
+	stalled := assume(p.submitted("8503-2026"))  // em análise há 8 dias (limite 7)
+	due40 := assume(p.submitted("8504-2026"))    // complementação que vence em 40 horas
+	due60 := assume(p.submitted("8505-2026"))    // a que vence em 60 horas
+	resub := assume(p.submitted("8506-2026"))    // reenviado, sem conferência depois
+	reviewed := assume(p.submitted("8507-2026")) // reenviado e já conferido
+	refused := assume(p.submitted("8508-2026"))  // enquadramento recusado, sem nova indicação
+	again := assume(p.submitted("8509-2026"))    // recusado e indicado de novo (no Revisor há 6 dias)
+	archived := assume(p.submitted("8510-2026")) // arquivado pelo Analista
 
 	p.age(entryOld.id, 3)
 	p.age(stalled.id, 10, 8)
@@ -71,8 +71,8 @@ func TestVisaoGeralDaFilaDoAnalista(t *testing.T) {
 	}
 	p.setDue(due40.id, time.Now().Add(40*time.Hour))
 	p.setDue(due60.id, time.Now().Add(60*time.Hour))
-	p.returnAndResubmit(resub, an, "8506/2026")
-	p.returnAndResubmit(reviewed, an, "8507/2026")
+	p.returnAndResubmit(resub, an, "8506-2026")
+	p.returnAndResubmit(reviewed, an, "8507-2026")
 	require.Equal(t, 200, p.review(an, reviewed.id, "section", "institution", true).Status)
 	for _, fp := range []*fundingProject{refused, again} {
 		require.True(t, allApproved(p.approveAll(an, fp.id)))
@@ -215,11 +215,11 @@ func TestVisaoGeralFilaProntosParaIndicar(t *testing.T) {
 		return fp
 	}
 
-	ready := assume(p.submitted("8601/2026"))    // tudo aprovado, sem departamento
-	pending := assume(p.submitted("8602/2026"))  // ainda com itens por conferir
-	rejected := assume(p.submitted("8603/2026")) // aprovado e depois reprovado um item
-	refused := assume(p.submitted("8604/2026"))  // recusado pelo Revisor: volta pronto para indicar de novo
-	framing := assume(p.submitted("8605/2026"))  // com o Revisor: já tem departamento
+	ready := assume(p.submitted("8601-2026"))    // tudo aprovado, sem departamento
+	pending := assume(p.submitted("8602-2026"))  // ainda com itens por conferir
+	rejected := assume(p.submitted("8603-2026")) // aprovado e depois reprovado um item
+	refused := assume(p.submitted("8604-2026"))  // recusado pelo Revisor: volta pronto para indicar de novo
+	framing := assume(p.submitted("8605-2026"))  // com o Revisor: já tem departamento
 	for _, fp := range []*fundingProject{ready, rejected, refused, framing} {
 		require.True(t, allApproved(p.approveAll(an, fp.id)))
 	}
@@ -264,7 +264,7 @@ func TestVisaoGeralFilaProntosParaIndicar(t *testing.T) {
 		// Com o limite em 2, o terceiro candidato (o mais novo) nem é examinado.
 		p.app.Projects.SetReadyCandidates(2)
 		for i := 0; i < 2; i++ {
-			assume(p.submitted(fmt.Sprintf("87%02d/2026", i)))
+			assume(p.submitted(fmt.Sprintf("87%02d-2026", i)))
 		}
 		p.age(refused.id, 40, 39, 38, 37)
 		blk := p.queueOverview(an, "").data()["blocks"].(map[string]any)["ready"].(map[string]any)
@@ -308,20 +308,20 @@ func TestAtividadeDaFilaDaEquipe(t *testing.T) {
 	an := staff.analyst
 	const secret = "JUSTIFICATIVA-INTERNA-DA-RECUSA"
 
-	main := p.submitted("8701/2026")
+	main := p.submitted("8701-2026")
 	require.Equal(t, 200, p.startAnalysis(an, main.id).Status)
-	p.returnAndResubmit(main, an, "8701/2026")
+	p.returnAndResubmit(main, an, "8701-2026")
 	require.True(t, allApproved(p.approveAll(an, main.id)))
 	require.Equal(t, 200, p.assign(an, main.id, fin).Status)
 	require.Equal(t, 200, p.refuse(staff.reviewerSame, main.id, 1, secret).Status)
 	require.Equal(t, 200, p.assign(an, main.id, fin).Status)
 	require.Equal(t, 200, p.confirm(staff.reviewerSame, main.id, 2).Status)
 
-	archivedByTeam := p.submitted("8702/2026")
+	archivedByTeam := p.submitted("8702-2026")
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+archivedByTeam.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, an).Status)
-	withdrawn := p.submitted("8703/2026")
+	withdrawn := p.submitted("8703-2026")
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+withdrawn.id+"/withdraw", map[string]any{"note": "Vamos refazer o projeto."}, p.maria).Status)
-	expired := p.submitted("8704/2026")
+	expired := p.submitted("8704-2026")
 	require.Equal(t, 200, p.complement(an, expired.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
 	p.setDue(expired.id, time.Now().Add(-time.Hour))
 	n, err := p.app.Projects.ExpireComplements(context.Background())
@@ -439,7 +439,7 @@ func TestMeuResumoDoAnalista(t *testing.T) {
 	fin := p.deptID("Financeiro")
 	an := staff.analyst
 
-	a1, a2, a3 := p.submitted("8801/2026"), p.submitted("8802/2026"), p.submitted("8803/2026")
+	a1, a2, a3 := p.submitted("8801-2026"), p.submitted("8802-2026"), p.submitted("8803-2026")
 	for _, fp := range []*fundingProject{a1, a2, a3} {
 		require.Equal(t, 200, p.startAnalysis(an, fp.id).Status)
 	}
@@ -450,7 +450,7 @@ func TestMeuResumoDoAnalista(t *testing.T) {
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+a3.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, an).Status)
 
 	// Outro Analista: assumiu um e arquivou outro. A desistência de um terceiro, feita pelo proponente, não é de nenhum dos dois.
-	b1, b2, w := p.submitted("8804/2026"), p.submitted("8805/2026"), p.submitted("8806/2026")
+	b1, b2, w := p.submitted("8804-2026"), p.submitted("8805-2026"), p.submitted("8806-2026")
 	require.Equal(t, 200, p.startAnalysis(other, b1.id).Status)
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+b2.id+"/archive", map[string]any{"reason": "other", "note": "Arquivado pela equipe."}, other).Status)
 	require.Equal(t, 200, p.do("POST", "/api/admin/projects/"+w.id+"/withdraw", map[string]any{"note": "Vamos refazer o projeto."}, p.maria).Status)
@@ -488,7 +488,7 @@ func TestMeuResumoDoAnalista(t *testing.T) {
 	})
 
 	t.Run("arquivamento pelo sistema e desistência não contam", func(t *testing.T) {
-		exp := p.submitted("8807/2026")
+		exp := p.submitted("8807-2026")
 		require.Equal(t, 200, p.complement(an, exp.id, map[string]any{"message": "Corrija.", "items": []any{section("proposal", "Título.")}}).Status)
 		p.setDue(exp.id, time.Now().Add(-time.Hour))
 		n, err := p.app.Projects.ExpireComplements(context.Background())

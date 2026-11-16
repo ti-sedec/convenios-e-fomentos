@@ -60,7 +60,7 @@ func multiline(s string) string { return strings.TrimSpace(s) }
 
 var (
 	nonDigits  = regexp.MustCompile(`\D`)
-	sigconRe   = regexp.MustCompile(`^[0-9]{1,6}/[0-9]{4}$`)
+	sigconRe   = regexp.MustCompile(`^[0-9]{1,6}-[0-9]{4}$`)
 	validAreas = map[string]bool{}
 )
 

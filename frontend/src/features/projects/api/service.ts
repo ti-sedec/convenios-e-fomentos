@@ -20,8 +20,10 @@ import type {
   ProjectStatus,
   ProjectSummary,
   ProponentSection,
+  ProjectReport,
   ProposalInput,
   FilePreview,
+  ReportKind,
   ReviewDecision,
   ReviewKind,
   StageHistory
@@ -254,6 +256,59 @@ export async function downloadReceipt(id: string): Promise<Blob> {
   const res = await fetch(`/bff/admin/projects/${id}/receipt`);
   if (!res.ok) throw await apiErrorFromResponse(res);
   return res.blob();
+}
+
+/** PDF de uma resposta de relatório, com o nome sugerido pelo servidor. */
+export interface ReportFile {
+  blob: Blob;
+  filename: string;
+}
+
+function filenameOf(res: Response, fallback: string) {
+  const m = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '');
+  return m?.[1] ?? fallback;
+}
+
+/** Gera o relatório resumido. A resposta é o PDF (não é JSON), por isso não passa pelo apiClient. */
+export async function generateReport(
+  id: string,
+  input: { pageNumbers: boolean }
+): Promise<ReportFile> {
+  const res = await fetch(`/bff/admin/projects/${id}/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'summary', ...input })
+  });
+  if (!res.ok) throw await apiErrorFromResponse(res);
+  return { blob: await res.blob(), filename: filenameOf(res, 'relatorio.pdf') };
+}
+
+/** Pede o relatório completo: entra na fila e responde o registro (a montagem é em segundo plano). */
+export async function requestFullReport(
+  id: string,
+  input: { pageNumbers: boolean; coverSheets: boolean }
+) {
+  return (
+    await apiClient<ApiResponse<ProjectReport>>(`/admin/projects/${id}/reports`, {
+      method: 'POST',
+      ...json({ kind: 'full', ...input })
+    })
+  ).data;
+}
+
+/** Endereço do download de um relatório do histórico: o navegador baixa direto (o completo pode ter centenas de MB). */
+export const reportDownloadUrl = (id: string, reportId: string) =>
+  `/bff/admin/projects/${id}/reports/${reportId}/download`;
+
+/** Baixa de novo um relatório do histórico (o servidor refaz o PDF idêntico). */
+export async function downloadReport(id: string, reportId: string): Promise<ReportFile> {
+  const res = await fetch(`/bff/admin/projects/${id}/reports/${reportId}/download`);
+  if (!res.ok) throw await apiErrorFromResponse(res);
+  return { blob: await res.blob(), filename: filenameOf(res, 'relatorio.pdf') };
+}
+
+export async function listReports(id: string) {
+  return (await apiClient<ApiResponse<ProjectReport[]>>(`/admin/projects/${id}/reports`)).data;
 }
 
 export async function resubmitProject(
