@@ -75,13 +75,22 @@ export function DateInput({
   const [text, setText] = React.useState(isoToText(value));
   const [open, setOpen] = React.useState(false);
 
-  // Sincroniza quando o valor muda por fora (reset do formulário, calendário, filtro limpo).
-  React.useEffect(() => {
+  // Sincroniza quando o valor muda por fora (reset do formulário, calendário, filtro limpo). É o ajuste de estado durante a renderização
+  // que a documentação do React indica no lugar de um efeito: não faz uma renderização a mais com o texto antigo na tela.
+  const [syncedValue, setSyncedValue] = React.useState(value);
+  if (value !== syncedValue) {
+    setSyncedValue(value);
     setText((current) => (textToIso(current) === (value ?? '') ? current : isoToText(value)));
-  }, [value]);
+  }
 
   const minDate = isoToDate(min == null ? undefined : String(min));
   const maxDate = isoToDate(max == null ? undefined : String(max));
+
+  // Sem isto o seletor de ano do calendário termina no ano corrente (padrão do react-day-picker),
+  // o que impede escolher datas futuras como a validade de uma certidão ou o fim de uma vigência.
+  const [thisYear] = React.useState(() => new Date().getFullYear());
+  const startMonth = minDate ?? new Date(thisYear - 100, 0);
+  const endMonth = maxDate ?? new Date(thisYear + 20, 11);
 
   return (
     <div className={cn('relative', className)}>
@@ -120,6 +129,8 @@ export function DateInput({
             mode='single'
             autoFocus
             captionLayout='dropdown'
+            startMonth={startMonth}
+            endMonth={endMonth}
             selected={isoToDate(value)}
             defaultMonth={isoToDate(value)}
             disabled={(date) => (!!minDate && date < minDate) || (!!maxDate && date > maxDate)}
