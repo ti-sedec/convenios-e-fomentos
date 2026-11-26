@@ -24,3 +24,8 @@ graphify-out/
 # Certificados: só os públicos (CA/servidor) vão para o Git; chaves e o resto de backend/certs/ ficam de fora
 backend/certs/*
 !backend/certs/*.crt
+
+# Material interno da MTI e correspondência com ela: fica só na máquina de quem trabalha com o SIGADOC (o repositório é público)
+docs/solicitacao-mti-sigadoc.md
+docs/sigadoc/swagger-*.yaml
+docs/sigadoc/extra/
