@@ -5,8 +5,16 @@ import { useState } from 'react';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { parliamentariansQueryOptions } from '@/features/parliamentarians/api/queries';
+import type { Parliamentarian } from '@/features/parliamentarians/api/types';
 import { useFormReadOnly } from '@/lib/form-context';
 import type { Amendment } from '../api/types';
 import { MoneyInput } from './money-input';
@@ -23,6 +31,48 @@ export const toRow = (a: Amendment): AmendmentRow => ({
 });
 
 export const fromRow = ({ other: _other, ...a }: AmendmentRow): Amendment => a;
+
+/**
+ * Seletor do parlamentar. Não é o `<select>` nativo: a lista nativa do navegador fecha sozinha com qualquer scroll, perda de foco ou
+ * mudança no DOM (o clique rápido abria e fechava a lista na hora). O `Select` do shadcn desenha a própria lista.
+ */
+function ParliamentarianSelect({
+  id,
+  value,
+  options,
+  disabled,
+  onPick
+}: {
+  id: string;
+  value: string;
+  options: Parliamentarian[];
+  disabled: boolean;
+  onPick: (value: string) => void;
+}) {
+  const items = [
+    ...options.map((p) => ({
+      value: p.id,
+      label: `${p.name}${p.chamber === 'federal' ? ' (federal)' : ''}`
+    })),
+    { value: OTHER, label: 'Outro (informar o nome)' }
+  ];
+  return (
+    <Select items={items} value={value} disabled={disabled} onValueChange={(v) => onPick(v ?? '')}>
+      <SelectTrigger id={id} className='w-full'>
+        <SelectValue placeholder='Escolha…' />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
 
 /** Emendas parlamentares do projeto: parlamentar (do cadastro ou por extenso), número, ano e valor. */
 export function AmendmentsEditor({
@@ -57,25 +107,16 @@ export function AmendmentsEditor({
             <label className='text-xs font-medium' htmlFor={`amendment-${i}-who`}>
               Parlamentar
             </label>
-            <NativeSelect
+            <ParliamentarianSelect
               id={`amendment-${i}-who`}
-              className='w-full'
               value={a.other ? OTHER : a.parliamentarianId}
-              onChange={(e) => {
-                const v = e.target.value;
+              options={options}
+              disabled={readOnly}
+              onPick={(v) => {
                 if (v === OTHER) set(i, { other: true, parliamentarianId: '' });
                 else set(i, { other: false, parliamentarianId: v, parliamentarianName: '' });
               }}
-            >
-              <NativeSelectOption value=''>Escolha…</NativeSelectOption>
-              {options.map((p) => (
-                <NativeSelectOption key={p.id} value={p.id}>
-                  {p.name}
-                  {p.chamber === 'federal' ? ' (federal)' : ''}
-                </NativeSelectOption>
-              ))}
-              <NativeSelectOption value={OTHER}>Outro (informar o nome)</NativeSelectOption>
-            </NativeSelect>
+            />
             {a.other && (
               <Input
                 aria-label={`Nome do parlamentar da emenda ${i + 1}`}

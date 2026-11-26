@@ -7,4 +7,10 @@ export const parliamentarianKeys = {
 };
 
 export const parliamentariansQueryOptions = () =>
-  queryOptions({ queryKey: parliamentarianKeys.list(), queryFn: listParliamentarians });
+  queryOptions({
+    queryKey: parliamentarianKeys.list(),
+    queryFn: listParliamentarians,
+    // Cadastro que quase não muda: reler a cada foco da janela re-renderizava os selects abertos e os fechava.
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false
+  });
