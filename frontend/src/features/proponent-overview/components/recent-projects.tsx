@@ -57,7 +57,7 @@ export function RecentProjects({ acesso }: { acesso: AccessKey }) {
                 <div className='min-w-0'>
                   <Link
                     href={projectHref(p.id)}
-                    className='text-sm font-medium underline-offset-4 hover:underline'
+                    className='block text-sm font-medium break-words underline-offset-4 hover:underline'
                   >
                     {p.title || 'Projeto sem título'}
                   </Link>
@@ -89,7 +89,7 @@ export function RecentProjects({ acesso }: { acesso: AccessKey }) {
       <CardFooter>
         <Link
           href={projectsHref(null, acesso)}
-          className='text-sm font-medium underline-offset-4 hover:underline'
+          className='block text-sm font-medium break-words underline-offset-4 hover:underline'
         >
           Ver todos os projetos
         </Link>
