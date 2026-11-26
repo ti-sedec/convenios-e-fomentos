@@ -44,7 +44,7 @@ function describe(it: ActivityItem): string {
     case 'resubmitted':
       return d.version ? `Correções enviadas (versão ${d.version}).` : 'Correções enviadas.';
     case 'awaiting_opinion':
-      return 'Projeto enquadrado. Aguardando parecer.';
+      return 'Projeto enquadrado. A equipe abrirá o processo e seguirá para o parecer.';
     case 'archived': {
       const reason = d.reason ? archiveReasonLabels[d.reason as ArchiveReason] : undefined;
       return reason ? `Projeto arquivado: ${reason}.` : 'Projeto arquivado.';

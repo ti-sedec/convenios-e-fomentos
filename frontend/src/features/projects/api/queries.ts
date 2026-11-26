@@ -6,6 +6,7 @@ import {
   getDeclaration,
   getProfile,
   getProject,
+  getSigadoc,
   getStageHistory,
   listMembers,
   listReports,
@@ -21,6 +22,7 @@ export const projectKeys = {
   preview: (id: string, fileId: string) => [...projectKeys.all, 'preview', id, fileId] as const,
   checklist: (id: string) => [...projectKeys.all, 'checklist', id] as const,
   history: (id: string) => [...projectKeys.all, 'history', id] as const,
+  sigadoc: (id: string) => [...projectKeys.all, 'sigadoc', id] as const,
   declaration: (id: string, code: string) => [...projectKeys.all, 'declaration', id, code] as const,
   members: (id: string) => [...projectKeys.all, 'members', id] as const,
   reports: (id: string) => [...projectKeys.all, 'reports', id] as const,
@@ -65,6 +67,17 @@ export const checklistQueryOptions = (id: string) =>
     queryFn: () => getChecklist(id),
     refetchInterval: (query) =>
       query.state.data?.items.some((i) => i.declarationAwaiting) ? 5000 : false
+  });
+
+/**
+ * O SIGADOC é consultado pelo servidor de tempos em tempos; a tela relê a cada 2 minutos enquanto está aberta e a cada 3 segundos
+ * enquanto uma montagem do processo está em andamento.
+ */
+export const sigadocQueryOptions = (id: string) =>
+  queryOptions({
+    queryKey: projectKeys.sigadoc(id),
+    queryFn: () => getSigadoc(id),
+    refetchInterval: (query) => (query.state.data?.task?.status === 'running' ? 3_000 : 120_000)
   });
 
 export const stageHistoryQueryOptions = (id: string) =>

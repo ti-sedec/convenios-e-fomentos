@@ -19,14 +19,22 @@ import { AssignDepartmentDialog, ComplementDialog, ConfirmDialog, NoteDialog } f
 import { reportStaffError } from './errors';
 import { isResponsible } from './review-panel';
 
-function StartAnalysisButton({ project }: { project: Project }) {
+/**
+ * Inicia a análise (fila de entrada) ou, com `assume`, assume o projeto enquadrado que voltou à fila dos analistas para abrir o
+ * processo no SIGADOC. As duas usam a mesma rota; o servidor decide pela etapa.
+ */
+function StartAnalysisButton({ project, assume }: { project: Project; assume?: boolean }) {
   const qc = useQueryClient();
   const run = useMutation({
     mutationFn: () => startAnalysis(project.id),
     onSuccess: async (saved) => {
       qc.setQueryData(projectKeys.detail(project.id), saved);
       await qc.invalidateQueries({ queryKey: projectKeys.lists() });
-      toast.success('Análise iniciada. Você é o analista responsável por este projeto.');
+      toast.success(
+        assume
+          ? 'Você assumiu o projeto e é o analista responsável pela abertura do processo no SIGADOC.'
+          : 'Análise iniciada. Você é o analista responsável por este projeto.'
+      );
     },
     onError: async (err) => {
       if (reportStaffError(err).reload)
@@ -35,7 +43,7 @@ function StartAnalysisButton({ project }: { project: Project }) {
   });
   return (
     <LoadingButton loading={run.isPending} onClick={() => run.mutate()}>
-      <Icons.circleCheck aria-hidden /> Iniciar análise
+      <Icons.circleCheck aria-hidden /> {assume ? 'Assumir projeto' : 'Iniciar análise'}
     </LoadingButton>
   );
 }
@@ -53,7 +61,7 @@ function AnalystActions({ project }: { project: Project }) {
   const canTakeOver =
     can(projectActions.startAnalysis) &&
     !responsible &&
-    (stage === 'in_analysis' || stage === 'awaiting_proponent') &&
+    (stage === 'in_analysis' || stage === 'awaiting_proponent' || stage === 'opening_sigadoc') &&
     !framingPending;
 
   const showAssign =
@@ -70,6 +78,9 @@ function AnalystActions({ project }: { project: Project }) {
     <>
       {can(projectActions.startAnalysis) && stage === 'awaiting_checklist' && (
         <StartAnalysisButton project={project} />
+      )}
+      {can(projectActions.startAnalysis) && stage === 'awaiting_analyst' && (
+        <StartAnalysisButton project={project} assume />
       )}
       {canTakeOver && (
         <ConfirmDialog
@@ -129,9 +140,9 @@ function ReviewerActions({ project }: { project: Project }) {
         project={project}
         button={{ label: 'Confirmar enquadramento' }}
         title='Confirmar o enquadramento?'
-        description={`O projeto se enquadra no departamento ${framing.department.name} e passa a aguardar o parecer. Vale a primeira decisão de qualquer Revisor do departamento.`}
+        description={`O projeto se enquadra no departamento ${framing.department.name} e volta à fila dos analistas, que abrem o processo no SIGADOC antes do parecer. Vale a primeira decisão de qualquer Revisor do departamento.`}
         confirmLabel='Confirmar enquadramento'
-        success='Enquadramento confirmado. O projeto aguarda o parecer.'
+        success='Enquadramento confirmado. O projeto voltou à fila dos analistas.'
         submit={() => confirmFraming(project.id, framing.round)}
       />
       <NoteDialog

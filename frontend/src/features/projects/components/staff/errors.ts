@@ -38,6 +38,26 @@ export function staffErrorMessage(err: unknown): string {
       case 'framing_already_decided':
       case 'framing_round_stale':
         return 'Outra pessoa já decidiu, ou a indicação mudou. A página foi atualizada.';
+      case 'sigadoc_task_running':
+        return 'A montagem do processo no SIGADOC está em andamento.';
+      case 'sigadoc_task_interrupted':
+        return 'A montagem foi interrompida: use "Retomar" e informe o PIN de novo.';
+      case 'sigadoc_nothing_to_resume':
+        return 'Não há montagem interrompida para retomar.';
+      case 'sigadoc_nothing_to_cancel':
+        return 'Não há montagem em andamento.';
+      case 'sigadoc_process_exists':
+        return 'O processo deste projeto já foi aberto no SIGADOC.';
+      case 'sigadoc_not_configured':
+      case 'sigadoc_no_matricula':
+      case 'sigadoc_forbidden':
+      case 'sigadoc_error':
+      case 'sigadoc_unavailable':
+      case 'pin_rejected':
+      case 'pin_invalid':
+        return err.message;
+      case 'rate_limited':
+        return 'Muitas tentativas de PIN em pouco tempo. Espere alguns minutos: tentativas erradas podem bloquear o seu PIN.';
       case 'analysis_not_started':
         return 'Inicie a análise antes de conferir.';
       case 'forbidden':

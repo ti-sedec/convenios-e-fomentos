@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Project } from '../../api/types';
 import { AuditHistory } from '@/features/audit-logs/components/audit-history';
 import { formatDateTimeCuiaba } from '../../format';
+import { SigadocTimeline } from './sigadoc-panel';
 import { StageTimeline } from './stage-timeline';
 
 /** Histórico do projeto para a equipe: as etapas, o pedido de complementação mais recente e, para quem pode, o registro de auditoria. */
@@ -13,6 +14,7 @@ export function HistoryPanel({ project }: { project: Project }) {
   return (
     <div className='max-w-3xl space-y-4'>
       {project.status !== 'draft' && <StageTimeline projectId={project.id} />}
+      {project.status !== 'draft' && <SigadocTimeline projectId={project.id} />}
       <Card>
         <CardHeader>
           <CardTitle className='text-base'>Pedido de complementação</CardTitle>

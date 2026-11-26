@@ -24,6 +24,7 @@ const transitionLabels: Record<string, string> = {
   'project.assign-department': 'Departamento indicado',
   'project.framing-confirm': 'Enquadramento confirmado',
   'project.framing-refuse': 'Enquadramento recusado',
+  'project.assume-opening': 'Assumido para abrir o processo no SIGADOC',
   'project.archive': 'Arquivado'
 };
 

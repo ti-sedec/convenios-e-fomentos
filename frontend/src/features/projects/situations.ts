@@ -28,9 +28,12 @@ export const situations: Situation[] = [
   },
   {
     key: 'parecer',
-    label: 'Aguardando parecer',
-    params: { status: 'submitted', stage: ['awaiting_opinion'] },
-    count: (c) => c.awaiting_opinion
+    label: 'Enquadrados',
+    params: {
+      status: 'submitted',
+      stage: ['awaiting_analyst', 'opening_sigadoc', 'awaiting_opinion']
+    },
+    count: (c) => c.awaiting_analyst + c.opening_sigadoc + c.awaiting_opinion
   },
   {
     key: 'arquivados',
