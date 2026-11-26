@@ -21,6 +21,8 @@ import { HistoryPanel } from './history-panel';
 import { ReviewPanel } from './review-panel';
 import { StaffActions } from './staff-actions';
 import { ResponsibleNotice, StaffBanner } from './staff-banner';
+import { SigadocOpenPanel } from './sigadoc-open';
+import { SigadocArchiveNotice } from './sigadoc-panel';
 
 interface TabSpec {
   key: string;
@@ -96,7 +98,9 @@ export function StaffProjectView({ project }: { project: Project }) {
       </p>
       <ResponsibleNotice project={project} />
       <StaffBanner project={project} />
+      <SigadocArchiveNotice project={project} />
       <StaffActions project={project} />
+      <SigadocOpenPanel project={project} />
       <ProjectReportCard project={project} />
 
       <Tabs value={current.key} onValueChange={(v) => void setTab(v)}>

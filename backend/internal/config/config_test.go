@@ -112,3 +112,17 @@ func TestEnvExampleDocumentaTodasAsVariaveis(t *testing.T) {
 		assert.True(t, read[name], "%s está no .env.example mas não é lida pela aplicação", name)
 	}
 }
+
+func TestSigadocURL(t *testing.T) {
+	tests := []struct {
+		nome string
+		c    Config
+		want string
+	}{
+		{"sem nada", Config{}, ""},
+		{"só a raiz do X-Via: acrescenta o serviço", Config{XViaBaseURL: "https://x/r1/mt-dev/", XViaSigadocService: "GOV/MTI/SIGADOC"}, "https://x/r1/mt-dev/GOV/MTI/SIGADOC"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.nome, func(t *testing.T) { assert.Equal(t, tt.want, tt.c.SigadocURL()) })
+	}
+}

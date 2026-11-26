@@ -62,8 +62,12 @@ func errStage(stage string) error {
 	switch stage {
 	case StageAwaitingProponent:
 		return httpapi.ErrConflict("project_stage_invalid", "O projeto está aguardando o proponente.")
+	case StageAwaitingAnalyst:
+		return httpapi.ErrConflict("project_stage_invalid", "O enquadramento já foi confirmado; o projeto aguarda um analista para abrir o processo no SIGADOC.")
+	case StageOpeningSigadoc:
+		return httpapi.ErrConflict("project_stage_invalid", "O enquadramento já foi confirmado; o projeto está na abertura do processo no SIGADOC.")
 	case StageAwaitingOpinion:
-		return httpapi.ErrConflict("project_stage_invalid", "O enquadramento já foi confirmado; o projeto aguarda o parecer.")
+		return httpapi.ErrConflict("project_stage_invalid", "O processo já foi aberto no SIGADOC; o projeto aguarda o parecer.")
 	default:
 		return httpapi.ErrConflict("project_stage_invalid", "O projeto não está em uma etapa que permita esta ação.")
 	}
@@ -205,14 +209,15 @@ func (s *Service) decideFraming(ctx context.Context, actor Actor, id uuid.UUID, 
 			return httpapi.ErrConflict("framing_round_stale", "A indicação de departamento mudou desde que você abriu o projeto. Recarregue para ver a rodada atual.")
 		}
 
-		decision, status, stage, department := FramingConfirmed, ptr(FramingConfirmed), StageAwaitingOpinion, cur.DepartmentID
+		// Confirmar leva o projeto de volta à fila dos analistas (sem responsável); recusar o devolve ao analista de sempre.
+		decision, status, stage, department, release := FramingConfirmed, ptr(FramingConfirmed), StageAwaitingAnalyst, cur.DepartmentID, true
 		if !confirm {
-			decision, status, stage, department = FramingRefused, nil, StageInAnalysis, nil
+			decision, status, stage, department, release = FramingRefused, nil, StageInAnalysis, nil, false
 		}
 		if _, err := q.DecideFraming(ctx, db.DecideFramingParams{ID: pending.ID, Decision: decision, DecidedByID: &actor.ID, Justification: justification}); err != nil {
 			return notFound(err)
 		}
-		row, err := q.SetProjectFraming(ctx, db.SetProjectFramingParams{ID: id, DepartmentID: department, FramingStatus: status, Stage: ptr(stage), UpdatedByID: &actor.ID})
+		row, err := q.SetProjectFraming(ctx, db.SetProjectFramingParams{ID: id, DepartmentID: department, FramingStatus: status, Stage: ptr(stage), ReleaseAnalyst: release, UpdatedByID: &actor.ID})
 		if err != nil {
 			return notFound(err)
 		}
@@ -229,7 +234,7 @@ func (s *Service) decideFraming(ctx context.Context, actor Actor, id uuid.UUID, 
 		if !confirm {
 			return s.notifyFramingRefused(ctx, q, out, int(pending.Round), pending.DepartmentName, justification)
 		}
-		return nil
+		return s.notifyAwaitingAnalyst(ctx, q, out, int(pending.Round), pending.DepartmentName)
 	})
 	return out, err
 }

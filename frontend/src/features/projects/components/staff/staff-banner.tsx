@@ -15,7 +15,12 @@ export function ResponsibleNotice({ project }: { project: Project }) {
   const analyst = project.analyst;
   if (!can(projectActions.startAnalysis) || !analyst || analyst.isMe) return null;
   if (project.status !== 'submitted') return null;
-  if (project.stage !== 'in_analysis' && project.stage !== 'awaiting_proponent') return null;
+  if (
+    project.stage !== 'in_analysis' &&
+    project.stage !== 'awaiting_proponent' &&
+    project.stage !== 'opening_sigadoc'
+  )
+    return null;
   return (
     <Alert>
       <Icons.eye aria-hidden />
@@ -97,6 +102,36 @@ export function StaffBanner({ project }: { project: Project }) {
           O departamento <strong>{project.framing.department.name}</strong> foi indicado em{' '}
           {formatDateTimeCuiaba(project.framing.indicatedAt)} (indicação nº {project.framing.round})
           e o Revisor do Departamento ainda não decidiu.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (project.stage === 'awaiting_analyst') {
+    return (
+      <Alert>
+        <Icons.alertCircle aria-hidden />
+        <AlertTitle>Projeto enquadrado: aguardando um analista</AlertTitle>
+        <AlertDescription>
+          Enquadramento confirmado
+          {project.framing ? ` pelo departamento ${project.framing.department.name}` : ''}. Um
+          analista precisa assumir o projeto para abrir o processo no SIGADOC.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (project.stage === 'opening_sigadoc') {
+    return (
+      <Alert>
+        <Icons.circleCheck aria-hidden />
+        <AlertTitle>Abertura do processo no SIGADOC</AlertTitle>
+        <AlertDescription>
+          Enquadramento confirmado
+          {project.framing ? ` pelo departamento ${project.framing.department.name}` : ''}.
+          {project.analyst?.name
+            ? ` ${project.analyst.name} é o analista responsável pela abertura do processo.`
+            : ''}
         </AlertDescription>
       </Alert>
     );

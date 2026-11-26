@@ -55,7 +55,7 @@ SELECT email::text FROM admins WHERE id = $1 AND is_active AND NOT blocked;
 -- o responsável. Não mexe na etapa nem na versão.
 -- name: ClaimProjectAnalyst :one
 UPDATE projects SET analyst_id = sqlc.arg(analyst_id), updated_at = now(), updated_by_id = sqlc.arg(analyst_id)
-WHERE id = sqlc.arg(id) AND status = 'submitted' AND stage = 'in_analysis' AND analyst_id IS NULL
+WHERE id = sqlc.arg(id) AND status = 'submitted' AND stage IN ('in_analysis', 'opening_sigadoc') AND analyst_id IS NULL
 RETURNING *;
 
 -- Grava o analista responsável de um projeto enviado e ativo (primeiro responsável ou troca de responsável), sem mexer em etapa nem
@@ -63,4 +63,11 @@ RETURNING *;
 -- name: SetProjectAnalyst :one
 UPDATE projects SET analyst_id = sqlc.arg(analyst_id), updated_at = now(), updated_by_id = sqlc.arg(analyst_id)
 WHERE id = sqlc.arg(id) AND status = 'submitted'
+RETURNING *;
+
+-- Um analista assume o projeto que voltou à fila depois do enquadramento ("Aguardando analista" passa a "Abertura do processo no
+-- SIGADOC") e vira o responsável. Quem chama já travou a linha e confere a regra; precisa passar por Service.transition.
+-- name: AssumeProjectOpening :one
+UPDATE projects SET stage = 'opening_sigadoc', analyst_id = sqlc.arg(analyst_id), updated_at = now(), updated_by_id = sqlc.arg(analyst_id)
+WHERE id = sqlc.arg(id) AND status = 'submitted' AND stage = 'awaiting_analyst'
 RETURNING *;

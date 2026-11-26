@@ -33,6 +33,7 @@ const (
 	kindArchived            = "project.archived"
 	kindInvited             = "project.invited"
 	kindTakenOver           = "project.analysis-taken-over"
+	kindAwaitingAnalyst     = "project.awaiting-analyst"
 )
 
 func primaryEmail(p *Project) string {
@@ -342,6 +343,37 @@ func (s *Service) notifyFramingIndicated(ctx context.Context, q *db.Queries, p *
 	fmt.Fprintf(&b, "Os documentos e os demais dados estão no sistema:\n%s\n", s.link(p.ID))
 	return s.toSupervisors(ctx, q, kindFramingIndicated, fmt.Sprintf("framing-indicated:%s:%d", p.ID, round), p,
 		fmt.Sprintf("Projeto %s encaminhado ao departamento %s", p.Code, department), b.String())
+}
+
+// notifyAwaitingAnalyst: o enquadramento foi confirmado e o projeto voltou à fila dos analistas, para a abertura do processo no SIGADOC.
+// Vai a todos os Analistas ativos (uma vez por endereço) e leva só a lista permitida de framingSummary: sem CPF, telefones, e-mails
+// pessoais, endereços, justificativa nem documentos. Entra na transação do enquadramento, então se ela desfizer o e-mail não existe.
+func (s *Service) notifyAwaitingAnalyst(ctx context.Context, q *db.Queries, p *Project, round int, department string) error {
+	list, err := q.ListStaffEmailsByRole(ctx, roleAnalyst)
+	if err != nil {
+		return err
+	}
+	summary, err := s.framingSummary(ctx, q, p)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "O enquadramento do projeto %s foi confirmado pelo departamento %s e o projeto está na fila dos analistas, aguardando um analista para abrir o processo no SIGADOC.\n\n", p.Code, department)
+	b.WriteString(summary)
+	fmt.Fprintf(&b, "\nPara assumir o projeto, acesse o sistema:\n%s\n", s.link(p.ID))
+	seen := map[string]bool{}
+	for _, to := range list {
+		k := strings.ToLower(strings.TrimSpace(to))
+		if k == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		if err := s.enqueue(ctx, q, kindAwaitingAnalyst, p.ID, to, fmt.Sprintf("Projeto %s aguardando analista para abrir o processo no SIGADOC", p.Code), b.String(),
+			fmt.Sprintf("awaiting-analyst:%s:%d:%s", p.ID, round, k)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // notifyFramingRefused: o Revisor do Departamento recusou o enquadramento; o projeto voltou ao Analista.

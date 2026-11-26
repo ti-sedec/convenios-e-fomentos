@@ -9,6 +9,9 @@ export interface OverviewCounts {
   awaiting_checklist: number;
   in_analysis: number;
   awaiting_proponent: number;
+  /** Enquadrado: volta à fila dos analistas, que abrem o processo no SIGADOC e depois aguardam o parecer. */
+  awaiting_analyst: number;
+  opening_sigadoc: number;
   awaiting_opinion: number;
   archived: number;
 }

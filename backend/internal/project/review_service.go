@@ -104,14 +104,20 @@ func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, 
 		if err != nil {
 			return err
 		}
-		row, changed := cur, false
+		row, changed, opening := cur, false, false
 		switch str(cur.Stage) {
 		case StageAwaitingChecklist:
 			if row, err = q.AssumeProjectAnalysis(ctx, db.AssumeProjectAnalysisParams{ID: id, AnalystID: &actor.ID}); err != nil {
 				return notFound(err)
 			}
 			changed = true
-		case StageInAnalysis:
+		case StageAwaitingAnalyst:
+			// Depois do enquadramento o projeto voltou à fila: quem assume vira o responsável pela abertura do processo no SIGADOC.
+			if row, err = q.AssumeProjectOpening(ctx, db.AssumeProjectOpeningParams{ID: id, AnalystID: &actor.ID}); err != nil {
+				return notFound(err)
+			}
+			opening, changed = true, true
+		case StageInAnalysis, StageOpeningSigadoc:
 			if cur.AnalystID != nil {
 				if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
 					return err
@@ -126,7 +132,11 @@ func (s *Service) StartAnalysis(ctx context.Context, actor Actor, id uuid.UUID, 
 			return errStage(str(cur.Stage))
 		}
 		if changed {
-			if err := s.transition(ctx, q, row, actor.entry("project.start-analysis", id, map[string]any{"stage": StageInAnalysis})); err != nil {
+			action, stage := "project.start-analysis", StageInAnalysis
+			if opening || str(cur.Stage) == StageOpeningSigadoc {
+				action, stage = actionAssumeOpening, StageOpeningSigadoc
+			}
+			if err := s.transition(ctx, q, row, actor.entry(action, id, map[string]any{"stage": stage})); err != nil {
 				return err
 			}
 		}
@@ -149,14 +159,21 @@ func (s *Service) TakeOverAnalysis(ctx context.Context, actor Actor, id uuid.UUI
 			return err
 		}
 		switch str(cur.Stage) {
-		case StageInAnalysis, StageAwaitingProponent:
+		case StageInAnalysis, StageAwaitingProponent, StageOpeningSigadoc:
 		case StageAwaitingChecklist:
 			return errStageForReview(StageAwaitingChecklist)
+		case StageAwaitingAnalyst:
+			// Sem responsável a assumir: quem quer o projeto o assume pela rota de iniciar (assumir da fila).
+			return errStage(StageAwaitingAnalyst)
 		default:
 			return errStage(str(cur.Stage))
 		}
 		if framingPending(cur) {
 			return errFramingPending()
+		}
+		// Durante a montagem do processo no SIGADOC o PIN do analista está na memória da tarefa: não se troca o responsável.
+		if t, err := q.GetLatestSigadocTask(ctx, id); err == nil && t.Status == taskRunning {
+			return httpapi.ErrConflict("sigadoc_task_running", "A montagem do processo no SIGADOC está em andamento: espere terminar ou cancele-a antes de trocar o responsável.")
 		}
 		row := cur
 		if cur.AnalystID == nil || *cur.AnalystID != actor.ID {

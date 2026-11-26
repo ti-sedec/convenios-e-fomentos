@@ -265,10 +265,11 @@ export function StaffQueue() {
                   )}
                   {rows.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>
+                      <TableCell className='max-w-xs whitespace-normal'>
                         <Link
                           href={`/dashboard/projetos/${p.id}`}
-                          className='font-medium underline-offset-4 hover:underline'
+                          className='line-clamp-3 font-medium break-words underline-offset-4 hover:underline'
+                          title={p.title}
                         >
                           {p.title || 'Projeto sem título'}
                         </Link>
@@ -286,7 +287,7 @@ export function StaffQueue() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className='max-w-56 whitespace-normal break-words'>
                         {p.institutionName || <span className='text-muted-foreground'>—</span>}
                         {p.institutionCnpj && (
                           <div className='text-muted-foreground text-xs'>

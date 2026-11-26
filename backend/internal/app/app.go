@@ -31,6 +31,7 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/project"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/rules"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/scan"
+	"github.com/wagner/convenios-e-fomentos/backend/internal/sigadoc"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/storage"
 )
 
@@ -67,6 +68,8 @@ type App struct {
 	pool           *pgxpool.Pool
 	noOutboxWorker bool
 	noReportWorker bool
+	// noSigadocWatcher: os testes controlam quando o acompanhamento do SIGADOC roda.
+	noSigadocWatcher bool
 	// outboxDone fecha quando o worker de e-mail termina (ver Wait). Nulo se o worker não foi iniciado.
 	outboxDone chan struct{}
 }
@@ -78,8 +81,11 @@ type options struct {
 	store          storage.Store
 	mtid           mtid.Client
 	converter      preview.Converter
+	sigadoc        sigadoc.Client
 	noOutboxWorker bool
 	noReportWorker bool
+	// noSigadocWatcher: veja WithoutSigadocWatcher.
+	noSigadocWatcher bool
 }
 
 // WithStore usa o armazenamento dado em vez de criar o S3 a partir da configuração.
@@ -88,6 +94,13 @@ func WithStore(s storage.Store) Option { return func(o *options) { o.store = s }
 // WithMTID liga o MT-ID (assinatura das declarações). Sem ele, emitir declaração responde 503: o cliente HTTP real ainda não existe
 // (docs/debito-tecnico-mt-id.md).
 func WithMTID(c mtid.Client) Option { return func(o *options) { o.mtid = c } }
+
+// WithSigadoc liga o SIGADOC (abertura e acompanhamento do processo do projeto). Sem ele, o acompanhamento não roda.
+func WithSigadoc(c sigadoc.Client) Option { return func(o *options) { o.sigadoc = c } }
+
+// WithoutSigadocWatcher não inicia o acompanhamento do SIGADOC em segundo plano. Os testes usam para controlar quando ele roda
+// (App.Projects.ProcessSigadocWatches).
+func WithoutSigadocWatcher() Option { return func(o *options) { o.noSigadocWatcher = true } }
 
 // WithPreviewConverter usa o conversor de Word para PDF dado em vez do Gotenberg da configuração.
 func WithPreviewConverter(c preview.Converter) Option { return func(o *options) { o.converter = c } }
@@ -180,6 +193,10 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	if cfg.ClamAVAddr != "" {
 		projectSvc.SetScanner(scan.ClamAV{Addr: cfg.ClamAVAddr})
 	}
+	if o.sigadoc != nil {
+		projectSvc.SetSigadoc(o.sigadoc)
+		projectSvc.SetSigadocLookup(cfg.SigadocLookupMatricula)
+	}
 	if o.mtid != nil {
 		projectSvc.SetMTID(o.mtid)
 	}
@@ -221,7 +238,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 		},
 	})
 	mux := r.(*chi.Mux)
-	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Identifier: identifier, EndUsers: endUserSvc, APITokens: tokenSvc, Documents: documentSvc, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker, noReportWorker: o.noReportWorker}, nil
+	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Identifier: identifier, EndUsers: endUserSvc, APITokens: tokenSvc, Documents: documentSvc, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker, noReportWorker: o.noReportWorker, noSigadocWatcher: o.noSigadocWatcher}, nil
 }
 
 // Start sincroniza o registro de ações com o banco e passa a escutar as
@@ -249,6 +266,17 @@ func (a *App) Start(ctx context.Context) error {
 	if !a.noReportWorker {
 		go a.Projects.RunReportWorker(ctx)
 	}
+	// As montagens do processo no SIGADOC rodam em segundo plano com o contexto da aplicação; as que estavam em execução quando a API
+	// caiu perderam o PIN e ficam interrompidas.
+	a.Projects.SetSigadocContext(ctx)
+	if n, err := a.Projects.InterruptStaleSigadocTasks(ctx); err != nil {
+		return err
+	} else if n > 0 {
+		a.log.WarnContext(ctx, "montagens do processo no SIGADOC interrompidas pelo reinício", "quantidade", n)
+	}
+	if !a.noSigadocWatcher {
+		go a.Projects.RunSigadocWatcher(ctx)
+	}
 	if !a.noOutboxWorker {
 		a.outboxDone = make(chan struct{})
 		go func() {
@@ -268,15 +296,22 @@ func (a *App) Start(ctx context.Context) error {
 // timeout. Sem isso o processo pode sair no meio de um envio e a mensagem, já entregue ao servidor SMTP, voltar à fila e sair de novo.
 // Devolve false se o prazo acabou antes. Sem worker iniciado, devolve true na hora.
 func (a *App) Wait(timeout time.Duration) bool {
-	if a.outboxDone == nil {
-		return true
+	start := time.Now()
+	ok := true
+	if a.outboxDone != nil {
+		select {
+		case <-a.outboxDone:
+		case <-time.After(timeout):
+			ok = false
+		}
 	}
-	select {
-	case <-a.outboxDone:
-		return true
-	case <-time.After(timeout):
-		return false
+	// As montagens do processo no SIGADOC já receberam o cancelamento do contexto; esperam gravar o resultado (interrompida).
+	if left := timeout - time.Since(start); left > 0 {
+		ok = a.Projects.WaitSigadoc(left) && ok
+	} else {
+		ok = false
 	}
+	return ok
 }
 
 // DrainOutbox envia agora todos os e-mails vencidos da caixa de saída e devolve quantos reservou.

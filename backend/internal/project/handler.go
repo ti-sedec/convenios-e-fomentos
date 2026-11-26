@@ -109,6 +109,13 @@ func (h *Handler) Routes(r chi.Router) {
 
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/documents", h.checklist)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/history", h.history)
+	r.With(g(ActionRead)).Get("/admin/projects/{id}/sigadoc", h.sigadocState)
+	r.With(g(ActionRead)).Post("/admin/projects/{id}/sigadoc/movements/seen", h.sigadocSeen)
+	// Abrir o processo no SIGADOC é do analista responsável (a mesma ação de assumir a análise).
+	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/sigadoc/termo", h.sigadocTermo)
+	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/sigadoc/open", h.sigadocOpen)
+	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/sigadoc/resume", h.sigadocResume)
+	r.With(g(ActionStartAnalysis)).Post("/admin/projects/{id}/sigadoc/cancel", h.sigadocCancel)
 	r.With(g(ActionRead)).Get("/admin/projects/{id}/declarations/{code}", h.declarationPreview)
 	r.With(g(ActionUpdate), heavy).Post("/admin/projects/{id}/declarations/{code}/accept", h.acceptDeclaration)
 	r.With(g(ActionUpdate)).Delete("/admin/projects/{id}/declarations/{code}", h.cancelDeclaration)
@@ -168,10 +175,10 @@ func parseStaffFilters(q url.Values, p *ListParams) error {
 	if v := q.Get("stage"); v != "" {
 		for _, st := range strings.Split(v, ",") {
 			switch st = strings.TrimSpace(st); st {
-			case StageAwaitingChecklist, StageInAnalysis, StageAwaitingProponent, StageAwaitingOpinion:
+			case StageAwaitingChecklist, StageInAnalysis, StageAwaitingProponent, StageAwaitingAnalyst, StageOpeningSigadoc, StageAwaitingOpinion:
 				p.Stages = append(p.Stages, st)
 			default:
-				bad = append(bad, httpapi.FieldError{Field: "stage", Message: "Valores aceitos: awaiting_checklist, in_analysis, awaiting_proponent, awaiting_opinion."})
+				bad = append(bad, httpapi.FieldError{Field: "stage", Message: "Valores aceitos: awaiting_checklist, in_analysis, awaiting_proponent, awaiting_analyst, opening_sigadoc, awaiting_opinion."})
 			}
 		}
 	}
@@ -558,6 +565,92 @@ func (h *Handler) checklist(w http.ResponseWriter, r *http.Request) {
 	}
 	read, _ := admin.DecisionFrom(r.Context())
 	v, err := h.svc.Checklist(r.Context(), actorOf(r), id, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+// sigadocState: o processo do projeto no SIGADOC e as movimentações vistas (só a equipe; o proponente recebe 404).
+func (h *Handler) sigadocState(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	read, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.SigadocState(r.Context(), actorOf(r), id, read)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+func (h *Handler) sigadocTermo(w http.ResponseWriter, r *http.Request) {
+	in, id, dec, ok := decode[TermoInput](w, r)
+	if !ok {
+		return
+	}
+	v, err := h.svc.PreviewTermo(r.Context(), actorOf(r), id, in, dec)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+// sigadocOpen e sigadocResume recebem o PIN no corpo. O corpo nunca é registrado (o log de acesso só leva método, caminho e status) e o
+// PIN não vai para a auditoria.
+func (h *Handler) sigadocOpen(w http.ResponseWriter, r *http.Request)   { h.sigadocStart(w, r, false) }
+func (h *Handler) sigadocResume(w http.ResponseWriter, r *http.Request) { h.sigadocStart(w, r, true) }
+
+func (h *Handler) sigadocStart(w http.ResponseWriter, r *http.Request, resume bool) {
+	in, id, dec, ok := decode[OpenInput](w, r)
+	if !ok {
+		return
+	}
+	var (
+		v   *SigadocView
+		err error
+	)
+	if resume {
+		v, err = h.svc.ResumeSigadoc(r.Context(), actorOf(r), id, in, dec)
+	} else {
+		v, err = h.svc.OpenSigadoc(r.Context(), actorOf(r), id, in, dec)
+	}
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusAccepted, v, nil)
+}
+
+func (h *Handler) sigadocCancel(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	dec, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.CancelSigadoc(r.Context(), actorOf(r), id, dec)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, v, nil)
+}
+
+// sigadocSeen marca como vistas as movimentações posteriores ao arquivamento.
+func (h *Handler) sigadocSeen(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		httpapi.Error(w, r, err)
+		return
+	}
+	read, _ := admin.DecisionFrom(r.Context())
+	v, err := h.svc.MarkSigadocSeen(r.Context(), actorOf(r), id, read)
 	if err != nil {
 		httpapi.Error(w, r, err)
 		return

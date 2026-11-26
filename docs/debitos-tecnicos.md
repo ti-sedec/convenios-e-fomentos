@@ -199,6 +199,7 @@ Este documento é para ser atualizado: ao resolver um item, mover para "Resolvid
 ## Fora do escopo (fases futuras)
 
 ### T23. Etapas depois de "Aguardando parecer"
+- **Atualização (17/11/2026):** depois do enquadramento o projeto agora volta à fila dos analistas (`awaiting_analyst`) e passa pela abertura do processo no SIGADOC (`opening_sigadoc`) antes de "Aguardando parecer"; veja [planejamento-integracao-sigadoc.md](planejamento-integracao-sigadoc.md). A montagem do processo (fases F2 a F5) ainda não existe: hoje o projeto fica em `opening_sigadoc`.
 - O fluxo termina em "Projeto enquadrado" (D1). Parecer técnico (deferido/indeferido), formalização e prestação de contas não existem. O Secretário nega e o proponente desiste em qualquer etapa, **inclusive depois do enquadramento**, e isso já funciona. As etapas "Parado" e "Concluído" do planejamento original também ficam para depois.
 
 ---

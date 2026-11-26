@@ -125,12 +125,19 @@ export function LifecycleBanner({
     );
   }
 
-  if (project.status === 'submitted' && project.stage === 'awaiting_opinion') {
+  if (
+    project.status === 'submitted' &&
+    (project.stage === 'awaiting_analyst' ||
+      project.stage === 'opening_sigadoc' ||
+      project.stage === 'awaiting_opinion')
+  ) {
     return (
       <Alert>
         <Icons.circleCheck aria-hidden />
         <AlertTitle>Projeto enquadrado</AlertTitle>
-        <AlertDescription>O projeto foi enquadrado e aguarda o parecer da equipe.</AlertDescription>
+        <AlertDescription>
+          O projeto foi enquadrado. A equipe abrirá o processo e seguirá para o parecer.
+        </AlertDescription>
       </Alert>
     );
   }

@@ -192,10 +192,13 @@ func TestConfirmarEnquadramento(t *testing.T) {
 
 	r := f.confirm(f.staff.reviewerSame, f.fp.id, 1)
 	require.Equal(t, 200, r.Status, r.Body)
-	assert.Equal(t, "awaiting_opinion", r.data()["stage"])
+	assert.Equal(t, "awaiting_analyst", r.data()["stage"], "confirmado, o projeto volta à fila dos analistas")
 	assert.Equal(t, "confirmed", framingOf(r)["decision"])
 	assert.NotEmpty(t, framingOf(r)["decidedBy"])
-	assert.Empty(t, f.mail.Msgs, "confirmar não envia e-mail")
+	for _, m := range f.mail.Msgs {
+		assert.Equal(t, "m.analista@exemplo.com", m.To, "confirmar só avisa os Analistas (nem o Revisor, o Supervisor ou o proponente)")
+	}
+	assert.Len(t, f.mailsBy("m.analista@exemplo.com", "aguardando analista"), 1)
 
 	// Depois de confirmado o departamento continua e a decisão não se repete.
 	assert.Equal(t, 200, f.status(f.staff.reviewerSame, "/api/admin/projects/"+f.fp.id), "o Revisor segue vendo")
@@ -204,7 +207,7 @@ func TestConfirmarEnquadramento(t *testing.T) {
 
 	// A lista mostra a etapa, o enquadramento e o departamento só para a equipe.
 	var staffRow map[string]any
-	for _, it := range f.do("GET", "/api/admin/projects?stage=awaiting_opinion", nil, f.staff.analyst).list() {
+	for _, it := range f.do("GET", "/api/admin/projects?stage=awaiting_analyst", nil, f.staff.analyst).list() {
 		if it.(map[string]any)["id"] == f.fp.id {
 			staffRow = it.(map[string]any)
 		}
@@ -391,6 +394,8 @@ func TestEnquadramentoPendenteBloqueiaAConferencia(t *testing.T) {
 	})
 }
 
+// Depois de confirmado o projeto volta à fila dos analistas: o analista só pode assumi-lo (abertura do processo no SIGADOC); conferir,
+// devolver, indicar e arquivar por falta de documentos não cabem mais. Desistir e negar continuam valendo.
 func TestDepoisDeConfirmadoSoRestaDesistirOuNegar(t *testing.T) {
 	f := newFramingEnv(t, "7701-2026")
 	require.Equal(t, 200, f.assign(f.staff.analyst, f.fp.id, f.fin).Status)
@@ -401,7 +406,7 @@ func TestDepoisDeConfirmadoSoRestaDesistirOuNegar(t *testing.T) {
 		"devolver": f.complement(f.staff.analyst, id, map[string]any{"items": []any{section("proposal", "")}}),
 		"desfazer": f.review(f.staff.analyst, id, "section", "proponent", false),
 		"indicar":  f.assign(f.staff.analyst, id, f.jur),
-		"assumir":  f.startAnalysis(f.staff.analyst, id),
+		"arquivar": f.do("POST", "/api/admin/projects/"+id+"/archive", map[string]any{"reason": "missing_documents", "note": "Faltam documentos."}, f.staff.analyst),
 	} {
 		assert.Equal(t, 409, r.Status, name)
 		assert.Equal(t, "project_stage_invalid", r.errCode(), name)

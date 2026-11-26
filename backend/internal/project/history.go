@@ -14,7 +14,7 @@ import (
 // Com quem o projeto está (project_stage_history.holder_type).
 const (
 	HolderTeam       = "team"       // enviado e ainda sem analista responsável
-	HolderAnalyst    = "analyst"    // em análise, com analista responsável
+	HolderAnalyst    = "analyst"    // em análise ou na abertura do processo no SIGADOC, com analista responsável
 	HolderDepartment = "department" // enquadramento pendente ou aguardando parecer
 	HolderProponent  = "proponent"  // devolvido para complementação
 	HolderNone       = "none"       // arquivado
@@ -30,7 +30,7 @@ func holderOf(r db.Project) string {
 		return HolderProponent
 	case str(r.Stage) == StageAwaitingOpinion || framingPending(r):
 		return HolderDepartment
-	case str(r.Stage) == StageInAnalysis && r.AnalystID != nil:
+	case (str(r.Stage) == StageInAnalysis || str(r.Stage) == StageOpeningSigadoc) && r.AnalystID != nil:
 		return HolderAnalyst
 	}
 	return HolderTeam

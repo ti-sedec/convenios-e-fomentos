@@ -29,6 +29,16 @@ const analystTabs: QueueTab[] = [
     params: { ...active, stage: ['awaiting_proponent'] }
   },
   {
+    key: 'analista',
+    label: 'Aguardando analista',
+    params: { ...active, stage: ['awaiting_analyst'] }
+  },
+  {
+    key: 'sigadoc',
+    label: 'Abertura no SIGADOC',
+    params: { ...active, stage: ['opening_sigadoc'] }
+  },
+  {
     key: 'parecer',
     label: 'Aguardando parecer',
     params: { ...active, stage: ['awaiting_opinion'] }
@@ -46,6 +56,16 @@ const reviewerTabs: QueueTab[] = [
 const generalTabs: QueueTab[] = [
   { key: 'todos', label: 'Todos', params: {} },
   { key: 'analise', label: 'Em análise', params: { ...active, stage: ['in_analysis'] } },
+  {
+    key: 'analista',
+    label: 'Aguardando analista',
+    params: { ...active, stage: ['awaiting_analyst'] }
+  },
+  {
+    key: 'sigadoc',
+    label: 'Abertura no SIGADOC',
+    params: { ...active, stage: ['opening_sigadoc'] }
+  },
   {
     key: 'parecer',
     label: 'Aguardando parecer',

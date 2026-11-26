@@ -26,6 +26,8 @@ export type ProjectStage =
   | 'awaiting_checklist'
   | 'in_analysis'
   | 'awaiting_proponent'
+  | 'awaiting_analyst'
+  | 'opening_sigadoc'
   | 'awaiting_opinion';
 export type PhoneType = 'mobile' | 'landline';
 export type MemberLevel = 'read' | 'edit';
@@ -379,10 +381,22 @@ export const statusLabels: Record<ProjectStatus, string> = {
   archived: 'Arquivado'
 };
 
+export const sigadocItemStatusLabels: Record<SigadocItemStatus, string> = {
+  pending: 'Na fila',
+  creating: 'Criando',
+  created: 'Criado',
+  finalized: 'Finalizado',
+  signed: 'Assinado',
+  joined: 'No processo',
+  failed: 'Com problema'
+};
+
 export const stageLabels: Record<ProjectStage, string> = {
   awaiting_checklist: 'Aguardando análise de checklist',
   in_analysis: 'Em análise',
   awaiting_proponent: 'Aguardando correções do proponente',
+  awaiting_analyst: 'Aguardando analista',
+  opening_sigadoc: 'Abertura do processo no SIGADOC',
   awaiting_opinion: 'Aguardando parecer'
 };
 
@@ -427,6 +441,98 @@ export interface StageHistory {
     byHolder: Partial<Record<HistoryHolder, number>>;
     byStage: Partial<Record<ProjectStage, number>>;
   };
+}
+
+// ---- SIGADOC: processo e tramitação acompanhada (equipe) ----
+
+/** O processo do projeto no SIGADOC. O sistema só acompanha: o que acontece lá é feito direto no SIGADOC. */
+export interface SigadocProcess {
+  number: string;
+  sigla: string;
+  openedAt: string;
+  /** Nulo enquanto o processo está ativo no SIGADOC. */
+  archivedAtSigadoc: string | null;
+  situation: string;
+  lastCheckedAt: string | null;
+  /** Texto curto da última consulta que falhou; vazio se deu certo. */
+  error: string;
+}
+
+export interface SigadocMovement {
+  id: string;
+  movId: number;
+  event: string;
+  /** Descrição do documento tramitado, como o SIGADOC informa. */
+  description: string;
+  lotacao: string;
+  destination: string;
+  person: string;
+  /** Nulo se o formato da data não foi reconhecido (use `atRaw`). */
+  at: string | null;
+  atRaw: string;
+  /** Aconteceu depois de o projeto ser arquivado no sistema. */
+  afterArchive: boolean;
+  seen: boolean;
+}
+
+export type SigadocTaskStatus = 'running' | 'interrupted' | 'completed' | 'cancelled';
+export type SigadocItemStatus =
+  | 'pending'
+  | 'creating'
+  | 'created'
+  | 'finalized'
+  | 'signed'
+  | 'joined'
+  | 'failed';
+
+export interface SigadocItem {
+  kind: 'termo' | 'report' | 'document';
+  label: string;
+  part: number;
+  parts: number;
+  status: SigadocItemStatus;
+  /** Texto curto; nunca leva PIN, URL ou credencial. */
+  error: string;
+}
+
+/** Uma tentativa de montagem do processo no SIGADOC (a primeira e cada retomada). */
+export interface SigadocTask {
+  id: string;
+  status: SigadocTaskStatus;
+  attempt: number;
+  progressDone: number;
+  progressTotal: number;
+  errorCode: string;
+  error: string;
+  startedAt: string;
+  finishedAt: string | null;
+  items: SigadocItem[];
+}
+
+/** Se o botão "Abrir no SIGADOC" cabe agora e, se não, por quê. */
+export interface SigadocOpening {
+  available: boolean;
+  reason: string;
+  configured: boolean;
+  termoReady: boolean;
+}
+
+export interface TermoPreview {
+  html: string;
+  /** Campos lógicos do Termo com os valores usados (o analista ajusta e pede de novo). */
+  fields: Record<string, string>;
+}
+
+export interface SigadocView {
+  task: SigadocTask | null;
+  opening: SigadocOpening;
+  process: SigadocProcess | null;
+  movements: SigadocMovement[];
+  projectArchived: boolean;
+  /** Arquivado no sistema, mas o processo segue sem arquivamento no SIGADOC. */
+  stillOpenAtSigadoc: boolean;
+  /** Movimentações posteriores ao arquivamento que a equipe ainda não viu. */
+  newAfterArchive: number;
 }
 
 // ---- Conferência e enquadramento (equipe) ----

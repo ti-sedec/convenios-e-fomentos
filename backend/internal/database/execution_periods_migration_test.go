@@ -19,7 +19,20 @@ func TestMigracaoPeriodosDeExecucaoPreservaOsDadosAntigos(t *testing.T) {
 	m := database.NewMigrator(pool)
 	t.Cleanup(func() { _ = m.Close() })
 
-	require.NoError(t, m.Down(ctx), "desfazer a 00036")
+	// Down desfaz UMA migração: desce até a 00036 sair (reconhece pela tabela que ela criou), por mais migrações que venham depois dela.
+	downPast36 := func() {
+		t.Helper()
+		exists := func() bool {
+			var n int
+			require.NoError(t, pool.QueryRow(ctx, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'project_execution_periods'").Scan(&n))
+			return n > 0
+		}
+		for steps := 0; exists(); steps++ {
+			require.Less(t, steps, 20, "a 00036 deveria sair")
+			require.NoError(t, m.Down(ctx))
+		}
+	}
+	downPast36()
 
 	exec := func(sql string, args ...any) {
 		t.Helper()
@@ -81,7 +94,7 @@ func TestMigracaoPeriodosDeExecucaoPreservaOsDadosAntigos(t *testing.T) {
 	assert.Empty(t, rows(empty))
 
 	// Descer de novo volta ao formato antigo, resumindo as linhas (menor início, maior término, municípios distintos).
-	require.NoError(t, m.Down(ctx))
+	downPast36()
 	var start, end, detail string
 	require.NoError(t, pool.QueryRow(ctx, `SELECT start_date::text, end_date::text, execution_place_detail FROM projects WHERE id = $1`, withMunicipalities).Scan(&start, &end, &detail))
 	assert.Equal(t, []string{"2026-11-01", "2027-05-01", "Av. Principal"}, []string{start, end, detail})

@@ -9,6 +9,9 @@ export interface QueueCounts {
   in_analysis: number;
   framing_pending: number;
   awaiting_proponent: number;
+  /** Enquadrados que voltaram à fila, sem responsável, e os que um analista já assumiu para abrir o processo no SIGADOC. */
+  awaiting_analyst: number;
+  opening_sigadoc: number;
   awaiting_opinion: number;
   /** Arquivados nos últimos 30 dias. */
   archived_30d: number;
@@ -23,7 +26,13 @@ export interface StalledLimits {
 }
 
 /** Etapa de trabalho: o estado do projeto visto de quem está com ele. */
-export type WorkStage = 'awaiting_checklist' | 'in_analysis' | 'framing' | 'awaiting_opinion';
+export type WorkStage =
+  | 'awaiting_checklist'
+  | 'in_analysis'
+  | 'framing'
+  | 'awaiting_analyst'
+  | 'opening_sigadoc'
+  | 'awaiting_opinion';
 export type Holder = 'team' | 'analyst' | 'department';
 
 export interface QueueItem {
@@ -57,7 +66,14 @@ export interface QueueBlock {
   capped?: boolean;
 }
 
-export type BlockKey = 'refused' | 'resubmitted' | 'entry' | 'ready' | 'stalled' | 'deadlines';
+export type BlockKey =
+  | 'refused'
+  | 'resubmitted'
+  | 'entry'
+  | 'awaiting_analyst'
+  | 'ready'
+  | 'stalled'
+  | 'deadlines';
 
 export interface QueueOverview {
   counts: QueueCounts;

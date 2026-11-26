@@ -32,6 +32,9 @@ Comandos:
   seed               cria os dados iniciais (idempotente): roles e permissões padrão,
                      departamentos de exemplo, os Super Admins de SEED_SUPER_ADMIN_CPF e,
                      em desenvolvimento, um administrador de exemplo por role
+  sigadoc:check      autentica no SIGADOC pelo X-Via e mostra quais métodos o usuário de sistema
+                     consegue chamar (não altera nada; sem banco)
+                     --matricula SEDEC123456 [--strict]
   cleanup            remove sessões de usuário final e tokens de uso único vencidos há mais
                      de N dias [--days 7] e envios de arquivo nunca confirmados há mais de 24 h;
                      com --draft-days N, também apaga rascunhos de projeto sem alteração há mais
@@ -53,6 +56,9 @@ func run(ctx context.Context, cmd string, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
+	}
+	if cmd == "sigadoc:check" { // não precisa do banco
+		return sigadocCheck(ctx, cfg, args, os.Stdout)
 	}
 	pool, err := database.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {

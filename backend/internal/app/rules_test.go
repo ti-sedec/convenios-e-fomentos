@@ -39,9 +39,9 @@ func effectiveByKey(t *testing.T, r resp) map[string]map[string]any {
 func TestParametrosPadraoDasNormas(t *testing.T) {
 	e, boss := setup(t)
 
-	// Em jun/2026 todos os seis estão vigentes.
+	// Em jun/2026 todos os sete estão vigentes.
 	eff := effectiveByKey(t, e.do("GET", "/api/admin/rule-parameters/effective?date=2026-06-01", nil, boss))
-	require.Len(t, eff, 6)
+	require.Len(t, eff, 7)
 	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(7), "framing": float64(5), "awaiting_opinion": float64(15)},
 		eff["stalled_after_days"]["value"], "limites de parado, por etapa")
 	assert.EqualValues(t, 3, eff["complement_days"]["value"])
@@ -72,7 +72,7 @@ func TestParametrosPadraoDasNormas(t *testing.T) {
 	assert.Equal(t, 200, e.do("GET", "/api/admin/rule-parameters/effective", nil, boss).Status, "sem data usa hoje")
 
 	keys := e.do("GET", "/api/admin/rule-parameters/keys", nil, boss).list()
-	assert.Len(t, keys, 6)
+	assert.Len(t, keys, 7)
 	assert.NotEmpty(t, keys[0].(map[string]any)["description"])
 }
 

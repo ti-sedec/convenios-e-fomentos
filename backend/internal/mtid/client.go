@@ -3,8 +3,6 @@ package mtid
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +11,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/wagner/convenios-e-fomentos/backend/internal/xvia"
 )
 
 // ErrNoToken indica que a chamada não trouxe o token do MT Login (veja WithToken): o MT-ID não aceita pedido sem ele.
@@ -65,27 +64,10 @@ func NewHTTP(cfg HTTPConfig) (*HTTP, error) {
 	if service == "" {
 		service = "GOV/MTI/SMARTPASS"
 	}
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: cfg.TLSServerName}
-	if cfg.CAFile != "" {
-		pem, err := os.ReadFile(cfg.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("mtid: lendo o certificado do X-Via: %w", err)
-		}
-		pool, err := x509.SystemCertPool()
-		if err != nil || pool == nil {
-			pool = x509.NewCertPool()
-		}
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("mtid: %s não contém certificado PEM", cfg.CAFile)
-		}
-		tlsCfg.RootCAs = pool
+	hc, err := xvia.NewHTTPClient(xvia.TLS{CAFile: cfg.CAFile, ServerName: cfg.TLSServerName, Timeout: cfg.Timeout})
+	if err != nil {
+		return nil, fmt.Errorf("mtid: %w", err)
 	}
-	timeout := cfg.Timeout
-	if timeout <= 0 {
-		timeout = 30 * time.Second
-	}
-	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.TLSClientConfig = tlsCfg
 	log := cfg.Log
 	if log == nil {
 		log = slog.Default()
@@ -93,7 +75,7 @@ func NewHTTP(cfg HTTPConfig) (*HTTP, error) {
 	return &HTTP{
 		base:   strings.TrimRight(cfg.BaseURL, "/") + "/" + service,
 		xroad:  cfg.XRoadClient,
-		client: &http.Client{Transport: tr, Timeout: timeout},
+		client: hc,
 		log:    log,
 	}, nil
 }

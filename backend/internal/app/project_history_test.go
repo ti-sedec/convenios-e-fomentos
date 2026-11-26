@@ -164,9 +164,9 @@ func TestHistoricoDeEtapas(t *testing.T) {
 		require.Equal(t, 200, p.confirm(revJur, fp.id, 2).Status)
 		h = p.assertHistory(fp.id)
 		last := h[len(h)-1]
-		assert.Equal(t, "awaiting_opinion", last.Stage)
-		assert.Equal(t, "department", last.Holder)
-		assert.Equal(t, "Jurídico", *last.DeptName)
+		assert.Equal(t, "awaiting_analyst", last.Stage, "confirmado, o projeto volta à fila dos analistas")
+		assert.Equal(t, "team", last.Holder)
+		assert.Nil(t, last.DeptName, "na fila dos analistas o projeto não está com o departamento")
 		assert.Equal(t, "project.framing-confirm", last.Transition)
 	})
 

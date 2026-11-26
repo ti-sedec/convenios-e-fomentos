@@ -30,9 +30,11 @@ WHERE f.project_id = $1
 ORDER BY f.round;
 
 -- Define o departamento e o enquadramento do projeto, e a etapa. framing_status e department_id nulos limpam (recusa).
+-- release_analyst libera o analista responsável (confirmação do enquadramento: o projeto volta à fila dos analistas).
 -- name: SetProjectFraming :one
 UPDATE projects
 SET department_id = sqlc.narg(department_id), framing_status = sqlc.narg(framing_status), stage = sqlc.arg(stage),
+    analyst_id = CASE WHEN sqlc.arg(release_analyst)::boolean THEN NULL ELSE analyst_id END,
     version = version + 1, updated_at = now(), updated_by_id = sqlc.arg(updated_by_id)
 WHERE id = sqlc.arg(id) AND status = 'submitted'
 RETURNING *;

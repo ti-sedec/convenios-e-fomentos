@@ -232,25 +232,29 @@ func (q *Queries) NextFramingRound(ctx context.Context, projectID uuid.UUID) (in
 const setProjectFraming = `-- name: SetProjectFraming :one
 UPDATE projects
 SET department_id = $1, framing_status = $2, stage = $3,
-    version = version + 1, updated_at = now(), updated_by_id = $4
-WHERE id = $5 AND status = 'submitted'
+    analyst_id = CASE WHEN $4::boolean THEN NULL ELSE analyst_id END,
+    version = version + 1, updated_at = now(), updated_by_id = $5
+WHERE id = $6 AND status = 'submitted'
 RETURNING id, created_by_id, updated_by_id, department_id, status, version, created_at, updated_at, proponent_name, proponent_cpf, proponent_phones, proponent_emails, proponent_uf, proponent_municipality_ibge, proponent_job_title, is_legal_representative, legal_rep_name, legal_rep_cpf, legal_rep_job_title, instrument, institution_cnpj, institution_name, entity_type_id, entity_type_other, entity_nature, entity_non_profit, institution_uf, institution_municipality_ibge, institution_zip, institution_street, institution_number, institution_complement, institution_district, institution_email, institution_phone, habilitation_status, habilitation_number, habilitation_valid_until, sigcon_number, sigcon_registered_on, title, object_description, justification, object_nature, has_artistic_hiring, calamity, funding_type, own_amount_cents, amendment_amount_cents, total_amount_cents, counterpart_kind, counterpart_cents, counterpart_description, indirect_costs_cents, tender_status, tender_notice_number, tender_approved_on, tender_legal_basis, tender_justification, artist_fees_cents, regional_artist_fees_cents, governor_waiver, price_oldest_collected_on, exclusive_supplier, public_space_use, reduced_deadline, code, stage, submitted_at, submitted_by_id, submission_ip, late_submission, archived_at, archived_by_id, archive_reason, archive_note, origin_project_id, proponent_personal, legal_rep_personal, analyst_id, framing_status
 `
 
 type SetProjectFramingParams struct {
-	DepartmentID  *uuid.UUID `json:"department_id"`
-	FramingStatus *string    `json:"framing_status"`
-	Stage         *string    `json:"stage"`
-	UpdatedByID   *uuid.UUID `json:"updated_by_id"`
-	ID            uuid.UUID  `json:"id"`
+	DepartmentID   *uuid.UUID `json:"department_id"`
+	FramingStatus  *string    `json:"framing_status"`
+	Stage          *string    `json:"stage"`
+	ReleaseAnalyst bool       `json:"release_analyst"`
+	UpdatedByID    *uuid.UUID `json:"updated_by_id"`
+	ID             uuid.UUID  `json:"id"`
 }
 
 // Define o departamento e o enquadramento do projeto, e a etapa. framing_status e department_id nulos limpam (recusa).
+// release_analyst libera o analista responsável (confirmação do enquadramento: o projeto volta à fila dos analistas).
 func (q *Queries) SetProjectFraming(ctx context.Context, arg SetProjectFramingParams) (Project, error) {
 	row := q.db.QueryRow(ctx, setProjectFraming,
 		arg.DepartmentID,
 		arg.FramingStatus,
 		arg.Stage,
+		arg.ReleaseAnalyst,
 		arg.UpdatedByID,
 		arg.ID,
 	)

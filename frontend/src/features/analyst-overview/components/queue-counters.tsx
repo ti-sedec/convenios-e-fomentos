@@ -15,6 +15,13 @@ const cards: { tab: string; label: string; count: (c: QueueCounts) => number; en
     { tab: 'analise', label: 'Em análise', count: (c) => c.in_analysis },
     { tab: 'enquadramento', label: 'Em enquadramento', count: (c) => c.framing_pending },
     { tab: 'proponente', label: 'Aguardam proponente', count: (c) => c.awaiting_proponent },
+    {
+      tab: 'analista',
+      label: 'Aguardando analista',
+      count: (c) => c.awaiting_analyst,
+      entry: true
+    },
+    { tab: 'sigadoc', label: 'Abertura no SIGADOC', count: (c) => c.opening_sigadoc },
     { tab: 'parecer', label: 'Aguardando parecer', count: (c) => c.awaiting_opinion },
     { tab: 'arquivados', label: 'Arquivados (30 dias)', count: (c) => c.archived_30d }
   ];
@@ -27,7 +34,7 @@ export function QueueCounters({ counts, escopo }: { counts: QueueCounts; escopo:
   const shown = cards.filter((c) => !(escopo === 'meus' && c.entry));
   return (
     <section aria-label='Fila por etapa'>
-      <ul className='grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6'>
+      <ul className='grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8'>
         {shown.map((c) => (
           <li key={c.tab}>
             <Link

@@ -59,6 +59,13 @@ const specs: BlockSpec[] = [
     })
   },
   {
+    key: 'awaiting_analyst',
+    title: 'Enquadrados aguardando analista',
+    note: 'O enquadramento foi confirmado: um analista precisa assumir para abrir o processo no SIGADOC.',
+    cta: 'Assumir',
+    detail: (it) => ({ text: `Na fila há ${ago(it)}` })
+  },
+  {
     key: 'ready',
     title: 'Tudo aprovado, falta indicar o departamento',
     cta: 'Indicar departamento',

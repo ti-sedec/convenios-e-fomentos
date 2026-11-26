@@ -30,7 +30,9 @@ const (
 	workAwaitingChecklist = "awaiting_checklist" // com a equipe, na fila de entrada
 	workInAnalysis        = "in_analysis"        // com o Analista
 	workFraming           = "framing"            // enquadramento pendente, com o departamento
-	workAwaitingOpinion   = "awaiting_opinion"   // enquadrado, aguardando parecer
+	workAwaitingAnalyst   = "awaiting_analyst"   // enquadrado, de volta à fila dos analistas (sem responsável)
+	workOpeningSigadoc    = "opening_sigadoc"    // com o Analista, na abertura do processo no SIGADOC
+	workAwaitingOpinion   = "awaiting_opinion"   // processo aberto no SIGADOC, aguardando parecer
 )
 
 // workSQL é a etapa de trabalho de uma linha de projetos. Espelha holderOf (history.go), com o enquadramento pendente separado da análise.
@@ -38,6 +40,8 @@ const workSQL = `(CASE WHEN status <> 'submitted' THEN NULL
 	WHEN framing_status = 'pending' THEN '` + workFraming + `'
 	WHEN stage = 'awaiting_checklist' THEN '` + workAwaitingChecklist + `'
 	WHEN stage = 'in_analysis' THEN '` + workInAnalysis + `'
+	WHEN stage = 'awaiting_analyst' THEN '` + workAwaitingAnalyst + `'
+	WHEN stage = 'opening_sigadoc' THEN '` + workOpeningSigadoc + `'
 	WHEN stage = 'awaiting_opinion' THEN '` + workAwaitingOpinion + `'
 	END)`
 
@@ -51,7 +55,10 @@ type QueueCounts struct {
 	InAnalysis        int `json:"in_analysis"`
 	FramingPending    int `json:"framing_pending"`
 	AwaitingProponent int `json:"awaiting_proponent"`
-	AwaitingOpinion   int `json:"awaiting_opinion"`
+	// AwaitingAnalyst e OpeningSigadoc são as etapas depois do enquadramento confirmado (docs/planejamento-integracao-sigadoc.md).
+	AwaitingAnalyst int `json:"awaiting_analyst"`
+	OpeningSigadoc  int `json:"opening_sigadoc"`
+	AwaitingOpinion int `json:"awaiting_opinion"`
 	// Archived30d são os arquivados nos últimos 30 dias; o total completo fica na aba "Arquivados" da fila.
 	Archived30d int `json:"archived_30d"`
 }
@@ -93,9 +100,11 @@ type QueueBlocks struct {
 	Refused     QueueBlock `json:"refused"`
 	Resubmitted QueueBlock `json:"resubmitted"`
 	Entry       QueueBlock `json:"entry"`
-	Ready       QueueBlock `json:"ready"`
-	Stalled     QueueBlock `json:"stalled"`
-	Deadlines   QueueBlock `json:"deadlines"`
+	// AwaitingAnalyst são os projetos enquadrados que voltaram à fila e esperam um analista assumir (a fila inteira, sem responsável).
+	AwaitingAnalyst QueueBlock `json:"awaiting_analyst"`
+	Ready           QueueBlock `json:"ready"`
+	Stalled         QueueBlock `json:"stalled"`
+	Deadlines       QueueBlock `json:"deadlines"`
 }
 
 // QueueOverview é a resposta de GET /admin/projects/queue/overview.
@@ -194,6 +203,12 @@ func (s *Service) QueueOverview(ctx context.Context, actor Actor, perm authz.Fil
 	}); err != nil {
 		return nil, err
 	}
+	// Enquadrados que voltaram à fila: esperam um analista assumir (a fila inteira, mesmo em "só os meus").
+	if err := s.queueBlock(ctx, team(), &out.Blocks.AwaitingAnalyst, false, func(*queueQuery) (string, string) {
+		return `work = '` + workAwaitingAnalyst + `'`, `since DESC`
+	}, nil); err != nil {
+		return nil, err
+	}
 	// Pronto para indicar o departamento: em análise, sem departamento e com tudo aprovado.
 	if err := s.queueReady(ctx, scoped(), actor, &out.Blocks.Ready); err != nil {
 		return nil, err
@@ -247,6 +262,10 @@ func (s *Service) queueCounts(ctx context.Context, q *queueQuery, out *QueueOver
 			c.InAnalysis += n
 		case stage == StageAwaitingProponent:
 			c.AwaitingProponent += n
+		case stage == StageAwaitingAnalyst:
+			c.AwaitingAnalyst += n
+		case stage == StageOpeningSigadoc:
+			c.OpeningSigadoc += n
 		case stage == StageAwaitingOpinion:
 			c.AwaitingOpinion += n
 		}
@@ -341,9 +360,9 @@ func (s *Service) queueReady(ctx context.Context, q *queueQuery, actor Actor, b 
 // holderOfWork diz com quem o projeto está em cada etapa de trabalho.
 func holderOfWork(work string) string {
 	switch work {
-	case workAwaitingChecklist:
+	case workAwaitingChecklist, workAwaitingAnalyst:
 		return HolderTeam
-	case workInAnalysis:
+	case workInAnalysis, workOpeningSigadoc:
 		return HolderAnalyst
 	case workFraming, workAwaitingOpinion:
 		return HolderDepartment

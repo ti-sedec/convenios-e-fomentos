@@ -26,6 +26,8 @@ import type {
   ReportKind,
   ReviewDecision,
   ReviewKind,
+  SigadocView,
+  TermoPreview,
   StageHistory
 } from './types';
 
@@ -136,6 +138,60 @@ const docs = (id: string) => `/admin/projects/${id}/documents`;
 
 export async function getChecklist(id: string) {
   return (await apiClient<ApiResponse<Checklist>>(docs(id))).data;
+}
+
+export async function getSigadoc(id: string) {
+  return (await apiClient<ApiResponse<SigadocView>>(`/admin/projects/${id}/sigadoc`)).data;
+}
+
+/** Pré-visualiza o Termo de Abertura com os dados do projeto e os ajustes do analista. Nada é gravado no SIGADOC. */
+export async function previewTermo(id: string, fields: Record<string, string>) {
+  return (
+    await apiClient<ApiResponse<TermoPreview>>(`/admin/projects/${id}/sigadoc/termo`, {
+      method: 'POST',
+      ...json({ fields })
+    })
+  ).data;
+}
+
+/** Abre o processo no SIGADOC. O PIN vai só neste corpo e nunca é guardado (nem no cache de mutações). */
+export async function openSigadoc(
+  id: string,
+  input: { pin: string; fields: Record<string, string> }
+) {
+  return (
+    await apiClient<ApiResponse<SigadocView>>(`/admin/projects/${id}/sigadoc/open`, {
+      method: 'POST',
+      ...json(input)
+    })
+  ).data;
+}
+
+/** Retoma a montagem interrompida, com o PIN de novo. */
+export async function resumeSigadoc(id: string, pin: string) {
+  return (
+    await apiClient<ApiResponse<SigadocView>>(`/admin/projects/${id}/sigadoc/resume`, {
+      method: 'POST',
+      ...json({ pin })
+    })
+  ).data;
+}
+
+export async function cancelSigadoc(id: string) {
+  return (
+    await apiClient<ApiResponse<SigadocView>>(`/admin/projects/${id}/sigadoc/cancel`, {
+      method: 'POST'
+    })
+  ).data;
+}
+
+/** A equipe viu o aviso: as movimentações posteriores ao arquivamento passam a vistas. */
+export async function markSigadocSeen(id: string) {
+  return (
+    await apiClient<ApiResponse<SigadocView>>(`/admin/projects/${id}/sigadoc/movements/seen`, {
+      method: 'POST'
+    })
+  ).data;
 }
 
 export async function getStageHistory(id: string) {

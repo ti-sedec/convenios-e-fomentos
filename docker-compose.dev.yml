@@ -63,6 +63,12 @@ x-api: &api
     X_ROAD_CLIENT: ${X_ROAD_CLIENT:-}
     X_VIA_CA_FILE: ${X_VIA_CA_FILE:-}
     X_VIA_TLS_SERVER_NAME: ${X_VIA_TLS_SERVER_NAME:-}
+    # SIGADOC pelo X-Via: usuário de sistema (Basic) que representa a matrícula do analista; veja .env.example.
+    SIGADOC_USERNAME: ${SIGADOC_USERNAME:-}
+    SIGADOC_PASSWORD: ${SIGADOC_PASSWORD:-}
+    X_VIA_SIGADOC_SERVICE: ${X_VIA_SIGADOC_SERVICE:-GOV/MTI/SIGADOC}
+    SIGADOC_SIMULATE: ${SIGADOC_SIMULATE:-false}
+    SIGADOC_LOOKUP_MATRICULA: ${SIGADOC_LOOKUP_MATRICULA:-}
     # Segredos: os padrões servem SOMENTE para desenvolvimento.
     JWT_API_SECRET: ${JWT_API_SECRET:-dev-only-api-secret-change-me-000000000000}
     API_TOKEN_SALT: ${API_TOKEN_SALT:-dev-only-api-token-salt-change-me-0000000}

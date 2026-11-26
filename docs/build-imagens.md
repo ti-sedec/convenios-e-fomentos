@@ -67,7 +67,7 @@ Para forçar um deploy sem push novo: apague `/var/lib/convenios-autodeploy/last
 
 ## Produção (Coolify)
 
-A produção também roda no Coolify (VM própria, painel em `http://201.49.171.163:8000`), com a mesma stack, `IMAGE_TAG=prod` e a branch `main`. O deploy automático é o mesmo timer do hml, instalado com `BRANCH=main` e o `COOLIFY_APP_UUID` da aplicação de produção (o `/etc/convenios-autodeploy.env` é por servidor). O Coolify lê o certificado público do X-Via de produção em `backend/certs/xvia.crt` (nome conferido: `XV-SS-SEDEC`, não o host da URL).
+A produção também roda no Coolify (VM própria, painel só acessível pela rede da SEDEC; o endereço não fica neste repositório), com a mesma stack, `IMAGE_TAG=prod` e a branch `main`. O deploy automático é o mesmo timer do hml, instalado com `BRANCH=main` e o `COOLIFY_APP_UUID` da aplicação de produção (o `/etc/convenios-autodeploy.env` é por servidor). O Coolify lê o certificado público do X-Via de produção em `backend/certs/xvia.crt` (nome conferido: `XV-SS-SEDEC`, não o host da URL).
 
 Se o seu ambiente de produção for o Portainer: o `main` não tem deploy automático; espere o workflow da `main` terminar (aba *Actions*) e, na stack, **Pull and redeploy** com *Re-pull image* ligado (o compose já tem `pull_policy: always`).
 
