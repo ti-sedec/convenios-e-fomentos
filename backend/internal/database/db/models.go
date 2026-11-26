@@ -525,6 +525,21 @@ type ProjectReport struct {
 	Stats           []byte     `json:"stats"`
 }
 
+type ProjectSigadoc struct {
+	ProjectID            uuid.UUID  `json:"project_id"`
+	Matricula            string     `json:"matricula"`
+	ProcessNumber        string     `json:"process_number"`
+	ProcessSigla         string     `json:"process_sigla"`
+	OpenedByID           *uuid.UUID `json:"opened_by_id"`
+	OpenedAt             time.Time  `json:"opened_at"`
+	SigadocArchivedAt    *time.Time `json:"sigadoc_archived_at"`
+	Situation            string     `json:"situation"`
+	WatchNextAt          time.Time  `json:"watch_next_at"`
+	WatchIntervalSeconds int32      `json:"watch_interval_seconds"`
+	WatchedAt            *time.Time `json:"watched_at"`
+	WatchError           string     `json:"watch_error"`
+}
+
 type ProjectStageHistory struct {
 	ID                   uuid.UUID  `json:"id"`
 	ProjectID            uuid.UUID  `json:"project_id"`
@@ -584,4 +599,56 @@ type Setting struct {
 	Key       string    `json:"key"`
 	Value     []byte    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type SigadocItem struct {
+	ID          uuid.UUID  `json:"id"`
+	ProjectID   uuid.UUID  `json:"project_id"`
+	Key         string     `json:"key"`
+	Seq         int32      `json:"seq"`
+	Kind        string     `json:"kind"`
+	Label       string     `json:"label"`
+	Description string     `json:"description"`
+	FileID      *uuid.UUID `json:"file_id"`
+	Part        int32      `json:"part"`
+	Parts       int32      `json:"parts"`
+	Sha256      string     `json:"sha256"`
+	Payload     []byte     `json:"payload"`
+	Status      string     `json:"status"`
+	Sigla       string     `json:"sigla"`
+	Error       string     `json:"error"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type SigadocMovement struct {
+	ID                  uuid.UUID  `json:"id"`
+	ProjectID           uuid.UUID  `json:"project_id"`
+	MovID               int64      `json:"mov_id"`
+	TypeID              int32      `json:"type_id"`
+	Event               string     `json:"event"`
+	DocumentDescription string     `json:"document_description"`
+	Lotacao             string     `json:"lotacao"`
+	Destination         string     `json:"destination"`
+	Person              string     `json:"person"`
+	PerformedAt         *time.Time `json:"performed_at"`
+	PerformedAtRaw      string     `json:"performed_at_raw"`
+	CapturedAt          time.Time  `json:"captured_at"`
+	AfterProjectArchive bool       `json:"after_project_archive"`
+	SeenAt              *time.Time `json:"seen_at"`
+}
+
+type SigadocTask struct {
+	ID            uuid.UUID  `json:"id"`
+	ProjectID     uuid.UUID  `json:"project_id"`
+	StartedByID   *uuid.UUID `json:"started_by_id"`
+	Matricula     string     `json:"matricula"`
+	Status        string     `json:"status"`
+	Attempt       int32      `json:"attempt"`
+	ProgressDone  int32      `json:"progress_done"`
+	ProgressTotal int32      `json:"progress_total"`
+	ErrorCode     string     `json:"error_code"`
+	Error         string     `json:"error"`
+	StartedAt     time.Time  `json:"started_at"`
+	HeartbeatAt   *time.Time `json:"heartbeat_at"`
+	FinishedAt    *time.Time `json:"finished_at"`
 }

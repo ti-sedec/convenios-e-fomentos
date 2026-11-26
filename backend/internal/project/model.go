@@ -52,7 +52,12 @@ const (
 	StageInAnalysis        = "in_analysis"
 	// StageAwaitingProponent: a equipe devolveu itens e o proponente tem prazo para corrigi-los.
 	StageAwaitingProponent = "awaiting_proponent"
-	// StageAwaitingOpinion: o Revisor do Departamento confirmou o enquadramento; falta o parecer técnico (fora deste fluxo).
+	// StageAwaitingAnalyst: o Revisor do Departamento confirmou o enquadramento e o projeto voltou à fila dos analistas, sem
+	// responsável, para a abertura do processo no SIGADOC.
+	StageAwaitingAnalyst = "awaiting_analyst"
+	// StageOpeningSigadoc: um analista assumiu o projeto e (a partir da fase seguinte) monta o processo no SIGADOC.
+	StageOpeningSigadoc = "opening_sigadoc"
+	// StageAwaitingOpinion: o processo está pronto no SIGADOC; falta o parecer técnico (fora deste fluxo).
 	StageAwaitingOpinion = "awaiting_opinion"
 
 	// Situação do enquadramento em andamento (nulo = nenhum) e decisão de cada rodada.

@@ -86,7 +86,7 @@ func TestVisaoGeralDaFilaDoAnalista(t *testing.T) {
 	r := p.queueOverview(an, "")
 	counts := r.data()["counts"].(map[string]any)
 	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(4), "framing_pending": float64(1),
-		"awaiting_proponent": float64(2), "awaiting_opinion": float64(0), "archived_30d": float64(1)}, counts)
+		"awaiting_proponent": float64(2), "awaiting_analyst": float64(0), "opening_sigadoc": float64(0), "awaiting_opinion": float64(0), "archived_30d": float64(1)}, counts)
 	assert.Equal(t, map[string]any{"awaiting_checklist": float64(2), "in_analysis": float64(7), "framing": float64(5), "awaiting_opinion": float64(15)}, r.data()["limits"])
 
 	t.Run("aguardando assumir: a fila de entrada, a mais antiga primeiro", func(t *testing.T) {
@@ -388,8 +388,11 @@ func TestAtividadeDaFilaDaEquipe(t *testing.T) {
 	})
 
 	t.Run("só os meus e o limite", func(t *testing.T) {
-		// O Analista que assumiu vê os do projeto principal; outro Analista, que não assumiu nada, não vê nenhum com "só os meus".
-		assert.NotEmpty(t, eventsOf(p.queueActivity(an, "?scope=mine&limit=30"), main.id))
+		// O projeto principal foi enquadrado e voltou à fila: o responsável é liberado, então ele deixa de ser "meu". O Analista segue vendo
+		// os que ainda são dele; outro Analista, que não assumiu nada, não vê nenhum com "só os meus".
+		assert.Empty(t, eventsOf(p.queueActivity(an, "?scope=mine&limit=30"), main.id), "enquadrado, o projeto não é mais de ninguém")
+		assert.NotEmpty(t, p.queueActivity(an, "?scope=mine&limit=30").list())
+		assert.NotEmpty(t, eventsOf(p.queueActivity(an, "?limit=30"), main.id), "mas a equipe inteira ainda vê o que aconteceu com ele")
 		assert.Empty(t, p.queueActivity(other, "?scope=mine&limit=30").list())
 		assert.NotEmpty(t, p.queueActivity(other, "?limit=30").list(), "a equipe inteira vê tudo")
 		assert.Len(t, p.queueActivity(an, "?limit=3").list(), 3)

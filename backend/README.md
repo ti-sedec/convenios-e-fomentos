@@ -141,7 +141,7 @@ docker compose run --rm --entrypoint /cli api admin:create --cpf 000.000.000-00
 ```
 
 O comando é idempotente: cria o registro (nome e e-mail ficam vazios até o primeiro acesso) ou concede a role a quem já existe.
-Outros comandos: `migrate:up|down|status`, `seed`, `cleanup`.
+Outros comandos: `migrate:up|down|status`, `seed`, `cleanup` e `sigadoc:check --matricula SEDEC123456 [--strict]`, que autentica no SIGADOC pelo X-Via e mostra quais métodos o usuário de sistema consegue chamar (não altera nada, não envia PIN e não precisa de banco; veja [docs/planejamento-integracao-sigadoc.md](../docs/planejamento-integracao-sigadoc.md)).
 
 Os demais: `POST /api/admin/users` pré-cadastra por **CPF + roles** (a pessoa completa o registro no primeiro acesso), ou basta a pessoa
 entrar e um administrador atribuir as roles depois. Nome, CPF e e-mail vêm do MT Login e são atualizados a cada acesso.
@@ -352,6 +352,10 @@ desenvolvimento, nem com Argon2 abaixo do mínimo da OWASP. A API também não s
 | `INITIAL_REGISTRATION_ENABLED` | *(vazio)* | Registro inicial por HTTP. Vazio: ligado fora de produção, desligado em produção. |
 | `SMTP_HOST` / `SMTP_PORT` | *(vazio)* / `587` | Servidor SMTP (STARTTLS; TLS implícito na 465). Sem host: log em dev, descarte em produção. Os e-mails de projeto saem pela caixa de saída (`outbound_emails`): a requisição só grava, um processo em segundo plano envia (tentativas em 1 min, 5 min, 30 min, 2 h, 12 h; até 8) e `cleanup` apaga os já resolvidos. |
 | `SMTP_USER` / `SMTP_PASSWORD` | *(vazio)* | Credenciais SMTP (opcionais). |
+| `SIGADOC_USERNAME` / `SIGADOC_PASSWORD` | *(vazio)* | Usuário de sistema do SIGADOC (Basic), acessado pelo mesmo X-Via (`X_VIA_SEDEC_BASE_URL`, `X_ROAD_CLIENT`). Ele representa a matrícula de cada analista. Definidos juntos. |
+| `SIGADOC_LOOKUP_MATRICULA` | *(vazio)* | Uma matrícula válida, usada só para achar a matrícula de cada analista pelo CPF (`GET /siga/matricula` exige um token). Não assina nada. Obrigatória para abrir processo. |
+| `X_VIA_SIGADOC_SERVICE` | `GOV/MTI/SIGADOC` | Caminho do serviço do SIGADOC no X-Via. |
+| `SIGADOC_SIMULATE` | `false` | SIGADOC simulado (sem rede), só desenvolvimento e testes; recusado em produção. |
 | `SMTP_FROM` | `no-reply@localhost` | Remetente padrão e dos templates criados no seed. |
 | `STORAGE_ENDPOINT` | *(vazio)* | Endpoint interno do MinIO/S3 (`host:porta`). Vazio desliga os arquivos dos documentos (rotas respondem 503). |
 | `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | *(vazio)* | Credenciais do armazenamento (obrigatórias com `STORAGE_ENDPOINT`). |
@@ -392,7 +396,7 @@ Ferramentas: `sqlc` (código tipado a partir de SQL), `goose` (CLI de migraçõe
 
 ```
 cmd/api            servidor HTTP
-cmd/cli            migrate:*, seed, admin:create --cpf, cleanup
+cmd/cli            migrate:*, seed, admin:create --cpf, cleanup, sigadoc:check
 api/openapi.yaml   especificação OpenAPI 3.1 (servida em /api/docs)
 internal/config    leitura e validação das variáveis de ambiente
 internal/database  pool pgx, transações, migrações (migrations/), queries sqlc (queries/ → db/)

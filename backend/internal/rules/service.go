@@ -334,6 +334,7 @@ type Snapshot struct {
 	ComplementDays  int                `json:"complementDays"`           // 0 = sem regra vigente
 	ElectoralLimit  string             `json:"electoralLimit,omitempty"` // AAAA-MM-DD; vazio = sem data-limite vigente
 	StalledAfter    *StalledAfterDays  `json:"stalledAfter,omitempty"`   // nulo = sem regra vigente
+	Sigadoc         *SigadocSettings   `json:"sigadoc,omitempty"`        // nulo = sem configuração vigente
 }
 
 // SnapshotAt interpreta os parâmetros vigentes na data. Valor guardado fora do formato esperado é ignorado
@@ -364,6 +365,11 @@ func (s *Service) SnapshotAt(ctx context.Context, q *db.Queries, date time.Time)
 			var v StalledAfterDays
 			if json.Unmarshal(p.Value, &v) == nil {
 				out.StalledAfter = &v
+			}
+		case KeySigadocSettings:
+			var v SigadocSettings
+			if json.Unmarshal(p.Value, &v) == nil {
+				out.Sigadoc = &v
 			}
 		}
 	}

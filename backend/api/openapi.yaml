@@ -961,7 +961,7 @@ paths:
         - {name: q, in: query, schema: {type: string}}
         - {name: status, in: query, schema: {type: string, enum: [draft, submitted, archived]}}
         - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}, description: "Restringe ao que é da própria pessoa: `owner` (titular), `member` (convidada por CPF, com acesso ativo, sem ser titular) ou `all` (um dos dois). Sem o parâmetro, vale só a permissão de leitura. Soma-se a ela, nunca a amplia: quem tem leitura ampla (equipe) recebe, com `access`, só o que é dela, em geral nada."}
-        - {name: stage, in: query, schema: {type: string}, description: "Uma ou mais etapas separadas por vírgula: `awaiting_checklist`, `in_analysis`, `awaiting_proponent`, `awaiting_opinion`."}
+        - {name: stage, in: query, schema: {type: string}, description: "Uma ou mais etapas separadas por vírgula: `awaiting_checklist`, `in_analysis`, `awaiting_proponent`, `awaiting_analyst` (enquadrado, na fila dos analistas), `opening_sigadoc` (abertura do processo no SIGADOC), `awaiting_opinion`."}
         - {name: framing, in: query, schema: {type: string, enum: [pending, confirmed, none]}, description: "Situação do enquadramento. `none` = sem enquadramento em andamento."}
         - {name: department, in: query, schema: {type: string, format: uuid}, description: "Projetos cujo departamento atual é este."}
         - {name: analyst, in: query, schema: {type: string}, description: "Identificador (uuid) ou `me`. Projetos cujo analista responsável é este. `me` = os que a própria pessoa assumiu (\"meus projetos\")."}
@@ -987,7 +987,7 @@ paths:
     get:
       tags: [Projetos]
       summary: Resumo dos projetos do proponente (visão geral)
-      description: "Resume o que é **da própria pessoa** (titular ou membro ativo), mesmo para quem tem leitura ampla: soma-se ao filtro da permissão de leitura, nunca o amplia. Permissão: `admin::projects.read`. `access` (`all` padrão, `owner`, `member`) filtra tudo, menos `byAccess`. Resposta: `counts {draft, awaiting_checklist, in_analysis, awaiting_proponent, awaiting_opinion, archived}` (um projeto conta em uma só; enquadramento pendente conta em `in_analysis`; arquivado só em `archived`), `byAccess {owner, member}` (sem o filtro de acesso, para o seletor), `activeCents {total, convenio, fomento}` (projetos enviados e ativos, sem rascunho nem arquivado) e `attention` (até 20 itens, por urgência): `complement_open` (`dueAt`, `overdue`, `items`; o resumo não arquiva o projeto vencido), `signature_pending` (`declaration`), `draft` (`updatedAt`; `blocking` só nos 5 mais recentes) e `shared_new` (`level`, `invitedBy`; convite ainda não aberto, vale para qualquer nível). Os três primeiros só para quem pode agir (titular ou membro com edição). Todo item traz `projectId`, `title` e, se enviado, `code`."
+      description: "Resume o que é **da própria pessoa** (titular ou membro ativo), mesmo para quem tem leitura ampla: soma-se ao filtro da permissão de leitura, nunca o amplia. Permissão: `admin::projects.read`. `access` (`all` padrão, `owner`, `member`) filtra tudo, menos `byAccess`. Resposta: `counts {draft, awaiting_checklist, in_analysis, awaiting_proponent, awaiting_analyst, opening_sigadoc, awaiting_opinion, archived}` (um projeto conta em uma só; enquadramento pendente conta em `in_analysis`; arquivado só em `archived`), `byAccess {owner, member}` (sem o filtro de acesso, para o seletor), `activeCents {total, convenio, fomento}` (projetos enviados e ativos, sem rascunho nem arquivado) e `attention` (até 20 itens, por urgência): `complement_open` (`dueAt`, `overdue`, `items`; o resumo não arquiva o projeto vencido), `signature_pending` (`declaration`), `draft` (`updatedAt`; `blocking` só nos 5 mais recentes) e `shared_new` (`level`, `invitedBy`; convite ainda não aberto, vale para qualquer nível). Os três primeiros só para quem pode agir (titular ou membro com edição). Todo item traz `projectId`, `title` e, se enviado, `code`."
       security: [{adminBearer: []}]
       parameters:
         - {name: access, in: query, schema: {type: string, enum: [all, owner, member]}}
@@ -1014,7 +1014,7 @@ paths:
     get:
       tags: [Projetos]
       summary: Resumo da fila do Analista (visão geral)
-      description: "Contagens por etapa e os blocos do que pede a ação do Analista. Permissão: `admin::projects.start-analysis`. O alcance é a condição dessa permissão somada a projeto enviado ou arquivado (rascunho nunca). `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); o bloco `entry` ignora `mine`, pois projeto não assumido não tem dono. Resposta: `counts {awaiting_checklist, in_analysis, framing_pending, awaiting_proponent, awaiting_opinion, archived_30d}` (enquadramento pendente conta só em `framing_pending`); `limits {awaiting_checklist, in_analysis, framing, awaiting_opinion}` (dias vigentes do parâmetro `stalled_after_days`; zero = sem regra, nada é marcado como parado); `blocks {refused, resubmitted, entry, ready, stalled, deadlines}`, cada um `{total, items}` com até 15 itens do mais urgente para o menos. Item: `projectId`, `title`, `code`, `institution`, `sinceSeconds` (tempo com o responsável atual, do trecho aberto do histórico), `stage` (etapa de trabalho: `awaiting_checklist`, `in_analysis`, `framing`, `awaiting_opinion`), `late`, `analyst`; `entry` traz `overLimit`; `stalled` traz `holder` (`team`, `analyst`, `department`) e `limitDays`, e **não** inclui \"aguardando proponente\" (tem prazo próprio); `refused` traz `department` e `refusedAt` (projeto em análise, sem departamento, cuja última rodada de enquadramento foi recusada); `ready` são os em análise, sem departamento, com **todos** os itens da conferência aprovados (falta indicar o departamento); a conferência é calculada só para os 30 candidatos mais antigos, então `total` conta os prontos entre eles e `capped: true` avisa que havia mais candidatos (a tela mostra \"N ou mais\"); `resubmitted` são os em análise cujo último trecho veio do reenvio do proponente e sem nenhuma conferência depois dele; `deadlines` traz `dueAt` e `overdue` (complementação que vence em até 48 horas). Nenhum dado pessoal do proponente (CPF, e-mail, telefone)."
+      description: "Contagens por etapa e os blocos do que pede a ação do Analista. Permissão: `admin::projects.start-analysis`. O alcance é a condição dessa permissão somada a projeto enviado ou arquivado (rascunho nunca). `scope`: `team` (padrão) ou `mine` (só os que a pessoa assumiu); o bloco `entry` ignora `mine`, pois projeto não assumido não tem dono. Resposta: `counts {awaiting_checklist, in_analysis, framing_pending, awaiting_proponent, awaiting_analyst, opening_sigadoc, awaiting_opinion, archived_30d}` (enquadramento pendente conta só em `framing_pending`; `awaiting_analyst` são os enquadrados que voltaram à fila, sem responsável, e `opening_sigadoc` os que um analista assumiu para abrir o processo no SIGADOC); `limits {awaiting_checklist, in_analysis, framing, awaiting_opinion}` (dias vigentes do parâmetro `stalled_after_days`; zero = sem regra, nada é marcado como parado); `blocks {refused, resubmitted, entry, awaiting_analyst, ready, stalled, deadlines}`, cada um `{total, items}` com até 15 itens do mais urgente para o menos. Item: `projectId`, `title`, `code`, `institution`, `sinceSeconds` (tempo com o responsável atual, do trecho aberto do histórico), `stage` (etapa de trabalho: `awaiting_checklist`, `in_analysis`, `framing`, `awaiting_analyst`, `opening_sigadoc`, `awaiting_opinion`; as etapas novas não têm limite de \"parado\" até o parâmetro `stalled_after_days` ganhar chaves para elas), `late`, `analyst`; `entry` traz `overLimit`; `awaiting_analyst` são os enquadrados esperando um analista assumir (a fila inteira, como `entry`, ignora `mine`); `stalled` traz `holder` (`team`, `analyst`, `department`) e `limitDays`, e **não** inclui \"aguardando proponente\" (tem prazo próprio); `refused` traz `department` e `refusedAt` (projeto em análise, sem departamento, cuja última rodada de enquadramento foi recusada); `ready` são os em análise, sem departamento, com **todos** os itens da conferência aprovados (falta indicar o departamento); a conferência é calculada só para os 30 candidatos mais antigos, então `total` conta os prontos entre eles e `capped: true` avisa que havia mais candidatos (a tela mostra \"N ou mais\"); `resubmitted` são os em análise cujo último trecho veio do reenvio do proponente e sem nenhuma conferência depois dele; `deadlines` traz `dueAt` e `overdue` (complementação que vence em até 48 horas). Nenhum dado pessoal do proponente (CPF, e-mail, telefone)."
       security: [{adminBearer: []}]
       parameters:
         - {name: scope, in: query, schema: {type: string, enum: [team, mine]}}
@@ -1455,6 +1455,161 @@ paths:
         "401": {$ref: "#/components/responses/Error"}
         "403": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc:
+    get:
+      tags: [Projetos]
+      summary: Processo do projeto no SIGADOC e a tramitação acompanhada (só equipe)
+      description: |
+        O processo que o projeto tem no SIGADOC e as movimentações que o sistema viu nele, da mais recente para a mais antiga. O sistema só
+        **acompanha**: consulta o processo de tempos em tempos (15 minutos no mínimo; o intervalo dobra, até 6 horas, enquanto não há novidade)
+        e registra cada movimentação nova, com a descrição do documento tramitado. Termina quando o processo é arquivado também no SIGADOC.
+        Interno da equipe: o titular e os membros recebem 404. Permissão: `admin::projects.read` (404 em projeto fora do alcance).
+        Resposta: `{process, movements, projectArchived, stillOpenAtSigadoc, newAfterArchive, task, opening}`. `task` é a última tentativa de montagem do processo (nula se nunca houve): `{id, status (running|interrupted|completed|cancelled), attempt, progressDone, progressTotal, errorCode, error, startedAt, finishedAt, items [{kind (termo|report|document), label, part, parts, status (pending|creating|created|finalized|signed|joined|failed), error}]}`; `error` é um texto curto, nunca com PIN, URL ou credencial. `opening` diz se o botão "Abrir no SIGADOC" cabe: `{available, reason, configured, termoReady}`. `process` é nulo enquanto o projeto não tem
+        processo; senão `{number, sigla, openedAt, archivedAtSigadoc (nulo enquanto ativo no SIGADOC), situation, lastCheckedAt, error (texto curto
+        da última consulta que falhou; nunca traz URL, credencial nem PIN)}`. Cada movimentação: `{id, movId, event, description, lotacao,
+        destination, person, at (nulo se o formato da data não foi reconhecido; veja atRaw), atRaw, afterArchive, seen}`. `afterArchive`: aconteceu
+        depois de o projeto ser arquivado no sistema. `stillOpenAtSigadoc`: o projeto está arquivado no sistema e o processo **segue sem
+        arquivamento** no SIGADOC (o aviso chamativo da tela). `newAfterArchive`: quantas posteriores ao arquivamento ainda não foram vistas.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc/movements/seen:
+    post:
+      tags: [Projetos]
+      summary: Marca como vistas as movimentações posteriores ao arquivamento (só equipe)
+      description: |
+        A equipe viu o aviso: as movimentações do SIGADOC posteriores ao arquivamento no sistema passam a `seen: true` e `newAfterArchive` zera.
+        Fica na auditoria (`project.sigadoc-movements-seen`, só quando havia algo a marcar). Responde o mesmo corpo de `GET .../sigadoc`.
+        Interno da equipe: o titular e os membros recebem 404. Permissão: `admin::projects.read`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc/termo:
+    post:
+      tags: [Projetos]
+      summary: Pré-visualiza o Termo de Abertura do processo no SIGADOC (analista responsável)
+      description: |
+        Preenche o modelo do Termo de Abertura (id em `sigadoc_settings.termo_model_id`) com os dados do projeto e devolve o HTML para o analista conferir.
+        **Nada é gravado no SIGADOC.** Corpo opcional: `fields`, os ajustes do analista (campo lógico: valor); os campos lógicos são `codigo`, `titulo`,
+        `instrumento`, `objeto`, `interessado`, `cnpj`, `proponente`, `valor_total`, `assunto`, `numero_sigcon`, `vigencia` e `departamento`, e o mapa
+        `field_map` do parâmetro troca cada nome pelo do campo da entrevista do modelo. Resposta: `{html, fields}`.
+        Só o analista responsável, com o projeto em `opening_sigadoc` e sem processo aberto. Erros: 409 `not_responsible_analyst`, 409 `project_stage_invalid`,
+        409 `sigadoc_process_exists`, 422 `sigadoc_not_configured` (sem id do modelo), 422 `sigadoc_no_matricula`, 502 `sigadoc_forbidden` (método não liberado
+        para o usuário de sistema) e 503 `sigadoc_unavailable`. Permissão: `admin::projects.start-analysis`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fields: {type: object, additionalProperties: {type: string}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc/open:
+    post:
+      tags: [Projetos]
+      summary: Abre o processo do projeto no SIGADOC (analista responsável)
+      description: |
+        O analista informa o **PIN de assinatura do SIGADOC uma única vez**. O servidor valida o PIN (nada é criado se for recusado: 422 `pin_rejected`) e
+        responde **202** na hora, com a montagem em segundo plano: cria, finaliza, assina e autua o Termo (o que gera o número do processo), cria o relatório
+        do projeto como documento interno capturado e cada arquivo do proponente como documento externo capturado (Word e imagem convertidos para PDF; um
+        documento por arquivo; arquivo acima de `max_part_mb` dividido em partes), assina e junta tudo ao processo. Ao terminar, o projeto passa de
+        `opening_sigadoc` para `awaiting_opinion`. O andamento está em `task` de `GET .../sigadoc` (consulte de tempos em tempos).
+        **O PIN só existe na memória da tarefa**: nunca vai para banco, auditoria, log nem mensagem de erro, e não é tentado de novo se o SIGADOC o recusar no
+        meio (a tarefa fica `interrupted` com `errorCode: pin_rejected`). Corpo: `{pin, fields?}` (`fields` são os ajustes do Termo, como em `.../termo`).
+        Limite de 5 tentativas de PIN por analista a cada 10 minutos (429). Erros: 409 `not_responsible_analyst`, 409 `project_stage_invalid`, 409
+        `sigadoc_task_running`, 409 `sigadoc_task_interrupted` (use `resume`), 409 `sigadoc_process_exists`, 422 `pin_invalid`, 422 `pin_rejected`, 422
+        `sigadoc_not_configured`, 422 `sigadoc_no_matricula`, 429, 502 e 503. Permissão: `admin::projects.start-analysis`. Responde o mesmo corpo de `GET .../sigadoc`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin: {type: string, minLength: 4, maxLength: 32}
+                fields: {type: object, additionalProperties: {type: string}}
+      responses:
+        "202": {description: Montagem iniciada}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc/resume:
+    post:
+      tags: [Projetos]
+      summary: Retoma a montagem interrompida do processo no SIGADOC (analista responsável)
+      description: |
+        Depois de uma montagem `interrupted` (falha do SIGADOC, PIN recusado, arquivo com problema ou reinício da API), o analista informa o PIN **de novo** e
+        a montagem continua de onde parou: o que já foi criado, assinado e juntado não se refaz (cada item guarda o último passo concluído). Um item cujo
+        arquivo falhou é preparado outra vez. Corpo: `{pin}`. Mesmas regras de PIN e erros de `open`, mais 409 `sigadoc_nothing_to_resume`. Responde 202.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin: {type: string, minLength: 4, maxLength: 32}
+      responses:
+        "202": {description: Montagem retomada}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "422": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+  /api/admin/projects/{id}/sigadoc/cancel:
+    post:
+      tags: [Projetos]
+      summary: Cancela a montagem em andamento (analista responsável)
+      description: |
+        Para a montagem no próximo ponto seguro: a tarefa fica `cancelled` e o PIN é descartado. O que já foi inserido permanece no SIGADOC. Fica na
+        auditoria (`project.sigadoc-cancel`). A desistência, a negação e o arquivamento do projeto também cancelam a montagem (`errorCode: project_archived`).
+        Erros: 409 `sigadoc_nothing_to_cancel`, 409 `not_responsible_analyst`. Responde o mesmo corpo de `GET .../sigadoc`.
+      security: [{adminBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: OK}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
   /api/admin/projects/{id}/history:
     get:
       tags: [Projetos]
@@ -2112,7 +2267,7 @@ paths:
       summary: Arquiva o projeto (equipe)
       description: |
         Arquiva o projeto enviado por `missing_documents` (falta de documentos obrigatórios) ou `other`, com o motivo em `note`. O proponente, os Revisores do departamento (se já havia um), o Analista responsável (ou, sem responsável, os Analistas) e os Supervisores recebem um e-mail.
-        Só o analista responsável arquiva (409 `not_responsible_analyst` para os outros); com enquadramento pendente, 409 `framing_pending`.
+        Só o analista responsável arquiva (409 `not_responsible_analyst` para os outros); com enquadramento pendente, 409 `framing_pending`. Depois do enquadramento confirmado (`awaiting_analyst`, `opening_sigadoc`, `awaiting_opinion`) o Analista não arquiva mais: 409 `project_stage_invalid` (só a desistência do proponente e a negação do Secretário arquivam).
         Permissão: `admin::projects.archive`. Responde o projeto completo.
       security: [{adminBearer: []}]
       parameters:
@@ -2139,6 +2294,9 @@ paths:
       tags: [Projetos]
       summary: Inicia a análise do projeto (Analista)
       description: |
+        Com o projeto enquadrado que voltou à fila ("Aguardando analista", `awaiting_analyst`), quem chama **assume** o projeto: a etapa passa a `opening_sigadoc`
+        ("Abertura do processo no SIGADOC"), quem assumiu vira o analista responsável e a ação fica na auditoria (`project.assume-opening`). Em `opening_sigadoc` o
+        responsável repete sem efeito e outro analista recebe 409 `not_responsible_analyst` (usa-se o take-over).
         "Aguardando análise de checklist" passa a "Em análise" e quem iniciou vira o **analista responsável**: só ele continua a análise (conferir itens, devolver,
         arquivar e indicar o departamento); os outros Analistas veem o projeto, mas as ações respondem 409 `not_responsible_analyst`. Idempotente para o responsável:
         repetir não muda nada. Se o projeto já está com outro analista, 409 `not_responsible_analyst` (para continuar a análise é preciso assumir o projeto). Se o projeto
@@ -2162,9 +2320,9 @@ paths:
         Ato explícito de continuar a análise de um projeto que outro analista assumiu: quem chama passa a ser o **analista responsável** e o anterior perde as ações
         (só visualiza) e recebe um e-mail (sem dado pessoal do proponente). A conferência já feita continua como está; o novo responsável precisa ver e ler os arquivos
         dos itens que for decidir. A troca fica na auditoria (`project.take-over`), no histórico de etapas e no feed da fila (`analysis_taken_over`).
-        Vale com o projeto em análise ou aguardando o proponente (nesse caso o reenvio volta para o novo responsável). Idempotente para quem já é o responsável.
+        Vale com o projeto em análise, aguardando o proponente (nesse caso o reenvio volta para o novo responsável) ou na abertura do processo no SIGADOC (`opening_sigadoc`). Idempotente para quem já é o responsável.
         Sem responsável (em análise), equivale a assumir. Erros: 409 `analysis_not_started` (antes de iniciar a análise: use `start-analysis`), 409 `framing_pending`
-        (o projeto está com o Revisor), 409 `project_stage_invalid` (aguardando o parecer), 409 `project_not_submitted` (rascunho ou arquivado).
+        (o projeto está com o Revisor), 409 `project_stage_invalid` (aguardando um analista na fila, que se assume por `start-analysis`, ou aguardando o parecer), 409 `project_not_submitted` (rascunho ou arquivado).
         Permissão: `admin::projects.start-analysis`. Responde o projeto completo, na visão da equipe.
       security: [{adminBearer: []}]
       parameters:
@@ -2250,7 +2408,7 @@ paths:
       tags: [Projetos]
       summary: Confirma o enquadramento (Revisor do Departamento)
       description: |
-        O projeto se enquadra no departamento: a rodada fica `confirmed`, o departamento é mantido e a etapa passa a `awaiting_opinion` ("Aguardando parecer"). Não envia e-mail.
+        O projeto se enquadra no departamento: a rodada fica `confirmed`, o departamento é mantido e o projeto **volta à fila dos analistas**: a etapa passa a `awaiting_analyst` ("Aguardando analista"), o analista responsável é liberado e todos os Analistas ativos recebem um e-mail (só dados não pessoais do projeto e o link, pela caixa de saída, na mesma transação). O Revisor não recebe e-mail.
         `round` é a rodada que o Revisor viu (409 `framing_round_stale` se mudou). **Vale a primeira decisão de qualquer Revisor do departamento**: a segunda recebe 409
         `framing_already_decided`, inclusive quando a primeira foi uma recusa. Permissão: `admin::projects.review-framing`, só sobre os projetos enviados do próprio departamento.
       security: [{adminBearer: []}]

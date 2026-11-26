@@ -268,3 +268,64 @@ func TestPanicoViraErro(t *testing.T) {
 	err := safe(func() error { panic("boom") })
 	assert.ErrorIs(t, err, ErrUnreadable)
 }
+
+// noisyPDF cria um PDF cujas páginas têm conteúdo pouco compressível, para o tamanho crescer com as páginas.
+func noisyPDF(t *testing.T, path string, pages, pageKB int) {
+	t.Helper()
+	pdf := fpdf.New("P", "mm", "A4", "")
+	pdf.SetCompression(false)
+	pdf.SetFont("Helvetica", "", 8)
+	for i := 1; i <= pages; i++ {
+		pdf.AddPage()
+		for y := 10.0; y < 280 && pdf.Err() == false; y += 4 {
+			pdf.Text(10, y, fmt.Sprintf("p%d %0*d", i, pageKB*20, i*7919+int(y)))
+		}
+	}
+	require.NoError(t, pdf.OutputFileAndClose(path))
+}
+
+func TestSplitDivideEmPartesQueCabem(t *testing.T) {
+	dir := t.TempDir()
+	in := filepath.Join(dir, "grande.pdf")
+	noisyPDF(t, in, 12, 5)
+	st, err := os.Stat(in)
+	require.NoError(t, err)
+	limit := st.Size() / 3
+
+	t.Run("cabe inteiro: devolve o próprio arquivo", func(t *testing.T) {
+		out := t.TempDir()
+		parts, err := Split(ctx, in, out, st.Size()+1)
+		require.NoError(t, err)
+		assert.Equal(t, []string{in}, parts)
+	})
+	t.Run("divide em partes de até o limite, sem perder páginas", func(t *testing.T) {
+		out := t.TempDir()
+		parts, err := Split(ctx, in, out, limit)
+		require.NoError(t, err)
+		require.Greater(t, len(parts), 1)
+		total := 0
+		for i, p := range parts {
+			fi, err := os.Stat(p)
+			require.NoError(t, err)
+			assert.LessOrEqual(t, fi.Size(), limit, "parte %d", i+1)
+			n, err := PageCount(ctx, p)
+			require.NoError(t, err)
+			total += n
+		}
+		assert.Equal(t, 12, total, "todas as páginas, uma só vez")
+		assert.NoFileExists(t, filepath.Join(out, "probe.pdf"), "arquivo de teste removido")
+	})
+	t.Run("página sozinha acima do limite", func(t *testing.T) {
+		_, err := Split(ctx, in, t.TempDir(), 500)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, ErrPageTooLarge))
+	})
+	t.Run("limite inválido e arquivo ruim", func(t *testing.T) {
+		_, err := Split(ctx, in, t.TempDir(), 0)
+		assert.Error(t, err)
+		bad := filepath.Join(dir, "lixo.pdf")
+		require.NoError(t, os.WriteFile(bad, bytes.Repeat([]byte("x"), 4096), 0o644))
+		_, err = Split(ctx, bad, t.TempDir(), 100)
+		assert.True(t, errors.Is(err, ErrUnreadable))
+	})
+}

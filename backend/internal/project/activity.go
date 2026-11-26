@@ -24,6 +24,7 @@ const (
 	maxActivityLimit           = 30
 	actionSubmit               = "project.submit"
 	actionStartAnalysis        = "project.start-analysis"
+	actionAssumeOpening        = "project.assume-opening"
 	actionTakeOver             = "project.take-over"
 	actionComplementRequest    = "project.complement-request"
 	actionResubmit             = "project.resubmit"

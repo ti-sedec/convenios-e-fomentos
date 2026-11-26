@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,7 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/preview"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/rules"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/scan"
+	"github.com/wagner/convenios-e-fomentos/backend/internal/sigadoc"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/storage"
 )
 
@@ -64,6 +66,13 @@ type Service struct {
 
 	// MT-ID, que assina as declarações geradas pelo sistema (opcional; ver SetMTID).
 	mtid mtid.Client
+
+	// SIGADOC, onde o processo do projeto é aberto e acompanhado (opcional; ver SetSigadoc).
+	sigadoc       *sigadoc.Session
+	sigadocLookup string
+	sigadocBG     context.Context
+	sigadocWG     sync.WaitGroup
+	runs          sigadocRuns
 
 	// Candidatos do bloco "pronto para indicar" da visão geral da fila (ver SetReadyCandidates); zero usa o padrão.
 	readyCandidates int

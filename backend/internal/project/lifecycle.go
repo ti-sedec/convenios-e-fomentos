@@ -383,6 +383,12 @@ func (s *Service) archive(ctx context.Context, actor Actor, id uuid.UUID, reason
 			if framingPending(cur) {
 				return errFramingPending()
 			}
+			// Arquivar por falta de documentos é uma saída da análise: depois do enquadramento confirmado só o proponente (desistência)
+			// e o Secretário (negação) arquivam.
+			switch st := str(cur.Stage); st {
+			case StageAwaitingAnalyst, StageOpeningSigadoc, StageAwaitingOpinion:
+				return errStage(st)
+			}
 			if err := s.ensureResponsible(ctx, q, cur, actor); err != nil {
 				return err
 			}

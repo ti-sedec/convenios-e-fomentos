@@ -102,6 +102,12 @@ x-api-env: &api-env
   X_VIA_CA_FILE: ${X_VIA_CA_FILE:-}
   X_VIA_TLS_SERVER_NAME: ${X_VIA_TLS_SERVER_NAME:-}
   X_VIA_TIMEOUT: ${X_VIA_TIMEOUT:-30s}
+  # SIGADOC pelo X-Via: usuário de sistema (Basic) que representa a matrícula do analista. O simulado é recusado em produção.
+  SIGADOC_USERNAME: ${SIGADOC_USERNAME:-}
+  SIGADOC_PASSWORD: ${SIGADOC_PASSWORD:-}
+  X_VIA_SIGADOC_SERVICE: ${X_VIA_SIGADOC_SERVICE:-GOV/MTI/SIGADOC}
+  SIGADOC_SIMULATE: "false"
+  SIGADOC_LOOKUP_MATRICULA: ${SIGADOC_LOOKUP_MATRICULA:-}
 
 services:
   # ---------------------------------------------------------------------------------------------------------------

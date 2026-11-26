@@ -20,7 +20,32 @@ const (
 	KeyLei12082           = "lei_12082"
 	KeyIndirectCostTiers  = "indirect_costs_tiers"
 	KeyStalledAfterDays   = "stalled_after_days"
+	KeySigadocSettings    = "sigadoc_settings"
 )
+
+// SigadocSettings são os dados do SIGADOC que dependem de como a SEDEC o configura: os modelos, os tipos de documento, a
+// classificação, o nível de acesso e a lotação de destino (docs/planejamento-integracao-sigadoc.md, P2). Ficam aqui, e não no código,
+// para o Supervisor ajustá-los sem uma nova versão.
+type SigadocSettings struct {
+	// TermoModelID é o id numérico do modelo "Termo de Abertura de Expediente/Processo" (a pré-visualização usa o id no caminho);
+	// TermoModel é o nome ou id com que o documento é criado. Sem o id, a pré-visualização responde 422.
+	TermoModelID string `json:"termo_model_id"`
+	TermoModel   string `json:"termo_model"`
+	// ReportModel e ReportDocType: o relatório gerado pelo sistema entra como documento interno capturado.
+	ReportModel   string `json:"report_model"`
+	ReportDocType string `json:"report_doc_type"`
+	// DocumentModel e DocumentDocType: os documentos do proponente entram como documento externo capturado.
+	DocumentModel   string `json:"document_model"`
+	DocumentDocType string `json:"document_doc_type"`
+	Classification  string `json:"classification"`
+	AccessLevel     string `json:"access_level"`
+	// DestinationLotacao é a sigla da lotação de destino dos documentos (opcional).
+	DestinationLotacao string `json:"destination_lotacao"`
+	// MaxPartMB é o tamanho máximo de cada documento enviado; arquivo maior é dividido em partes.
+	MaxPartMB int `json:"max_part_mb"`
+	// FieldMap troca o nome de um campo lógico do Termo (veja project.TermoFields) pelo nome do campo na entrevista do modelo.
+	FieldMap map[string]string `json:"field_map"`
+}
 
 // StalledAfterDays são os dias, por etapa de trabalho, a partir dos quais um projeto parado aparece na visão geral do Analista.
 // Contam horas corridas com o responsável atual. "Aguardando proponente" não tem limite: já tem o prazo de complementação.
@@ -98,6 +123,13 @@ func Specs() []Spec {
 			Validate:    validateIndirectTiers,
 			Defaults: []Default{{Value: `[{"up_to_cents":10000000,"max_pct":20,"cap_cents":1500000},{"up_to_cents":50000000,"max_pct":15,"cap_cents":5000000},{"up_to_cents":null,"max_pct":10,"cap_cents":20000000}]`,
 				ValidFrom: "2026-02-24", Note: "IN Conjunta 002/2026, art. 36-A"}},
+		},
+		{
+			Key: KeySigadocSettings, Source: "Decisão da equipe (abertura do processo no SIGADOC)",
+			Description: "Modelos e tipos de documento do SIGADOC usados na abertura do processo (Termo de Abertura, relatório interno capturado e documentos externos capturados), classificação, nível de acesso, lotação de destino, tamanho máximo de cada parte enviada e o mapa dos campos do Termo.",
+			Validate:    validateSigadocSettings,
+			Defaults: []Default{{Value: `{"termo_model_id":"23323","termo_model":"23323","report_model":"8420","report_doc_type":"Interno Capturado","document_model":"26113","document_doc_type":"Externo Capturado","classification":"004","access_level":"","destination_lotacao":"","max_part_mb":24,"field_map":{}}`,
+				ValidFrom: "2026-01-01", Note: "Modelos do SIGADOC de desenvolvimento (24/11/2026): 23323 Termo de Abertura, 8420 Documento Interno (Interno Capturado) e 26113 Capturado (Externo Capturado). Confirme os ids no SIGADOC de produção"}},
 		},
 		{
 			Key: KeyStalledAfterDays, Source: "Decisão da equipe (visão geral do Analista)",
@@ -209,6 +241,38 @@ func validateStalledAfterDays(raw json.RawMessage) error {
 		if c.v < 1 || c.v > 365 {
 			return fmt.Errorf("%s deve ser um número inteiro de dias entre 1 e 365", c.name)
 		}
+	}
+	return nil
+}
+
+func validateSigadocSettings(raw json.RawMessage) error {
+	var v SigadocSettings
+	if err := strictUnmarshal(raw, &v); err != nil {
+		return errors.New("informe termo_model_id, termo_model, report_model, report_doc_type, document_model, document_doc_type, classification, access_level, destination_lotacao, max_part_mb e field_map")
+	}
+	if v.MaxPartMB < 1 || v.MaxPartMB > 100 {
+		return errors.New("max_part_mb deve ser um número inteiro de megabytes entre 1 e 100")
+	}
+	for name, val := range map[string]string{"termo_model": v.TermoModel, "report_model": v.ReportModel, "report_doc_type": v.ReportDocType,
+		"document_model": v.DocumentModel, "document_doc_type": v.DocumentDocType} {
+		if val == "" || len(val) > 200 {
+			return fmt.Errorf("%s é obrigatório (até 200 caracteres)", name)
+		}
+	}
+	if v.TermoModelID != "" {
+		for _, c := range v.TermoModelID {
+			if c < '0' || c > '9' {
+				return errors.New("termo_model_id deve ser o id numérico do modelo (só dígitos) ou ficar vazio")
+			}
+		}
+	}
+	for _, val := range []string{v.Classification, v.AccessLevel, v.DestinationLotacao} {
+		if len(val) > 200 {
+			return errors.New("classification, access_level e destination_lotacao aceitam até 200 caracteres")
+		}
+	}
+	if len(v.FieldMap) > 50 {
+		return errors.New("field_map aceita até 50 campos")
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/logging"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/mailer"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/mtid"
+	"github.com/wagner/convenios-e-fomentos/backend/internal/sigadoc"
 )
 
 func main() {
@@ -70,6 +71,22 @@ func run() error {
 		}
 		opts = append(opts, app.WithMTID(real))
 		log.Info("MT-ID real ligado", "baseURL", cfg.XViaBaseURL, "xRoadClient", cfg.XRoadClient)
+	}
+	switch {
+	case cfg.SigadocSimulate:
+		opts = append(opts, app.WithSigadoc(sigadoc.NewMemory()))
+		log.Warn("SIGADOC SIMULADO ligado: nenhum processo é aberto de verdade")
+	case cfg.SigadocUsername != "":
+		real, err := sigadoc.NewHTTP(sigadoc.HTTPConfig{
+			BaseURL: cfg.SigadocURL(), XRoadClient: cfg.XRoadClient,
+			Username: cfg.SigadocUsername, Password: cfg.SigadocPassword,
+			CAFile: cfg.XViaCAFile, TLSServerName: cfg.XViaTLSServerName, Timeout: cfg.XViaTimeout, Log: log,
+		})
+		if err != nil {
+			return err
+		}
+		opts = append(opts, app.WithSigadoc(real))
+		log.Info("SIGADOC real ligado", "baseURL", cfg.SigadocURL())
 	}
 	application, err := app.New(ctx, cfg, log, pool, mail, opts...)
 	if err != nil {

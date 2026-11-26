@@ -66,8 +66,18 @@ type Config struct {
 	XViaCAFile        string        `env:"X_VIA_CA_FILE"`
 	XViaTLSServerName string        `env:"X_VIA_TLS_SERVER_NAME"`
 	XViaTimeout       time.Duration `env:"X_VIA_TIMEOUT" envDefault:"30s"`
-	MaxBodyBytes      int64         `env:"MAX_BODY_BYTES" envDefault:"1048576"`
-	PasswordMinLength int           `env:"PASSWORD_MIN_LENGTH" envDefault:"8"`
+	// SIGADOC (sistema de protocolo do estado, pelo X-Via). O usuário de sistema autentica com Basic e representa a matrícula
+	// de cada analista (POST /siga/autenticar?matricula=...). XViaSigadocService é o caminho do serviço (veja SigadocURL).
+	// SigadocSimulate liga um SIGADOC simulado (sem rede) para desenvolvimento e testes; é recusado em produção.
+	SigadocUsername    string `env:"SIGADOC_USERNAME"`
+	SigadocPassword    string `env:"SIGADOC_PASSWORD"`
+	XViaSigadocService string `env:"X_VIA_SIGADOC_SERVICE" envDefault:"GOV/MTI/SIGADOC"`
+	SigadocSimulate    bool   `env:"SIGADOC_SIMULATE"`
+	// SigadocLookupMatricula é uma matrícula válida com que o usuário de sistema se autentica só para procurar a matrícula de cada
+	// analista pelo CPF (GET /siga/matricula exige um token). Não assina nada.
+	SigadocLookupMatricula string `env:"SIGADOC_LOOKUP_MATRICULA"`
+	MaxBodyBytes           int64  `env:"MAX_BODY_BYTES" envDefault:"1048576"`
+	PasswordMinLength      int    `env:"PASSWORD_MIN_LENGTH" envDefault:"8"`
 
 	SMTPHost     string `env:"SMTP_HOST"`
 	SMTPPort     int    `env:"SMTP_PORT" envDefault:"587"`
@@ -151,6 +161,19 @@ func getAppEnv() string {
 // IsProduction indica se a aplicação roda em produção.
 func (c *Config) IsProduction() bool { return c.AppEnv == "production" }
 
+// SigadocURL é a URL base da API do SIGADOC, sem barra no fim: a raiz do X-Via (X_VIA_SEDEC_BASE_URL) com o serviço
+// (X_VIA_SIGADOC_SERVICE). Vazia sem X_VIA_SEDEC_BASE_URL.
+func (c *Config) SigadocURL() string {
+	if c.XViaBaseURL == "" {
+		return ""
+	}
+	service := strings.Trim(c.XViaSigadocService, "/")
+	if service == "" {
+		return strings.TrimRight(c.XViaBaseURL, "/")
+	}
+	return strings.TrimRight(c.XViaBaseURL, "/") + "/" + service
+}
+
 const (
 	minSecretLen         = 32
 	owaspArgon2MemoryKiB = 19456
@@ -195,6 +218,15 @@ func (c *Config) Validate() error {
 		if c.StorageUploadTTL <= 0 || c.StorageDownloadTTL <= 0 {
 			errs = append(errs, errors.New("STORAGE_UPLOAD_TTL e STORAGE_DOWNLOAD_TTL devem ser positivos"))
 		}
+	}
+	if c.SigadocSimulate && c.IsProduction() {
+		errs = append(errs, errors.New("SIGADOC_SIMULATE não pode ficar ligado em produção: o SIGADOC simulado não abre processo de verdade"))
+	}
+	if (c.SigadocUsername == "") != (c.SigadocPassword == "") {
+		errs = append(errs, errors.New("SIGADOC_USERNAME e SIGADOC_PASSWORD devem ser definidos juntos"))
+	}
+	if c.SigadocUsername != "" && c.SigadocURL() == "" {
+		errs = append(errs, errors.New("SIGADOC_USERNAME exige X_VIA_SEDEC_BASE_URL: o SIGADOC é acessado pelo X-Via"))
 	}
 	if c.MTIDSimulate && c.IsProduction() {
 		errs = append(errs, errors.New("MTID_SIMULATE não pode ficar ligado em produção: o MT-ID simulado não assina de verdade"))

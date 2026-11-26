@@ -30,6 +30,8 @@ type OverviewCounts struct {
 	AwaitingChecklist int `json:"awaiting_checklist"`
 	InAnalysis        int `json:"in_analysis"`
 	AwaitingProponent int `json:"awaiting_proponent"`
+	AwaitingAnalyst   int `json:"awaiting_analyst"`
+	OpeningSigadoc    int `json:"opening_sigadoc"`
 	AwaitingOpinion   int `json:"awaiting_opinion"`
 	Archived          int `json:"archived"`
 }
@@ -176,6 +178,10 @@ func (c *OverviewCounts) add(status, stage string, n int) {
 		c.InAnalysis += n
 	case stage == StageAwaitingProponent:
 		c.AwaitingProponent += n
+	case stage == StageAwaitingAnalyst:
+		c.AwaitingAnalyst += n
+	case stage == StageOpeningSigadoc:
+		c.OpeningSigadoc += n
 	case stage == StageAwaitingOpinion:
 		c.AwaitingOpinion += n
 	}
