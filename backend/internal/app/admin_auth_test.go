@@ -74,12 +74,8 @@ func newEnv(t *testing.T, mutate ...func(*config.Config)) *env {
 	cfg := &config.Config{
 		AppEnv: "test", HTTPPort: 8080,
 		JWKSURI: oidc.JWKSURI(), OIDCIssuer: oidc.Issuer, OIDCClientID: oidc.ClientID, OIDCCPFClaim: oidc.CPFClaim,
-		JWTAPISecret: "api-secret-de-teste-com-32-caracteres!!!", APITokenSalt: "salt-de-teste-com-32-caracteres-ok-123",
-		AccessTokenTTL: 15 * time.Minute, RefreshTokenMaxTTL: time.Hour, RefreshTokenIdleTTL: 30 * time.Minute,
-		ResetTokenTTL: 10 * time.Minute, EmailConfirmationTTL: time.Hour,
-		RateLimitAuthPerMin: 1000, MaxBodyBytes: 1 << 20, PasswordMinLength: 8,
-		Argon2MemoryKiB: 64, Argon2Iterations: 1, Argon2Parallel: 1,
-		PublicURL: "http://app.test", SigadocLookupMatricula: "SEDEC000001", CORSAllowedOrigins: []string{"http://localhost:3000"},
+		MaxBodyBytes: 1 << 20,
+		PublicURL:    "http://app.test", SigadocLookupMatricula: "SEDEC000001", CORSAllowedOrigins: []string{"http://localhost:3000"},
 	}
 	for _, m := range mutate {
 		m(cfg)
@@ -91,7 +87,7 @@ func newEnv(t *testing.T, mutate ...func(*config.Config)) *env {
 	signer := mtid.NewMemory()
 	sigsim := sigadoc.NewMemory()
 	conv := &fakeConverter{}
-	a, err := app.New(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)), pool, mail, app.WithStore(store), app.WithMTID(signer), app.WithPreviewConverter(conv), app.WithSigadoc(sigsim), app.WithoutOutboxWorker(), app.WithoutReportWorker(), app.WithoutSigadocWatcher())
+	a, err := app.New(ctx, cfg, slog.New(slog.NewJSONHandler(io.Discard, nil)), pool, mail, app.WithStore(store), app.WithActions(registerFixtureResource), app.WithMTID(signer), app.WithPreviewConverter(conv), app.WithSigadoc(sigsim), app.WithoutOutboxWorker(), app.WithoutReportWorker(), app.WithoutSigadocWatcher())
 	require.NoError(t, err)
 	require.NoError(t, a.Start(ctx))
 	return &env{store: store, mtid: signer, sigadoc: sigsim, conv: conv, t: t, h: a.Handler, pool: pool, mail: mail, cfg: cfg, authz: a.Authz, app: a, oidc: oidc}
@@ -300,12 +296,6 @@ func TestTokensRejeitados(t *testing.T) {
 	var n int
 	require.NoError(t, e.pool.QueryRow(context.Background(), "SELECT count(*) FROM admins").Scan(&n))
 	assert.Zero(t, n, "token recusado nunca cria administrador")
-}
-
-func TestTokenDeUsuarioFinalNaoAbreOPainel(t *testing.T) {
-	e := newEnv(t)
-	access, _, _ := e.userToken("joao", "j@exemplo.com")
-	assert.Equal(t, 401, e.do("GET", "/api/admin/auth/me", nil, access).Status)
 }
 
 func TestRotasDeSenhaESessaoLocaisNaoExistem(t *testing.T) {

@@ -1,8 +1,7 @@
 # Convênios e Fomentos — Backend
 
 API em Go cujo centro é um **controle de permissões robusto, granular e configurável em tempo de execução**, inspirado no
-Strapi 5: RBAC completo para administradores, *Users & Permissions* para usuários finais e tokens de API para integrações.
-Não há frontend: tudo o que o painel do Strapi faz está disponível por endpoints `/api/admin/...`, para um frontend futuro apenas consumir.
+Strapi 5: RBAC completo para os administradores, que entram pelo MT Login. O painel (`../frontend`) consome os endpoints `/api/admin/...`.
 
 - Documentação interativa da API: `GET /api/docs` (especificação em [`api/openapi.yaml`](api/openapi.yaml), OpenAPI 3.1).
 - Revisão de segurança e pendências: [`SEGURANCA.md`](SEGURANCA.md).
@@ -13,7 +12,7 @@ Não há frontend: tudo o que o painel do Strapi faz está disponível por endpo
 2. [Subindo o ambiente do zero](#2-subindo-o-ambiente-do-zero)
 3. [Criando o primeiro Super Admin](#3-criando-o-primeiro-super-admin)
 4. [Como o controle de acesso funciona](#4-como-o-controle-de-acesso-funciona)
-5. [Receitas: nova ação, condição, policy e recurso](#5-receitas-nova-ação-condição-policy-e-recurso)
+5. [Receitas: nova ação, condição e recurso](#5-receitas-nova-ação-condição-e-recurso)
 6. [Variáveis de ambiente](#6-variáveis-de-ambiente)
 7. [Dependências](#7-dependências)
 8. [Estrutura de pastas](#8-estrutura-de-pastas)
@@ -26,25 +25,19 @@ Não há frontend: tudo o que o painel do Strapi faz está disponível por endpo
 
 ## 1. Visão geral da arquitetura
 
-Três tipos de sujeito, cada um com seu domínio de permissões:
+Só existe um tipo de sujeito, o **administrador** (todo mundo que usa o sistema, inclusive o proponente):
 
 | Sujeito | Entra por | Autenticação | Permissões |
 |---|---|---|---|
 | **Administrador** | `/api/admin/...` | Access token do **MT Login** (Keycloak/OIDC, RS256, validado pelo JWKS); identidade = **CPF** | RBAC completo: **ação + recurso + campos + condições**, união de várias roles |
-| **Usuário final** | `/api/...` | JWT `aud=api` + refresh token; sem token = anônimo (role **Public**) | Por **ação** (`api::recurso.acao`), uma única role; propriedade via **policies** |
-| **Token de API** | `/api/...` | `Authorization: Bearer gat_...` | Tipo `read-only`, `full-access` ou `custom` (lista de ações) |
 
 ```
 Requisição
  └─ httpapi: ID da requisição → IP real (proxies confiáveis) → limite por IP → logs → recover
              → cabeçalhos de segurança → limite de corpo → CORS
-     ├─ /api/admin/*  auth.RequireAdmin  (token do MT Login + administrador ativo no banco)
-     │            admin.RequirePermission  → authz.Engine.Can(ação) → Decision no contexto
-     │            handler fino → service (regra de negócio, aplica filtro/campos) → sqlc
-     └─ /api/*    enduser.Identifier.Identify  (anônimo/Public | JWT aud=api | gat_...)
-                  Identifier.RequireAction   → authz.Engine.Can(ação)
-                  policy.Require(...)        → regras em código (ex.: is-owner)
-                  handler fino → service → sqlc
+     └─ /api/admin/*  auth.RequireAdmin  (token do MT Login + administrador ativo no banco)
+                  admin.RequirePermission  → authz.Engine.Can(ação) → Decision no contexto
+                  handler fino → service (regra de negócio, aplica filtro/campos) → sqlc
 ```
 
 Regras de arquitetura: handlers finos → services com a regra de negócio → repositórios (sqlc, SQL puro); injeção de
@@ -114,15 +107,12 @@ Idempotente e **não destrutivo**: rodar de novo não duplica nada nem desfaz o 
     existente as permissões padrão que faltam (sem alterar nem remover as que já tem). **Quem entra pelo MT
     Login pela primeira vez recebe esta role automaticamente** (se ela já existir), em vez de ficar sem nenhuma. O seed também a
     dá a quem já tinha entrado e está sem nenhuma role.
-- Roles de usuário final **Public** (`find`, `findOne`) e **Authenticated** (também `create`, `update`, `delete`), aplicadas uma
-  única vez (marcador `seed.enduser-permissions`). Configurações avançadas e templates de e-mail padrão em português.
 - Departamentos de exemplo: Financeiro e Jurídico. Em desenvolvimento nascem como **área finalística** (`is_finalistic`); fora dele nascem sem a marca, e quem administra marca os que podem receber projetos para enquadramento. O seed nunca altera a marca de um departamento que já existe.
 - **Cadastros de referência** — tipos de entidade, os 5.571 municípios do IBGE e os parâmetros de regras com os valores das normas —
   são carregados pelo próprio servidor ao subir (`App.Start`), só no que ainda não existe; não precisam do seed.
 - Os Super Admins listados em `SEED_SUPER_ADMIN_CPF` (qualquer ambiente).
-- **Somente com `APP_ENV=development`**: um administrador de exemplo por role (`super@`, `editor@`, `author@`, `revisor@` (Financeiro), `revisor.juridico@`, `analista@`, `supervisor@`, `secretario@dev.local`)
-  com **CPFs fictícios** (não entram pelo MT Login; `seed.DevUsers`) e o usuário final `usuario@dev.local`, com senha aleatória
-  **exibida no log só na primeira execução**.
+- **Somente com `APP_ENV=development`**: um administrador de exemplo por role (`super@`, `revisor@` (Financeiro), `revisor.juridico@`, `analista@`, `supervisor@`, `secretario@dev.local`)
+  com **CPFs fictícios** (não entram pelo MT Login; `seed.DevUsers`).
 - Avisa as instâncias em execução (LISTEN/NOTIFY) para recarregarem as permissões.
 
 ---
@@ -152,10 +142,9 @@ entrar e um administrador atribuir as roles depois. Nome, CPF e e-mail vêm do M
 
 ### Ações
 
-Toda ação protegida é uma string `dominio::recurso.acao` (`admin::content.document.update`, `api::document.find`),
+Toda ação protegida é uma string `dominio::recurso.acao` (hoje só `admin::`, por exemplo `admin::projects.read`),
 **registrada em código** no `authz.Registry` na inicialização, com nome legível em português, categoria
-(`collection-types`, `single-types`, `plugins`, `settings`, `application`), recurso, suporte a campos/condições/locales
-e, para `api::`, método HTTP e rota vinculada. **Ação não registrada sempre nega.** `GET /api/admin/catalog/actions` lista tudo
+(`collection-types`, `single-types`, `settings`), recurso e suporte a campos/condições/locales. **Ação não registrada sempre nega.** `GET /api/admin/catalog/actions` lista tudo
 agrupado por categoria (base da futura tela de permissões). Na subida, permissões de ações que saíram do código são removidas
 (com aviso no log).
 
@@ -193,18 +182,7 @@ As permissões por role ficam em memória; qualquer mudança chama `Engine.Inval
 publica via **LISTEN/NOTIFY** do PostgreSQL (`PGBroadcaster`, atrás da interface `Broadcaster`) para as outras instâncias. A
 escuta reconecta sozinha e invalida tudo a cada reconexão. Em instância única basta `LocalBroadcaster`.
 
-### Usuários finais, policies e tokens de API
-
-- Sem `Authorization` → anônimo, com a role **Public**; JWT `aud=api` → usuário final (uma role); `gat_...` → token de API;
-  cabeçalho presente porém inválido → 401 (nunca "cai" em anônimo). Sem permissão: anônimo → **401**, autenticado → **403**.
-- **Policies** (`internal/policy`): funções executadas depois da permissão, compostas na rota (`policy.Require(...)`,
-  `policy.All/Any`). Exemplo pronto: `policy.IsOwner(lookup)`; negação → 403 com `details.policy`.
-- **Tokens de API**: `gat_` + 256 bits, exibidos **uma única vez**; no banco, só o HMAC-SHA256 com `API_TOKEN_SALT` (trocar o
-  salt invalida todos os tokens). `read-only` = ações GET/HEAD; `full-access` = qualquer ação `api::`; `custom` = lista.
-  Duração 7d/30d/90d/ilimitada; regenerar invalida o anterior; revogar é definitivo. Revogação, expiração e edição valem na
-  hora (cada requisição consulta o banco). `last_used_at` é gravado fora da requisição, no máximo uma vez por minuto.
-
-### Autenticação (administradores e usuários finais)
+### Autenticação
 
 **Administradores.** O frontend conduz o login no MT Login (Authorization Code + PKCE) e envia o access token no `Authorization:
 Bearer`. A API **só valida**: assinatura RS256 pelas chaves do `JWKS_URI` (cache com releitura ao aparecer um `kid` novo), emissor
@@ -214,56 +192,47 @@ e-mail são atualizados. **A cada requisição o banco confirma que a conta segu
 `account_disabled`). Token válido sem CPF válido: 403 `invalid_identity`. A API não guarda sessão de administrador: renovação e
 encerramento são do MT Login. O CPF só aparece completo no `/api/admin/auth/me` do próprio usuário; listagens e auditoria o mascaram.
 
-**Usuários finais.** Access token JWT HS256 de 15 min com `aud=api` que carrega o ID da sessão; o banco confirma a cada requisição que
-a sessão segue ativa e a conta não foi bloqueada (revogação imediata, sem cache). Refresh token opaco de 32 bytes (guardado como hash
-SHA-256) com **rotação** e **detecção de reutilização** (token já usado → revoga toda a família). Expiração por ociosidade e por tempo
-máximo. Senhas em Argon2id com comparação em tempo constante e login com mensagem genérica (e verificação feita mesmo quando o e-mail
-não existe).
-
 ---
 
-## 5. Receitas: nova ação, condição, policy e recurso
+## 5. Receitas: nova ação, condição e recurso
 
-Tudo abaixo usa o recurso de exemplo `documents` (`internal/document`) como referência.
+Use o recurso `project` (`internal/project`) como referência.
 
-### 5.1 Registrar uma nova ação (ex.: arquivar documentos)
+### 5.1 Registrar uma nova ação (ex.: arquivar)
 
-1. **Declare e registre** em `internal/document/model.go`:
+1. **Declare e registre** em `internal/project/model.go`:
    ```go
-   const ActionAdminArchive = "admin::content.document.archive"
+   const ActionArchive = "admin::projects.archive"
    // dentro de Register(reg):
    reg.MustRegister(authz.Action{
-       ID: ActionAdminArchive, Domain: authz.DomainAdmin, Category: authz.CategoryCollectionTypes,
-       Name: "Arquivar documentos", Resource: Resource, SupportsConditions: true,
+       ID: ActionArchive, Domain: authz.DomainAdmin, Category: authz.CategoryCollectionTypes,
+       Name: "Arquivar projetos", Resource: Resource, SupportsConditions: true,
    })
    ```
-   O identificador precisa casar com `dominio::recurso.acao`; o `Register` rejeita formato inválido, duplicata ou domínio
+   O identificador precisa casar com `admin::recurso.acao`; o `Register` rejeita formato inválido, duplicata ou domínio
    divergente do prefixo (e a aplicação nem sobe).
 2. **Proteja a rota** com o middleware da ação (autentica + autoriza e deixa a `Decision` no contexto):
    ```go
-   r.With(g(ActionAdminArchive)).Post("/api/admin/content/documents/{id}/archive", h.archive)
+   r.With(g(ActionArchive)).Post("/api/admin/projects/{id}/archive", h.archive)
    ```
 3. **No handler/serviço**, aplique a decisão ao registro (`dec, _ := admin.DecisionFrom(r.Context())`):
    ```go
-   if !dec.AllowsRecord(doc.Getter()) { return httpapi.ErrForbidden() }
+   if !dec.AllowsRecord(p.Getter()) { return httpapi.ErrForbidden() }
    ```
 4. **Conceda** a quem deve ter: `PUT /api/admin/roles/{id}/permissions` (ou nas permissões padrão do seed, se for o caso). Para o
    front, a ação já aparece em `GET /api/admin/catalog/actions`.
 5. **Documente e teste**: adicione a rota ao `api/openapi.yaml` (o teste `TestOpenAPIEstaCoerenteComAsRotas` falha se rota e
    especificação divergirem) e um teste de integração com 401, 403 e o caso permitido.
 
-Para ações do domínio `api::`, use `Domain: authz.DomainAPI` e informe `Method` e `Route` (a "rota vinculada" que o
-admin vê ao editar a role) e proteja a rota com `identifier.RequireAction(ActionX)`.
+### 5.2 Registrar uma nova condição (ex.: só projetos em rascunho)
 
-### 5.2 Registrar uma nova condição (ex.: só documentos em rascunho)
-
-Em `internal/app/app.go`, junto de `authz.RegisterStandardConditions(...)`:
+Em `internal/app/app.go`, junto de `authz.RegisterStandardConditions(...)` (as condições de projeto ficam em `project.RegisterConditions`):
 
 ```go
 conds.MustRegister(authz.Condition{
     ID: "admin::is-draft", Name: "Está em rascunho", Category: "custom",
     Handler: func(ctx context.Context, s authz.Subject) (authz.Result, error) {
-        return authz.Restrict(authz.Eq("status", "rascunho")), nil   // ou authz.Allow() / authz.Deny()
+        return authz.Restrict(authz.Eq("status", "draft")), nil   // ou authz.Allow() / authz.Deny()
     },
 })
 ```
@@ -275,48 +244,27 @@ conds.MustRegister(authz.Condition{
 - A condição aparece em `GET /api/admin/catalog/conditions` e passa a ser aceita em permissões de ações com
   `SupportsConditions: true` (várias na mesma permissão = OR).
 
-### 5.3 Criar uma nova policy (ex.: só documentos publicados)
-
-```go
-// internal/policy ou no pacote do recurso
-isPublished := policy.New("is-published", func(c policy.Context) (bool, error) {
-    id, err := uuid.Parse(chi.URLParam(c.Request, "id"))
-    if err != nil { return false, httpapi.ErrNotFound() }
-    d, err := svc.Get(c.Request.Context(), id)          // devolva *httpapi.APIError para 404 etc.
-    return err == nil && d.Status == "publicado", err
-})
-
-r.With(
-    identifier.RequireAction(ActionAPIUpdate),   // 1º: permissão da ação
-    policy.Require(policy.IsOwner(lookup), isPublished), // 2º: policies, em ordem; todas devem permitir
-).Put("/api/documents/{id}", h.update)
-```
-
-Policies recebem a requisição e o sujeito (`policy.Context`). Combine com `policy.All` / `policy.Any`. Falha → 403 com o nome
-da policy em `details.policy`. Em `internal/document/public_handler.go` há o uso real de `is-owner`.
-
-### 5.4 Adicionar um novo recurso protegido
+### 5.3 Adicionar um novo recurso protegido
 
 1. **Migração** (`make migrate-create name=criar_tabela_x`) e **queries** em `internal/database/queries/*.sql` → `make sqlc`.
 2. **Modelo + Schema**: struct com tags `json`/`db`/`authz:"system"`; `authz.NewSchema(...)`.
-3. **Ações**: `Register(reg)` com as ações `admin::` (campos/condições conforme fizer sentido) e `api::` (com rota), mais
+3. **Ações**: `Register(reg)` com as ações `admin::` (campos/condições conforme fizer sentido), mais
    `reg.RegisterSchema(recurso, schema)` — isso habilita a validação de campos em `PUT /api/admin/roles/{id}/permissions`.
 4. **Service**: recebe a `Decision` e a aplica: `Filter` na listagem (`Filter.ToSQL(schema.Column, n)` **combinado com AND** aos
    filtros do usuário), `AllowsRecord` em leitura/edição/exclusão, `FieldsFor` + `Schema.Project` na leitura e
    `Schema.RejectedWrite` na escrita. Ordenação só por lista permitida (`httpapi.ParseSort`).
-5. **Handlers finos** e rotas com `Guard(ação)` (admin) ou `Identifier.RequireAction` + `policy.Require` (público).
+5. **Handlers finos** e rotas com `Guard(ação)`.
 6. **Fiação** em `internal/app/app.go` (`Register`, serviço, handlers, `Routes`).
 7. **Permissões padrão** no `internal/seed` (opcional) e **OpenAPI**.
-8. **Testes**: unitários do que for puro e de integração (401/403/422, campos, filtro, paginação).
-   Para respostas públicas, use uma struct de visão dedicada (como `PublicDocument`): o que não existe na struct não vaza.
+8. **Testes**: unitários do que for puro e de integração (401/403/422, campos, filtro, paginação). Os testes de RBAC por campo
+   usam um recurso de exemplo registrado só nos testes (`app.WithActions`, em `internal/app/fixture_resource_test.go`).
 
 ---
 
 ## 6. Variáveis de ambiente
 
 Documentadas em [`.env.example`](.env.example) (um teste garante que todas as variáveis lidas estão lá, e vice-versa).
-Em produção (`APP_ENV=production`) a aplicação **não sobe** com segredos ausentes, com menos de 32 caracteres, com o valor de
-desenvolvimento, nem com Argon2 abaixo do mínimo da OWASP. A API também não sobe sem `JWKS_URI`, `OIDC_ISSUER`,
+A API não sobe sem `JWKS_URI`, `OIDC_ISSUER`,
 `OIDC_CLIENT_ID` e `OIDC_CPF_CLAIM` (a CLI não exige).
 
 | Variável | Padrão | Descrição |
@@ -331,19 +279,7 @@ desenvolvimento, nem com Argon2 abaixo do mínimo da OWASP. A API também não s
 | `OIDC_CLIENT_ID` | *(obrigatório)* | Client do Keycloak; o token precisa ter sido emitido para ele. |
 | `OIDC_CPF_CLAIM` | `preferred_username` | Claim do access token que traz o CPF. |
 | `SEED_SUPER_ADMIN_CPF` | *(vazio)* | CPFs (vírgula) que o `seed` torna Super Admin. |
-| `JWT_API_SECRET` | *(dev)* | Segredo do JWT de usuário final. **Obrigatório e forte em produção.** |
-| `API_TOKEN_SALT` | *(dev)* | Chave do HMAC dos tokens de API. Trocar invalida todos os tokens. |
-| `ACCESS_TOKEN_TTL` | `15m` | Validade do access token. |
-| `REFRESH_TOKEN_MAX_TTL` | `720h` | Tempo máximo de uma sessão de usuário final, desde o login. |
-| `REFRESH_TOKEN_IDLE_TTL` | `168h` | Inatividade máxima entre renovações (usuário final). |
-| `RESET_TOKEN_TTL` | `30m` | Validade do link de redefinição de senha do usuário final. |
-| `EMAIL_CONFIRMATION_TTL` | `72h` | Validade do link de confirmação de e-mail. |
-| `PASSWORD_MIN_LENGTH` | `8` | Tamanho mínimo das senhas (máximo fixo de 128). |
-| `ARGON2_MEMORY_KIB` | `19456` | Memória do Argon2id (padrão OWASP: 19 MiB). |
-| `ARGON2_ITERATIONS` | `2` | Iterações do Argon2id. |
-| `ARGON2_PARALLELISM` | `1` | Paralelismo do Argon2id. |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Origens permitidas, separadas por vírgula. |
-| `RATE_LIMIT_AUTH_PER_MINUTE` | `10` | Login, cadastro, esqueci a senha e refresh, por IP + identificador. |
 | `RATE_LIMIT_GLOBAL_PER_MINUTE` | `600` | Limite geral por IP em todas as rotas (`0` desliga). |
 | `RATE_LIMIT_UPLOAD_PER_MINUTE` | `120` | Pedidos e confirmações de envio de arquivo de projeto **por usuário** (`0` desliga). Enviar/reenviar/comprovante/duplicar têm limite fixo de 20/min por usuário. Excesso → 429. |
 | `CLAMAV_ADDR` | *(vazio)* | `host:porta` do `clamd`. Com ele, todo arquivo de projeto é varrido na confirmação (falha fechada: scanner fora do ar → 503 `scan_unavailable`). Configure o `clamd` com `StreamMaxLength` ≥ 200M. |
@@ -356,7 +292,7 @@ desenvolvimento, nem com Argon2 abaixo do mínimo da OWASP. A API também não s
 | `SIGADOC_LOOKUP_MATRICULA` | *(vazio)* | Uma matrícula válida, usada só para achar a matrícula de cada analista pelo CPF (`GET /siga/matricula` exige um token). Não assina nada. Obrigatória para abrir processo. |
 | `X_VIA_SIGADOC_SERVICE` | `GOV/MTI/SIGADOC` | Caminho do serviço do SIGADOC no X-Via. |
 | `SIGADOC_SIMULATE` | `false` | SIGADOC simulado (sem rede), só desenvolvimento e testes; recusado em produção. |
-| `SMTP_FROM` | `no-reply@localhost` | Remetente padrão e dos templates criados no seed. |
+| `SMTP_FROM` | `no-reply@localhost` | Remetente dos e-mails. |
 | `STORAGE_ENDPOINT` | *(vazio)* | Endpoint interno do MinIO/S3 (`host:porta`). Vazio desliga os arquivos dos documentos (rotas respondem 503). |
 | `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | *(vazio)* | Credenciais do armazenamento (obrigatórias com `STORAGE_ENDPOINT`). |
 | `STORAGE_BUCKET` / `STORAGE_REGION` | `documentos` / `us-east-1` | Bucket (privado) e região usada na assinatura. |
@@ -378,9 +314,8 @@ Nenhuma biblioteca fora desta lista foi adicionada.
 | `go-chi/httprate` | Rate limiting (por IP e por IP + identificador). |
 | `jackc/pgx/v5` | Driver e pool PostgreSQL; LISTEN/NOTIFY. |
 | `pressly/goose/v3` | Migrações SQL versionadas, embutidas no binário. |
-| `golang-jwt/jwt/v5` | JWTs: HS256 dos usuários finais e validação RS256 dos tokens do MT Login. |
+| `golang-jwt/jwt/v5` | Validação RS256 dos tokens do MT Login. |
 | `MicahParks/keyfunc/v3` | Leitura e cache do JWKS do MT Login (releitura ao aparecer um `kid` desconhecido). |
-| `golang.org/x/crypto` | Argon2id. |
 | `go-playground/validator/v10` | Validação de entrada (mensagens em português). |
 | `caarlos0/env/v11`, `joho/godotenv` | Configuração por ambiente; `.env` só fora de produção. |
 | `google/uuid` | Identificadores UUID. |
@@ -401,13 +336,10 @@ api/openapi.yaml   especificação OpenAPI 3.1 (servida em /api/docs)
 internal/config    leitura e validação das variáveis de ambiente
 internal/database  pool pgx, transações, migrações (migrations/), queries sqlc (queries/ → db/)
 internal/httpapi   roteador (o pacote se chama httpapi para não colidir com net/http), middlewares, respostas, validação
-internal/auth      senha (Argon2id), JWT, tokens opacos, validação OIDC e resolução do administrador por CPF
+internal/auth      validação OIDC e resolução do administrador por CPF
 internal/cpf       normalização, validação e máscara de CPF
 internal/authz     motor de permissões: ações, condições, Engine.Can, filtros, Schema, cache, LISTEN/NOTIFY
 internal/admin     administradores, roles de admin, permissões, catálogo
-internal/enduser   usuários finais, roles, configurações avançadas, templates de e-mail, identificação na API pública
-internal/apitoken  tokens de API
-internal/policy    policies reutilizáveis (is-owner, All, Any)
 internal/audit     registro e consulta da auditoria
 internal/mailer    interface Mailer + SMTP, log (dev) e descarte
 internal/outbox    caixa de saída de e-mails: gravação na transação + envio assíncrono com tentativas
@@ -415,9 +347,8 @@ internal/catalog   cadastros de referência: tipos de entidade, municípios (IBG
 internal/rules     parâmetros das regras de negócio (limites, prazos, datas), versionados por vigência
 internal/project   cadastro de projetos pelo proponente (rascunho em seções: Proponente, Instituição, Proposta) e perfil do proponente; visão geral do proponente (`overview.go`, `activity.go`) e do Analista (`queue_overview.go`, `queue_activity.go`, `queue_me.go`) e do Revisor (`reviewer_overview.go`, `reviewer_activity.go`, `reviewer_me.go`)
 internal/cnpj      normalização, validação e formatação de CNPJ
-internal/document  recurso de exemplo "documentos"
 internal/seed      dados iniciais (idempotente)
-internal/maintenance  limpeza de sessões de usuário final e tokens vencidos
+internal/maintenance  limpeza de e-mails já enviados
 internal/app       injeção manual de dependências
 internal/slug, internal/logging, internal/testutil
 ```
@@ -434,9 +365,7 @@ make lint          # golangci-lint
 ```
 
 O pacote `authz` fica acima de 90% de cobertura (unitários + integração). A suíte de integração cobre, entre outros: validação dos tokens do MT Login (provedor OIDC falso em `testutil`),
-primeiro acesso e criação por CPF, pré-cadastro; refresh de usuário final; Author editando documento próprio × alheio; revisor de departamento com campo
-permitido e proibido; API pública anônima × autenticada; exclusão de role de usuário final movendo usuários para Public;
-impedimento de excluir role em uso e de remover o último Super Admin; token de API somente leitura tentando escrever; seed
+primeiro acesso e criação por CPF, pré-cadastro; permissão por campo e por condição; impedimento de excluir role em uso e de remover o último Super Admin; seed
 idempotente; e a coerência entre `openapi.yaml` e as rotas.
 
 ---
@@ -444,18 +373,18 @@ idempotente; e a coerência entre `openapi.yaml` e as rotas.
 ## 10. Operação
 
 - **Migrações** rodam por `cli migrate:up` (o Compose faz isso antes de subir a API). **Rollback** é manual (`migrate:down`).
-- **`cleanup`** (`make cleanup`) remove sessões de usuário final e tokens de uso único vencidos há mais de N dias (`--days`, padrão 7). Agende,
-  por exemplo, uma vez por dia. A carência preserva a detecção de reutilização de refresh token. Com `--draft-days N` (padrão 0 = desligado) também
+- **`cleanup`** (`make cleanup`) remove e-mails já enviados há mais de N dias (`--days`, padrão 7) e envios de arquivo nunca confirmados. Agende,
+  por exemplo, uma vez por dia. Com `--draft-days N` (padrão 0 = desligado) também
   apaga rascunhos de projeto, e os arquivos deles, sem alteração há mais de N dias (política de retenção; cada exclusão é auditada).
-- **Arquivos dos documentos** (MinIO/S3): o navegador envia e baixa direto do armazenamento por URLs pré-assinadas; a API só as emite e confere
-  o resultado. Fluxo de envio: `POST .../documents/{id}/files` (autoriza e devolve `upload.url` + `upload.fields`) → POST multipart ao armazenamento →
-  `POST .../files/{fileId}/confirm`. Tipos: PDF e DOCX até 200 MB; PNG, JPEG e WebP até 25 MB; até 50 arquivos por documento. O proxy precisa
+- **Arquivos dos projetos** (MinIO/S3): o navegador envia e baixa direto do armazenamento por URLs pré-assinadas; a API só as emite e confere
+  o resultado. Fluxo de envio: `POST /api/admin/projects/{id}/documents/{code}/files` (autoriza e devolve `upload.url` + `upload.fields`) → POST multipart ao armazenamento →
+  `POST .../files/{fileId}/confirm`. Tipos: PDF e DOCX até 200 MB; PNG, JPEG e WebP até 25 MB; até 10 arquivos por documento. O proxy precisa
   expor o MinIO em `STORAGE_PUBLIC_URL` e **remover o prefixo** antes de repassar, mantendo o `Host` (a assinatura SigV4 cobre `Host` e caminho);
   veja `haproxy/haproxy.cfg`. O `cleanup` também remove envios autorizados e nunca confirmados há mais de 24 h.
-  Nos arquivos de **projetos** a confirmação calcula e guarda o SHA-256, confere o tamanho e, se houver `CLAMAV_ADDR`, varre o conteúdo; há ainda
+  A confirmação calcula e guarda o SHA-256, confere o tamanho e, se houver `CLAMAV_ADDR`, varre o conteúdo; há ainda
   limites por projeto (10 arquivos por documento, 20 envios em andamento, 300 arquivos, 2 GiB).
 - **Proxy reverso**: configure `TRUSTED_PROXIES` com o CIDR do proxy; sem isso o IP considerado é o da conexão.
-- **Encerramento**: SIGINT/SIGTERM param de aceitar conexões, concluem as requisições (15 s) e gravações pendentes de `last_used_at`.
+- **Encerramento**: SIGINT/SIGTERM param de aceitar conexões, concluem as requisições (15 s).
 - **Imagem**: Dockerfile multi-stage, binário estático em `distroless/static:nonroot`.
 
 ---
@@ -467,30 +396,23 @@ idempotente; e a coerência entre `openapi.yaml` e as rotas.
 - **Sem cache de sessão/token**: cada requisição autenticada consulta o banco (chave primária / hash). Revogar, bloquear, desativar,
   regenerar ou editar valem na hora, sem protocolo de invalidação. Se o volume pedir, um cache curto entra depois.
 - **Administradores sem senha nem sessão local**: a identidade é o CPF do MT Login. `admins.password_hash` e `admin_sessions`
-  ficaram no esquema, sem uso, até uma migração remover depois de validado o novo login. `one_time_tokens` segue para os
-  usuários finais (redefinição e confirmação).
+  ficaram no esquema, sem uso, até uma migração remover.
 - **E-mail de administrador não é único**: é atributo sincronizado do MT Login; a unicidade é do CPF.
-- **E-mail de usuário final não é único no banco**: "uma conta por e-mail" é configuração, aplicada pela aplicação com lock por e-mail.
-- **Duas colunas de autoria em `documents`**: `created_by_id` (administrador, usado pelas condições) e `owner_user_id`
-  (usuário final, usado pela policy `is-owner`).
-- **Mudar `status` exige a ação `publish`** mesmo que o campo esteja liberado no `update`; senão um papel com o campo "publicaria" sem poder.
 - **Só um Super Admin concede/retira a role Super Admin** (evita escalada de privilégio por quem tem `settings.users.update`).
-- **SQL dinâmico só em três listagens** (administradores, usuários finais, documentos): valores sempre em `$n` e colunas de
+- **SQL dinâmico só em poucas listagens** (administradores, projetos): valores sempre em `$n` e colunas de
   uma lista permitida. Todo o resto usa sqlc.
 - **Seed não destrutivo**: permissões padrão só na criação da role; o que o administrador mudou depois é preservado.
-- **Auditoria** de toda alteração de roles, permissões, administradores, usuários finais, tokens, configurações e templates, com
-  `before`/`after` na mesma transação; nunca grava senhas, tokens nem hashes. Conteúdo (documentos) não é auditado.
+- **Auditoria** de toda alteração de roles, permissões, administradores e projetos, com
+  `before`/`after` na mesma transação; nunca grava senhas, tokens nem hashes.
 - **Visão geral do proponente** (`GET /api/admin/projects/overview` e `/activity`): sempre limitada ao que é da pessoa (titular ou membro ativo), mesmo para quem tem leitura ampla (equipe, Super Admin), somada ao filtro da permissão `admin::projects.read`; `GET /api/admin/projects?access=owner|member|all` faz o mesmo na listagem. O feed lê `audit_logs` só pelas ações de `activityKinds` (lista permitida) e monta `kind` e `data` no servidor, nunca repassa o `payload`, porque o log mistura o que é do proponente com o que é interno da equipe (departamento, recusa de enquadramento, conferência). Evento novo só aparece no feed se alguém o incluir lá de propósito. Ver [`docs/planejamento-visao-geral-proponente.md`](../docs/planejamento-visao-geral-proponente.md).
 - **Visão geral do Analista** (`GET /api/admin/projects/queue/overview`, `/queue/activity` e `/queue/me`, só com a ação `start-analysis`): o alcance é a condição dessa permissão somada a projeto enviado ou arquivado (rascunho nunca), e `scope=mine` restringe aos projetos que a pessoa assumiu (`analyst_id`). "Parado" usa o parâmetro de regra `stalled_after_days` (dias por etapa de trabalho: `awaiting_checklist`, `in_analysis`, `framing`, `awaiting_opinion`; "aguardando proponente" não tem limite) e mede o **trecho aberto** do histórico de etapas, isto é, o tempo com o responsável atual, diferente do `stageSeconds` da fila (tempo na etapa). O bloco "pronto para indicar" calcula a conferência em Go só para os 30 candidatos mais antigos (`SetReadyCandidates`). O feed da equipe tem lista permitida **própria** (`queueActivityKinds`), separada da do proponente: mostra o interno (departamento, recusa), nomeia só a equipe, esconde a identidade do proponente e nunca leva a justificativa da recusa nem o `payload`. `/queue/me` devolve sempre e somente os números de quem chama, sem parâmetro de pessoa. Ver [`docs/planejamento-visao-geral-analista.md`](../docs/planejamento-visao-geral-analista.md).
 - **Visão geral do Revisor** (`GET /api/admin/projects/department/overview`, `/department/activity` e `/department/me`, só com a ação `review-framing`): o alcance é a condição dessa permissão somada a projeto enviado ou arquivado **e** ao departamento do cadastro da pessoa (o Super Admin sem departamento recebe tudo vazio, nunca os projetos de outros; o Revisor sem departamento já leva 403 no guard). Não há `scope`: o trabalho é do departamento, e vale a primeira decisão de qualquer Revisor dele. Os pendentes usam o mesmo tempo com o responsável atual e o limite `framing` de `stalled_after_days`. Como a **recusa limpa o `department_id`** e tira o projeto do alcance do Revisor, as decisões do departamento (contadores e feed) vêm de `project_framings`, não de `projects`; o marco de um projeto recusado vem com `linkable: false`. O feed tem lista permitida **própria** (`framing_indicated`, `framing_confirmed`, `framing_refused`, `archived`), nomeia a equipe do departamento, esconde a identidade do proponente e nunca leva a justificativa da recusa nem o `payload`. `/department/me` devolve sempre e somente os números de quem chama. Ver [`docs/planejamento-visao-geral-revisor.md`](../docs/planejamento-visao-geral-revisor.md).
-- **Estrutura pronta para OAuth** (`end_users.provider` e a interface `enduser.Provider`), sem implementação.
+- **Portal público removido**: contas locais de usuário final, tokens de API, `/api/documents` e os templates de e-mail de senha saíram (migração `00043`). Estavam vazios em hml e produção.
 
 ---
 
 ## 12. Próximos passos
 
-- **OAuth/OIDC**: implementar `enduser.Provider` (callback → `Identity`), criar/associar o usuário com `provider` e adicionar as rotas
-  `/api/connect/{provider}`. O modelo de dados e o registro de provedores já existem.
 - **i18n/locales**: `SupportsLocales` já existe nas ações e `properties` (JSONB) nas permissões; falta o conteúdo localizado e a
   validação de `properties.locales`.
 - **Múltiplas instâncias**: o cache de permissões já sincroniza por LISTEN/NOTIFY. Falta apenas o que é de infraestrutura: o rate

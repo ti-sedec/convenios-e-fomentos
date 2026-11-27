@@ -3,9 +3,8 @@
 Sistema de controle de **convênios, termos de fomento e prestação de contas**. O projeto tem uma API em Go com
 controle de permissões granular (RBAC) e um painel administrativo em Next.js que a consome.
 
-> **Estado atual:** a fundação está pronta (autenticação, administradores, roles e permissões, usuários finais, tokens de
-> API, auditoria e um recurso de exemplo, *Documents*). As regras de negócio de convênios e fomentos ainda não foram
-> implementadas; a legislação de referência está em [`docs/`](docs/).
+> **Estado atual:** a fundação está pronta (autenticação pelo MT Login, administradores, roles e permissões, auditoria) e o
+> cadastro, a análise e o enquadramento de projetos já funcionam. A legislação de referência está em [`docs/`](docs/).
 
 ## Sumário
 
@@ -37,7 +36,7 @@ controle de permissões granular (RBAC) e um painel administrativo em Next.js qu
 ```
                     ┌─ /      ──► Next.js (:3000) ──► API Go (:8080) ──► PostgreSQL
 Navegador ─► HAProxy│              │  cookies httpOnly      │  JWT + RBAC
-              (:80) │              └─ proxy /bff/*          └─ /api/admin/*  /api/auth/*  /api/docs
+              (:80) │              └─ proxy /bff/*          └─ /api/admin/*  /api/docs
                     └─ /api/* ──► API Go (:8080)
 ```
 
@@ -160,11 +159,9 @@ Tudo isso é feito no painel, em **Administração → Usuários** (`/dashboard/
 - A **Visão geral** do Proponente mostra o que pede ação dele (correções com prazo, rascunhos, convites), os projetos por situação, os recentes e a atividade, com o filtro "Todos / Meus / Compartilhados comigo" ([planejamento](docs/planejamento-visao-geral-proponente.md)).
 - A **Visão geral** do Analista prioriza o trabalho (recusados pelo Revisor, reenviados, aguardando assumir, tudo aprovado sem departamento, parados além do limite por etapa e prazos a vencer), mostra a fila por etapa, a atividade da equipe e o resumo pessoal dele, com o filtro "Toda a equipe / Só os meus" ([planejamento](docs/planejamento-visao-geral-analista.md)).
 - A **Visão geral** do Revisor do Departamento mostra os enquadramentos que esperam a decisão dele (os mais antigos primeiro, com o limite de "parado"), os números do departamento, a atividade do departamento e as decisões da própria pessoa; sem departamento no cadastro, a tela explica o motivo ([planejamento](docs/planejamento-visao-geral-revisor.md)).
-- Também no painel: **Departamentos**, **Auditoria** (com o antes/depois de cada alteração), **Tokens de API** e o grupo **Portal público**
-  (usuários finais, perfis públicos, configurações e templates de e-mail).
-- O seed ainda cria, **só em desenvolvimento**, um administrador de exemplo por role (`super@`, `editor@`, `author@`,
+- Também no painel: **Departamentos**, **Auditoria** (com o antes/depois de cada alteração).
+- O seed ainda cria, **só em desenvolvimento**, um administrador de exemplo por role (`super@`,
   `revisor@` (Financeiro), `revisor.juridico@`, `analista@`, `supervisor@`, `secretario@dev.local`) com **CPFs fictícios**: servem para ver as listagens, mas não conseguem entrar (não existem no MT Login).
-  O usuário final `usuario@dev.local` continua tendo senha, que aparece no log do seed apenas na primeira execução.
 
 ## 5. Como o ambiente de desenvolvimento funciona
 
@@ -194,14 +191,13 @@ cache do Next, mantidos dentro do Docker para não misturar com o host).
 desenvolvimento no compose, então nada é obrigatório. Os padrões que importam:
 
 - `APP_URL` (`http://localhost`): origem pública da aplicação; dela derivam `PUBLIC_URL`, `CORS_ALLOWED_ORIGINS`,
-  `NEXT_PUBLIC_APP_URL` e `MTLOGIN_REDIRECT_URI`. Os links dos e-mails dos usuários finais abrem o frontend.
+  `NEXT_PUBLIC_APP_URL` e `MTLOGIN_REDIRECT_URI`.
 - `TRUSTED_PROXIES=172.16.0.0/12`: o backend confia no `X-Forwarded-For` enviado pelo HAProxy e pelo Next (rede padrão do
   Docker), para que o rate limit de login considere o IP do usuário e não o do proxy.
 - `DATABASE_URL`: montada a partir de `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB` (host `db`, na rede do Docker).
   Defina-a explicitamente apenas para usar outro banco. **Atenção:** uma `DATABASE_URL` exportada no seu shell (modo sem Docker,
   apontando para `localhost`) sobrescreve a do `.env` e quebra os contêineres.
 - `API_URL=http://api:8080` no frontend: o servidor do Next fala com a API direto pela rede do Docker, sem passar pelo HAProxy.
-- Segredos (`JWT_*`, `API_TOKEN_SALT`): valores fixos de desenvolvimento, **nunca** use em produção.
 
 ## 6. Rotina de trabalho
 
@@ -300,8 +296,6 @@ abram o frontend. Comandos do `Makefile` do backend: `run`, `dev`, `build`, `tes
 | `JWKS_URI`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` | **Obrigatórias.** MT Login: chaves públicas, emissor e client que a API aceita nos tokens dos administradores. |
 | `OIDC_CPF_CLAIM` | Claim do access token que traz o CPF (padrão `preferred_username`). |
 | `SEED_SUPER_ADMIN_CPF` | CPFs (vírgula) que o `seed` torna Super Admin. |
-| `JWT_API_SECRET`, `API_TOKEN_SALT` | Segredos (≥ 32 caracteres e distintos em produção). Os valores de exemplo são só para desenvolvimento. |
-| `ACCESS_TOKEN_TTL` / `REFRESH_TOKEN_*` | Duração dos tokens (15 min / 7 dias de inatividade / 30 dias no máximo). |
 | `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `PUBLIC_URL` | CORS, proxies confiáveis (IP real) e URL base dos links de e-mail. |
 | `SMTP_*` | Envio de e-mail; sem `SMTP_HOST` os e-mails são apenas registrados no log. |
 
@@ -312,7 +306,7 @@ abram o frontend. Comandos do `Makefile` do backend: `run`, `dev`, `build`, `tes
 | Portas no host | `HAPROXY_PORT` (80), `DB_PORT` (5432); com outra porta, defina também `APP_URL` |
 | Usuário do host | `UID`, `GID` (1000) |
 | PostgreSQL | `POSTGRES_IMAGE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL` (opcional) |
-| Backend | `APP_ENV`, `LOG_LEVEL`, `PUBLIC_URL`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `JWKS_URI`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CPF_CLAIM`, `SEED_SUPER_ADMIN_CPF`, `JWT_API_SECRET`, `API_TOKEN_SALT`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_MAX_TTL`, `REFRESH_TOKEN_IDLE_TTL`, `RATE_LIMIT_AUTH_PER_MINUTE`, `RATE_LIMIT_GLOBAL_PER_MINUTE`, `SMTP_*` |
+| Backend | `APP_ENV`, `LOG_LEVEL`, `PUBLIC_URL`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `JWKS_URI`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CPF_CLAIM`, `SEED_SUPER_ADMIN_CPF`, `RATE_LIMIT_GLOBAL_PER_MINUTE`, `SMTP_*` |
 | Frontend | `MTLOGIN_AUTHORIZATION_URI`, `MTLOGIN_TOKEN_URI`, `MTLOGIN_END_SESSION_URI`, `MTLOGIN_CLIENT_ID`, `MTLOGIN_CLIENT_SECRET` (só client confidencial), `MTLOGIN_REDIRECT_URI`, `API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SENTRY_DISABLED`, `NEXT_TELEMETRY_DISABLED`, `WATCHPACK_POLLING` |
 
 ## 9. Autenticação e e-mails em desenvolvimento
@@ -343,9 +337,9 @@ abram o frontend. Comandos do `Makefile` do backend: `run`, `dev`, `build`, `tes
 - Permissões na interface: `useCan()` e `<Can>` leem as permissões do `/api/admin/auth/me`. Servem só para esconder elementos; quem
   autoriza de fato é sempre o backend.
 
-**E-mails.** Os e-mails existem só para os **usuários finais** (confirmação de e-mail e redefinição de senha). Sem `SMTP_HOST`,
-a API não envia nada: registra o e-mail no log, com o link completo (`docker compose logs api | grep "e-mail (modo desenvolvimento)"`).
-Os tokens são de uso único. Administradores não recebem e-mails: não há senha nem convite.
+**E-mails.** A API envia e-mails sobre os projetos (convites de compartilhamento, pedidos de complementação e andamento). Sem `SMTP_HOST`,
+ela não envia nada: registra o e-mail no log, com o link completo (`docker compose logs api | grep "e-mail (modo desenvolvimento)"`).
+Não há e-mail de senha nem de convite de administrador: o login é só pelo MT Login.
 
 ## 10. Testes, lint e formatação
 
@@ -386,7 +380,6 @@ O frontend ainda não tem suíte de testes automatizados; a verificação de pon
 | Entra no MT Login mas cai em `/auth/denied` (`invalid_identity`) | O claim de `OIDC_CPF_CLAIM` não traz um CPF válido; confira o token. |
 | Entra e vê "Aguardando liberação" | Conta nova sem roles: peça a um Super Admin (ou use `admin:create --cpf`, seção 4). |
 | API sobe e cai com erro de conexão ao banco | O banco ainda iniciava; `docker compose logs db api`. O `migrate` só libera a API com o `db` saudável. |
-| `429 rate_limited` no login de usuário final | Muitas tentativas (limite por IP+e-mail). Aguarde um minuto. |
 | Erros de tipos estranhos referindo `.next/types` | Cache gerado antigo: `docker compose rm -sf web && docker volume rm convenios-dev_web-next`, ou `rm -rf frontend/.next` no modo host. |
 | Mudou dependências e o `web` não enxerga | `docker compose restart web` (roda `bun install` de novo). Em último caso, `docker volume rm convenios-dev_web-node-modules`. |
 | Logout inesperado ao usar várias instâncias do Next | A renovação de tokens é serializada por processo; veja a [seção 9](#9-autenticação-e-e-mails-em-desenvolvimento). |
@@ -406,8 +399,6 @@ O frontend ainda não tem suíte de testes automatizados; a verificação de pon
 │   │   ├── app/                # montagem do grafo de dependências + testes de integração
 │   │   ├── auth/ admin/        # autenticação e gestão de administradores
 │   │   ├── authz/              # motor de permissões (ações, campos, condições)
-│   │   ├── enduser/ apitoken/  # usuários finais e tokens de API
-│   │   ├── document/           # recurso de exemplo
 │   │   ├── audit/ httpapi/ ... # auditoria, roteador, middlewares, config, mailer
 │   │   └── database/           # migrações (goose) e queries (sqlc)
 │   ├── api/openapi.yaml        # contrato da API (servido em /api/docs)

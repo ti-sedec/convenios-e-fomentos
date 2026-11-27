@@ -199,17 +199,17 @@ func TestCamposPorRegistro(t *testing.T) {
 	assert.False(t, d.FieldsFor(record(map[string]any{})).Allows("titulo"))
 }
 
-func TestTiposDeSujeitoEDominio(t *testing.T) {
+func TestSoAdministradorTemPermissoes(t *testing.T) {
 	f := newFixture(t, nil)
 	r := role("x")
 	f.store.set(r.ID, Permission{Action: read})
-	for _, typ := range []SubjectType{SubjectAnonymous, SubjectEndUser, SubjectAPIToken} {
+	for _, typ := range []SubjectType{"anonymous", "end_user", "api_token"} {
 		d, err := f.eng.Can(context.Background(), Subject{Type: typ, Roles: []Role{r}}, read)
 		require.NoError(t, err)
 		assert.False(t, d.Allowed, typ)
 	}
 	// Um "super-admin" que não é administrador não ganha curinga.
-	assert.False(t, Subject{Type: SubjectEndUser, Roles: []Role{role(SuperAdminRoleCode)}}.IsSuperAdmin())
+	assert.False(t, Subject{Type: "end_user", Roles: []Role{role(SuperAdminRoleCode)}}.IsSuperAdmin())
 }
 
 func TestFiltroPorRecurso(t *testing.T) {
@@ -345,124 +345,6 @@ func TestPermissoesEfetivas(t *testing.T) {
 
 	su, _ := f.eng.Effective(context.Background(), adminWith(role(SuperAdminRoleCode)))
 	assert.Len(t, su, 5)
-	none, _ := f.eng.Effective(context.Background(), Subject{Type: SubjectAnonymous})
+	none, _ := f.eng.Effective(context.Background(), Subject{Type: "anonymous"})
 	assert.Empty(t, none)
-}
-
-func newAPIFixture(t *testing.T) (fixture, uuid.UUID, uuid.UUID) {
-	t.Helper()
-	f := newFixture(t, nil)
-	f.eng.actions.MustRegister(
-		Action{ID: "api::document.find", Domain: DomainAPI, Category: CategoryApplication, Name: "Listar", Method: "GET", Route: "/api/documents"},
-		Action{ID: "api::document.create", Domain: DomainAPI, Category: CategoryApplication, Name: "Criar", Method: "POST", Route: "/api/documents"},
-	)
-	apiStore := &fakeStore{perms: map[uuid.UUID][]Permission{}}
-	f.eng.SetEndUserStore(apiStore)
-	public, authed := uuid.New(), uuid.New()
-	apiStore.set(public, Permission{Action: "api::document.find"})
-	apiStore.set(authed, Permission{Action: "api::document.find"}, Permission{Action: "api::document.create"})
-	return f, public, authed
-}
-
-func TestDominioAPIUsuarioFinalEAnonimo(t *testing.T) {
-	f, public, authed := newAPIFixture(t)
-	ctx := context.Background()
-	anon := Subject{Type: SubjectAnonymous, Roles: []Role{{ID: public, Code: "public"}}}
-	user := Subject{Type: SubjectEndUser, ID: uuid.New(), Roles: []Role{{ID: authed, Code: "authenticated"}}}
-
-	d, err := f.eng.Can(ctx, anon, "api::document.find")
-	require.NoError(t, err)
-	assert.True(t, d.Allowed)
-	assert.True(t, d.Filter.IsTrue())
-	assert.True(t, d.Fields.IsAll(), "usuário final não tem restrição de campos")
-	d, _ = f.eng.Can(ctx, anon, "api::document.create")
-	assert.False(t, d.Allowed, "o anônimo não cria")
-	d, _ = f.eng.Can(ctx, user, "api::document.create")
-	assert.True(t, d.Allowed)
-	d, _ = f.eng.Can(ctx, user, "api::document.delete")
-	assert.False(t, d.Allowed, "ação não registrada")
-
-	// Cada sujeito só vale no seu domínio.
-	d, _ = f.eng.Can(ctx, user, read)
-	assert.False(t, d.Allowed, "usuário final não acessa ações de admin")
-	d, _ = f.eng.Can(ctx, adminWith(role("x")), "api::document.find")
-	assert.False(t, d.Allowed, "administrador não herda permissões de usuário final")
-	d, _ = f.eng.Can(ctx, Subject{Type: SubjectAPIToken, Roles: []Role{{ID: authed}}}, "api::document.find")
-	assert.False(t, d.Allowed, "token de API: Fase 6")
-	d, _ = f.eng.Can(ctx, Subject{Type: SubjectEndUser}, "api::document.find")
-	assert.False(t, d.Allowed, "sem role")
-	d, _ = f.eng.Can(ctx, Subject{Type: SubjectEndUser, Roles: []Role{{ID: authed}, {ID: public}}}, "api::document.find")
-	assert.False(t, d.Allowed, "usuário final tem uma única role")
-}
-
-func TestDominioAPISemStoreNega(t *testing.T) {
-	f := newFixture(t, nil)
-	f.eng.actions.MustRegister(Action{ID: "api::document.find", Domain: DomainAPI, Category: CategoryApplication, Name: "Listar", Method: "GET", Route: "/api/documents"})
-	d, err := f.eng.Can(context.Background(), Subject{Type: SubjectAnonymous, Roles: []Role{role("public")}}, "api::document.find")
-	require.NoError(t, err)
-	assert.False(t, d.Allowed)
-}
-
-func TestDominioAPICacheEInvalidacao(t *testing.T) {
-	f, public, _ := newAPIFixture(t)
-	ctx := context.Background()
-	anon := Subject{Type: SubjectAnonymous, Roles: []Role{{ID: public}}}
-	d, _ := f.eng.Can(ctx, anon, "api::document.find")
-	require.True(t, d.Allowed)
-	f.eng.apiCache.store.(*fakeStore).set(public)
-	d, _ = f.eng.Can(ctx, anon, "api::document.find")
-	assert.True(t, d.Allowed, "cache")
-	require.NoError(t, f.eng.Invalidate(ctx, public))
-	d, _ = f.eng.Can(ctx, anon, "api::document.find")
-	assert.False(t, d.Allowed)
-
-	f.eng.apiCache.store.(*fakeStore).err = errors.New("banco fora")
-	require.NoError(t, f.eng.Invalidate(ctx))
-	_, err := f.eng.Can(ctx, anon, "api::document.find")
-	assert.Error(t, err)
-}
-
-func TestTokensDeAPI(t *testing.T) {
-	f, _, _ := newAPIFixture(t)
-	f.eng.actions.MustRegister(Action{ID: "api::document.update", Domain: DomainAPI, Category: CategoryApplication, Name: "Atualizar", Method: "PUT", Route: "/api/documents/{id}"},
-		Action{ID: "api::document.head", Domain: DomainAPI, Category: CategoryApplication, Name: "Cabeçalho", Method: "HEAD", Route: "/api/documents/{id}"})
-	ctx := context.Background()
-	tok := func(typ string, actions ...string) Subject {
-		return Subject{Type: SubjectAPIToken, ID: uuid.New(), APIToken: &TokenGrant{Type: typ, Actions: actions}}
-	}
-	tests := []struct {
-		nome   string
-		s      Subject
-		action string
-		want   bool
-	}{
-		{"full-access: leitura", tok(TokenFullAccess), "api::document.find", true},
-		{"full-access: escrita", tok(TokenFullAccess), "api::document.create", true},
-		{"full-access: ação não registrada", tok(TokenFullAccess), "api::document.delete", false},
-		{"full-access: ação de admin", tok(TokenFullAccess), read, false},
-		{"read-only: GET", tok(TokenReadOnly), "api::document.find", true},
-		{"read-only: HEAD", tok(TokenReadOnly), "api::document.head", true},
-		{"read-only: POST", tok(TokenReadOnly), "api::document.create", false},
-		{"read-only: PUT", tok(TokenReadOnly), "api::document.update", false},
-		{"custom: na lista", tok(TokenCustom, "api::document.create"), "api::document.create", true},
-		{"custom: fora da lista", tok(TokenCustom, "api::document.create"), "api::document.find", false},
-		{"custom: lista vazia", tok(TokenCustom), "api::document.find", false},
-		{"custom: ação removida do código", tok(TokenCustom, "api::document.delete"), "api::document.delete", false},
-		{"tipo desconhecido", tok("outro"), "api::document.find", false},
-		{"sem grant", Subject{Type: SubjectAPIToken}, "api::document.find", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.nome, func(t *testing.T) {
-			d, err := f.eng.Can(ctx, tt.s, tt.action)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, d.Allowed)
-			if tt.want {
-				assert.True(t, d.Filter.IsTrue())
-				assert.True(t, d.Fields.IsAll())
-			}
-		})
-	}
-	// O token não tem role: não herda permissões de roles nem funciona em engine sem store de usuário final.
-	d, _ := f.eng.Can(ctx, Subject{Type: SubjectAPIToken, Roles: []Role{{ID: uuid.New()}}}, "api::document.find")
-	assert.False(t, d.Allowed)
 }

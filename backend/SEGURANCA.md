@@ -29,18 +29,8 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
   tem efeito imediato.
 - ⚠️ MFA, bloqueio por tentativas e política de senha são do MT Login (Keycloak), não desta aplicação.
 
-**Usuários finais e tokens de API:**
-- ✅ Senhas em Argon2id (parâmetros gravados no hash, comparação em tempo constante); política de 8–128 caracteres.
-- ✅ Login com mensagem genérica; a senha é verificada mesmo quando a conta não existe (tempo equalizado).
-- ✅ JWT HS256 com `iss`, `aud=api` e `exp` obrigatórios; algoritmo `none` e tokens de outra audiência rejeitados.
-- ✅ Refresh token opaco (32 bytes, só o SHA-256 no banco), rotação atômica, reutilização revoga a família, expiração por ociosidade e máxima.
-- ✅ Bloqueio, desativação e revogação valem na hora: cada requisição confere a sessão no banco (sem cache).
-- ✅ Tokens de confirmação e redefinição: uso único consumido atomicamente, com validade; token de outro tipo/sujeito é recusado.
-- ✅ Tokens de API: 256 bits, só o HMAC-SHA256 no banco, exibidos uma vez, `Cache-Control: no-store`, revogação/expiração imediatas.
-- 🔧 Parâmetros do Argon2 passaram a ser validados (e, em produção, não podem ficar abaixo do mínimo da OWASP).
-- ⚠️ Usuários finais: não há MFA/2FA nem bloqueio de conta por tentativas, só rate limit por IP + identificador
-  (`RATE_LIMIT_AUTH_PER_MINUTE`). Ataques distribuídos (credential stuffing) exigem proteção adicional no proxy/WAF.
-- ⚠️ JWT simétrico (HS256) dos usuários finais, sem `kid`: trocar o segredo invalida todos os access tokens (até 15 min).
+**Contas locais, usuários finais e tokens de API não existem mais** (removidos pela migração `00043`): a única porta de entrada é o MT Login. Isso tirou da superfície
+de ataque o cadastro aberto, o login com senha, o "esqueci a senha" e os tokens `gat_`.
 
 ### Autorização
 - ✅ Ação não registrada sempre nega; Super Admin também.
@@ -49,7 +39,6 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
 - ✅ Campos: leitura remove o não permitido (chaves fora do schema nunca saem); escrita recusa (422) campos não permitidos e **todos** os
   campos de sistema, inclusive para o Super Admin.
 - ✅ Registro único (leitura/edição/exclusão/publicação) é conferido contra o filtro da permissão (403 fora dele).
-- ✅ Mudar `status` exige a ação `publish` mesmo com o campo liberado.
 - ✅ Só um Super Admin concede/retira a role Super Admin ou convida com ela; ninguém desativa/exclui a própria conta; o último Super Admin
   ativo é protegido por lock consultivo (testado com requisições concorrentes).
 - ✅ Cada rota de `/admin` tem teste de 401 (sem token) e 403 (sem permissão).
@@ -59,29 +48,23 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
   cobre; não altera as permissões de uma role que possui (409 `cannot_modify_own_role`) nem os perfis ou a lotação da própria conta
   (409 `cannot_modify_self`); e não age sobre administradores com permissões que não possui (403 `target_more_privileged`). Remover
   permissões é sempre permitido. Cada regra tem teste de integração (`TestEscalonamentoDePrivilegioEBloqueado`) e unitário (`covers_test.go`).
-  Tokens de API ficam fora: concedem o domínio `api::` (API pública), não o `admin::`.
-- ⚠️ Os seletores do painel liberam leituras auxiliares a quem administra o recurso (lista de departamentos e de roles com `users.read`,
-  catálogo de ações da API com `api-tokens.read`/`enduser-roles.read`, lista de roles públicas com `enduser-users.read`/`enduser-settings.read`).
+- ⚠️ Os seletores do painel liberam leituras auxiliares a quem administra o recurso (lista de departamentos e de roles com `users.read`).
   Elas expõem só nomes e contagens; as permissões de cada role continuam exigindo `settings.roles.read`.
-- ⚠️ Public e Authenticated não herdam permissões uma da outra (como no Strapi); revisar ao configurar a API pública.
 
 ### Entrada e saída
 - ✅ Corpo limitado (`MAX_BODY_BYTES`, 413); JSON rejeita campos desconhecidos; validação com mensagens em português.
-- ✅ A API pública usa uma struct de visão (`PublicDocument`): `observacao_interna` e demais campos internos não existem na resposta.
 - ✅ Erros 500 nunca vazam detalhes (só o `requestId`); pânicos são capturados.
-- ✅ Templates de e-mail usam `html/template` (escape automático; `javascript:` neutralizado) e são validados ao salvar.
 - ✅ Cabeçalhos de e-mail recusam quebra de linha (sem injeção de cabeçalho).
-- ✅ Redirecionamento da confirmação de e-mail só para URL `http(s)` absoluta, configurável apenas por administrador com permissão.
 - 🔧 `X-Request-ID` do cliente agora é validado (`[A-Za-z0-9._-]{1,64}`); antes qualquer texto de até 64 bytes era refletido em cabeçalho e log.
 - 🔧 Todas as respostas levam `Cache-Control: no-store` (dados dinâmicos/pessoais não devem ir para caches compartilhados).
 - ✅ CSRF não se aplica: a autenticação é por cabeçalho `Authorization`, sem cookies. CORS restrito às origens configuradas.
 
 ### Disponibilidade
-- 🔧 Limite geral por IP em todas as rotas (`RATE_LIMIT_GLOBAL_PER_MINUTE`, padrão 600), além do limite específico de autenticação.
-- ✅ Timeouts do servidor HTTP, corpo limitado, `Argon2` com memória limitada e tamanho máximo de senha (anti-DoS).
+- 🔧 Limite geral por IP em todas as rotas (`RATE_LIMIT_GLOBAL_PER_MINUTE`, padrão 600).
+- ✅ Timeouts do servidor HTTP e corpo limitado (anti-DoS).
 - ✅ IP real só via `X-Forwarded-For` quando a conexão vem de um proxy em `TRUSTED_PROXIES`.
 - ⚠️ O rate limit é em memória, por instância. Com várias instâncias o limite efetivo é multiplicado; use também o proxy.
-- 🔧 Sessões e tokens de uso único só cresciam: novo comando `cleanup` (`make cleanup`) remove os vencidos há mais de N dias.
+- 🔧 O comando `cleanup` (`make cleanup`) remove os e-mails já enviados e os envios de arquivo nunca confirmados.
 
 ### Banco de dados
 - ✅ SQL via sqlc; SQL montado à mão em apenas três listagens, com valores em `$n` e colunas/ordenação de listas permitidas.
@@ -90,11 +73,10 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
 - ⚠️ Sem criptografia em repouso, backups ou TLS para o PostgreSQL por conta da aplicação: configure `sslmode=verify-full` na `DATABASE_URL` em produção.
 
 ### Segredos e logs
-- ✅ Em produção a aplicação não sobe com segredos ausentes, curtos, com valor de desenvolvimento ou com os dois segredos JWT iguais.
+- ✅ A aplicação não guarda segredo de assinatura nem sal: não há JWT nem token próprio, só a validação dos tokens do MT Login pelo JWKS.
 - ✅ O log de acesso registra só método, caminho (sem query string), status e duração; senhas, tokens e hashes nunca são registrados.
-- ✅ Auditoria sem senhas, tokens nem hashes (testado para tokens de API e usuários finais).
-- ⚠️ Em desenvolvimento, o `LogMailer` registra o corpo dos e-mails (com tokens) e o `seed` imprime senhas de exemplo. Isso só ocorre
-  fora de produção; em produção sem SMTP os e-mails são descartados sem o corpo.
+- ✅ Auditoria sem senhas, tokens nem hashes.
+- ⚠️ Em desenvolvimento, o `LogMailer` registra o corpo dos e-mails (com links). Isso só ocorre fora de produção; em produção sem SMTP os e-mails são descartados sem o corpo.
 
 ### Dependências
 - ✅ `govulncheck`: nenhuma vulnerabilidade alcançável. Atualizados `golang.org/x/crypto`, `moby/go-archive` e `moby/sys/user`
@@ -102,16 +84,15 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
 - ⚠️ Restou o aviso GO-2026-5932 (`x/crypto/openpgp`, sem correção): a aplicação **não importa** esse pacote.
 - Reexecute `govulncheck ./...` e `go list -m -u all` periodicamente (ex.: no CI).
 
-### Arquivos dos documentos (MinIO/S3)
+### Arquivos dos projetos (MinIO/S3)
 - ✅ Bucket privado; nenhum acesso anônimo. Envio e download só por URLs pré-assinadas de curta duração (envio 15 min, download 2 min), emitidas depois da
-  checagem de permissão sobre o **documento** (condições por registro valem para os arquivos).
+  checagem de permissão sobre o **projeto** (condições por registro valem para os arquivos).
 - ✅ O envio usa POST policy: o armazenamento recusa tipo diferente do declarado, tamanho acima do limite (PDF/DOCX 200 MB; imagens 25 MB), troca da
-  chave do objeto e uso fora do prazo. A chave do objeto é gerada pelo servidor (`documents/<documento>/<arquivo>`), nunca derivada do nome do cliente, e não sai da API.
+  chave do objeto e uso fora do prazo. A chave do objeto é gerada pelo servidor (derivada do projeto e do arquivo), nunca derivada do nome do cliente, e não sai da API.
 - ✅ A confirmação confere existência, tipo, tamanho real e a assinatura do formato (magic bytes); o que não passa é apagado. Downloads saem como
-  `attachment`, com o tipo gravado no servidor, e a API pública só serve arquivos confirmados de documentos publicados (senão 404).
+  `attachment`, com o tipo gravado no servidor,; só se baixam arquivos confirmados.
 - ✅ Excluir o documento ou o arquivo apaga os objetos; envios nunca confirmados são removidos pelo `cleanup` após 24 h.
-- ⚠️ Na API de documentos de exemplo (`/admin/documents`) não há antivírus nem verificação do conteúdo além da assinatura do formato. Nos **projetos** há SHA-256 e
-  varredura opcional com ClamAV (`CLAMAV_ADDR`), ver "Projetos dos proponentes".
+- ⚠️ Fora a assinatura do formato, a varredura do conteúdo é opcional (ClamAV, `CLAMAV_ADDR`), ver "Projetos dos proponentes".
 - ⚠️ O console do MinIO só é exposto (`/minio-console`) no HAProxy de desenvolvimento; não o publique em produção e troque `MINIO_ROOT_USER/PASSWORD`.
 
 ### Projetos dos proponentes (convênios e termos de fomento)
@@ -173,22 +154,18 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
 
 | Tema | Descrição | Mitigação / quando tratar |
 |---|---|---|
-| Enumeração de contas | O cadastro de usuário final responde 409 `already_taken` para e-mail/usuário existentes; em "esqueci a senha" há diferença de latência (grava token e envia e-mail só quando a conta existe). As respostas HTTP são idênticas. | Rate limit. Para eliminar o canal de tempo, enfileirar o envio de e-mails. |
 | E-mail síncrono | O envio SMTP acontece dentro da requisição; falha de envio é registrada no log, mas não chega ao cliente. | Fila/worker de e-mail quando o volume pedir. |
-| Confirmação de e-mail ligada depois | Usuários já logados sem confirmar só são barrados no próximo refresh/login. | Aceitável; revogar sessões ao ligar a opção se necessário. |
-| Auditoria | Sem retenção/rotação, sem assinatura de integridade; conteúdo (documentos) não é auditado. | Política de retenção e arquivamento conforme a necessidade. |
+| Auditoria | Sem retenção/rotação, sem assinatura de integridade; o conteúdo dos projetos não é auditado. | Política de retenção e arquivamento conforme a necessidade. |
 | Antivírus opcional | Sem `CLAMAV_ADDR` os arquivos dos projetos não são varridos (só têm hash e checagem de formato). | Em produção, subir um `clamd` e configurar `CLAMAV_ADDR`; a confirmação falha fechada se ele cair. |
 | Arquivo dentro do limite, mas só confirmado depois | Entre o envio ao armazenamento e a confirmação o objeto existe sem varredura; ele só passa a valer (e a poder ser baixado) depois de confirmado. | Aceito; envios não confirmados são apagados pelo `cleanup` após 24 h. |
 | Retenção de projetos enviados | Sem prazo de guarda definido. | Definir com a SEDEC/jurídico; ver "LGPD". |
 | Rate limit por instância | Ver "Disponibilidade". | Redis ou proxy quando houver várias instâncias. |
-| Sem MFA (usuário final) | Ver "Autenticação". | Planejar TOTP/WebAuthn; para administradores, é do MT Login. |
 
 ## 4. Checklist de pendências
 
 **Funcionalidades fora do escopo definido** (decisões já documentadas no README):
-- ⏳ OAuth/OIDC para **usuários finais**: estrutura pronta (`end_users.provider`, `enduser.Provider`); nenhum provedor implementado (os administradores já usam o MT Login).
 - ⏳ i18n/locales: preparado (`SupportsLocales`, `properties`), sem conteúdo localizado.
-- ✅ Frontend administrativo: usuários, perfis e permissões, departamentos, auditoria, tokens de API e portal público.
+- ✅ Frontend administrativo: usuários, perfis e permissões, departamentos e auditoria.
 
 **Melhorias identificadas (nenhuma bloqueia o uso):**
 - ⏳ Remover `admins.password_hash` e a tabela `admin_sessions` (sem uso desde o login pelo MT Login) numa migração, depois de validado o novo fluxo.
@@ -201,7 +178,7 @@ Convenção: ✅ verificado (há teste ou verificação automatizada) · 🔧 co
 
 ## 5. Checklist para colocar em produção
 
-1. `APP_ENV=production` e `JWT_API_SECRET`, `API_TOKEN_SALT` aleatórios (`openssl rand -hex 32`), distintos entre si.
+1. `APP_ENV=production`.
    `JWKS_URI`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` e `OIDC_CPF_CLAIM` do MT Login de **produção** (a API não sobe sem eles); no frontend, as `MTLOGIN_*`
    de produção, com a URL de retorno e a de pós-logout cadastradas no client.
 2. `DATABASE_URL` com `sslmode=verify-full`; usuário do banco com o mínimo de privilégios; backups agendados.

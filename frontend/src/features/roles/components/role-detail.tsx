@@ -87,7 +87,7 @@ export function RoleDetail({ id }: { id: string }) {
   const router = useRouter();
   const qc = useQueryClient();
   const role = useQuery(roleQueryOptions(id));
-  const catalog = useQuery(catalogActionsQueryOptions('admin'));
+  const catalog = useQuery(catalogActionsQueryOptions());
   const conditions = useQuery(catalogConditionsQueryOptions());
   const [confirmDelete, setConfirmDelete] = useState(false);
 

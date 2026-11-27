@@ -1,4 +1,9 @@
-import type { UploadGrant } from '../api/types';
+/** Envio autorizado: POST multipart para `url` com `fields` e, por último, o campo `file`. */
+export interface UploadGrant {
+  url: string;
+  fields: Record<string, string>;
+  expires_at: string;
+}
 
 export class StorageUploadError extends Error {
   constructor(

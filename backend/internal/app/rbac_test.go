@@ -408,7 +408,7 @@ func TestSubstituirPermissoesEValidacao(t *testing.T) {
 		path string
 	}{
 		{"ação inexistente", map[string]any{"action": "admin::content.fantasma.read"}, "permissions[0].action"},
-		{"ação do domínio api", map[string]any{"action": "api::x.find"}, "permissions[0].action"},
+		{"ação do domínio api, que não existe mais", map[string]any{"action": "api::x.find"}, "permissions[0].action"},
 		{"recurso divergente", map[string]any{"action": "admin::content.document.read", "subject": "outro"}, "permissions[0].subject"},
 		{"campos inexistentes", map[string]any{"action": "admin::content.document.read", "fields": []string{"titulo", "nope"}}, "permissions[0].fields"},
 		{"campos em ação sem suporte", map[string]any{"action": "admin::content.document.publish", "fields": []string{"titulo"}}, "permissions[0].fields"},
@@ -522,22 +522,15 @@ func TestCatalogo(t *testing.T) {
 		cats = append(cats, gm["category"].(string))
 		for _, a := range gm["actions"].([]any) {
 			am := a.(map[string]any)
-			assert.NotContains(t, am["id"], "api::", "só ações de admin por padrão")
 			if am["id"] == "admin::content.document.read" {
 				docAction = am
 			}
 		}
 	}
-	assert.Equal(t, []string{"collection-types", "plugins", "settings"}, cats)
+	assert.Equal(t, []string{"collection-types", "settings"}, cats)
 	require.NotNil(t, docAction)
 	assert.Equal(t, true, docAction["supportsFields"])
 	assert.Equal(t, []any{"titulo", "conteudo", "status", "observacao_interna", "department_id"}, docAction["availableFields"], "campos configuráveis (sem os de sistema)")
-
-	api := e.do("GET", "/api/admin/catalog/actions?domain=api", nil, boss).list()
-	require.Len(t, api, 1)
-	act := api[0].(map[string]any)["actions"].([]any)[0].(map[string]any)
-	assert.Equal(t, "GET", act["method"])
-	assert.Equal(t, "/api/documents", act["route"])
 
 	conds := e.do("GET", "/api/admin/catalog/conditions", nil, boss).list()
 	ids := []string{}
@@ -824,18 +817,16 @@ func TestListagemDeRolesAbertaAQuemAdministraAdministradores(t *testing.T) {
 	assert.Equal(t, 403, e.do("GET", "/api/admin/roles/"+e.roleID("vazio"), nil, leitor).Status, "as permissões continuam exigindo roles.read")
 }
 
-func TestCatalogoDeAcoesAbertoAQuemUsaSeletoresDePermissao(t *testing.T) {
+func TestCatalogoDeAcoesExigeLeituraDeRoles(t *testing.T) {
 	e, boss := setup(t)
-	e.mkRole("tokens", "admin::settings.api-tokens.read")
-	e.mkRole("publicos", "admin::plugin.enduser-roles.read")
+	e.mkRole("leitor", "admin::settings.roles.read")
 	e.mkRole("vazio")
-	tokens, _ := e.newAdmin(boss, "tokens@exemplo.com", "tokens")
-	publicos, _ := e.newAdmin(boss, "publicos@exemplo.com", "publicos")
+	leitor, _ := e.newAdmin(boss, "leitor@exemplo.com", "leitor")
 	vazio, _ := e.newAdmin(boss, "vazio@exemplo.com", "vazio")
 
-	for _, tok := range []string{tokens, publicos, boss} {
-		assert.Equal(t, 200, e.do("GET", "/api/admin/catalog/actions?domain=api", nil, tok).Status)
+	for _, tok := range []string{leitor, boss} {
+		assert.Equal(t, 200, e.do("GET", "/api/admin/catalog/actions", nil, tok).Status)
 	}
 	assert.Equal(t, 403, e.do("GET", "/api/admin/catalog/actions", nil, vazio).Status)
-	assert.Equal(t, 403, e.do("GET", "/api/admin/catalog/conditions", nil, tokens).Status, "as condições seguem exigindo roles.read")
+	assert.Equal(t, 401, e.do("GET", "/api/admin/catalog/actions", nil, "").Status)
 }

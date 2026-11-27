@@ -89,24 +89,18 @@ func TestExcluirDepartamentoEmUsoEhRecusado(t *testing.T) {
 	dept := e.mkDept("Financeiro")
 
 	require.Equal(t, 200, e.do("PUT", "/api/admin/users/"+biaID, map[string]any{"departmentId": dept}, boss).Status)
-	_, err := e.pool.Exec(context.Background(), `INSERT INTO documents (titulo, department_id) VALUES ('Contrato', $1), ('Termo', $1)`, dept)
-	require.NoError(t, err)
 
 	r := e.do("GET", "/api/admin/departments/"+dept, nil, boss)
 	assert.EqualValues(t, 1, r.data()["userCount"])
-	assert.EqualValues(t, 2, r.data()["documentCount"])
 
 	r = e.do("DELETE", "/api/admin/departments/"+dept, nil, boss)
 	assert.Equal(t, 409, r.Status)
 	assert.Equal(t, "department_in_use", r.errCode())
 	details := r.Body["error"].(map[string]any)["details"].(map[string]any)
 	assert.EqualValues(t, 1, details["userCount"])
-	assert.EqualValues(t, 2, details["documentCount"])
 
 	// Sem vínculos, a exclusão passa.
 	require.Equal(t, 200, e.do("PUT", "/api/admin/users/"+biaID, map[string]any{"departmentId": nil}, boss).Status)
-	_, err = e.pool.Exec(context.Background(), `DELETE FROM documents`)
-	require.NoError(t, err)
 	assert.Equal(t, 204, e.do("DELETE", "/api/admin/departments/"+dept, nil, boss).Status)
 }
 

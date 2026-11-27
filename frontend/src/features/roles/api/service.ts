@@ -2,7 +2,6 @@ import { apiClient } from '@/lib/api-client';
 import type { ApiResponse } from '@/lib/api/types';
 import type {
   CatalogCondition,
-  CatalogDomain,
   CatalogGroup,
   PermissionView,
   RoleDetail,
@@ -56,9 +55,8 @@ export async function replacePermissions(id: string, permissions: PermissionView
   ).data;
 }
 
-export async function getCatalogActions(domain: CatalogDomain) {
-  return (await apiClient<ApiResponse<CatalogGroup[]>>(`/admin/catalog/actions?domain=${domain}`))
-    .data;
+export async function getCatalogActions() {
+  return (await apiClient<ApiResponse<CatalogGroup[]>>('/admin/catalog/actions')).data;
 }
 
 export async function getCatalogConditions() {
