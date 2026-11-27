@@ -68,23 +68,6 @@ type AdminUsersRole struct {
 	RoleID  uuid.UUID `json:"role_id"`
 }
 
-type ApiToken struct {
-	ID           uuid.UUID  `json:"id"`
-	Name         string     `json:"name"`
-	Description  string     `json:"description"`
-	Type         string     `json:"type"`
-	TokenHash    string     `json:"token_hash"`
-	Hint         string     `json:"hint"`
-	Permissions  []byte     `json:"permissions"`
-	LifespanDays *int32     `json:"lifespan_days"`
-	ExpiresAt    *time.Time `json:"expires_at"`
-	LastUsedAt   *time.Time `json:"last_used_at"`
-	CreatedBy    *uuid.UUID `json:"created_by"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	RevokedAt    *time.Time `json:"revoked_at"`
-}
-
 type AuditLog struct {
 	ID        uuid.UUID `json:"id"`
 	ActorType string    `json:"actor_type"`
@@ -101,34 +84,6 @@ type Department struct {
 	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
 	IsFinalistic bool      `json:"is_finalistic"`
-}
-
-type Document struct {
-	ID                uuid.UUID  `json:"id"`
-	Titulo            string     `json:"titulo"`
-	Conteudo          string     `json:"conteudo"`
-	Status            string     `json:"status"`
-	ObservacaoInterna string     `json:"observacao_interna"`
-	DepartmentID      *uuid.UUID `json:"department_id"`
-	PublishedAt       *time.Time `json:"published_at"`
-	CreatedByID       *uuid.UUID `json:"created_by_id"`
-	UpdatedByID       *uuid.UUID `json:"updated_by_id"`
-	OwnerUserID       *uuid.UUID `json:"owner_user_id"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
-}
-
-type DocumentFile struct {
-	ID          uuid.UUID  `json:"id"`
-	DocumentID  uuid.UUID  `json:"document_id"`
-	ObjectKey   string     `json:"object_key"`
-	Filename    string     `json:"filename"`
-	ContentType string     `json:"content_type"`
-	SizeBytes   int64      `json:"size_bytes"`
-	Status      string     `json:"status"`
-	CreatedByID *uuid.UUID `json:"created_by_id"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ConfirmedAt *time.Time `json:"confirmed_at"`
 }
 
 type DocumentRequirement struct {
@@ -150,61 +105,6 @@ type DocumentRequirement struct {
 	Mandatory            bool      `json:"mandatory"`
 }
 
-type EmailTemplate struct {
-	Key         string    `json:"key"`
-	SenderName  string    `json:"sender_name"`
-	SenderEmail string    `json:"sender_email"`
-	ReplyTo     string    `json:"reply_to"`
-	Subject     string    `json:"subject"`
-	BodyHtml    string    `json:"body_html"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-type EndUser struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash *string   `json:"password_hash"`
-	Confirmed    bool      `json:"confirmed"`
-	Blocked      bool      `json:"blocked"`
-	RoleID       uuid.UUID `json:"role_id"`
-	Provider     string    `json:"provider"`
-	Profile      []byte    `json:"profile"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-type EndUserPermission struct {
-	ID        uuid.UUID `json:"id"`
-	RoleID    uuid.UUID `json:"role_id"`
-	Action    string    `json:"action"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type EndUserRole struct {
-	ID          uuid.UUID `json:"id"`
-	Type        string    `json:"type"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	IsSystem    bool      `json:"is_system"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-type EndUserSession struct {
-	ID               uuid.UUID  `json:"id"`
-	EndUserID        uuid.UUID  `json:"end_user_id"`
-	FamilyID         uuid.UUID  `json:"family_id"`
-	FamilyStartedAt  time.Time  `json:"family_started_at"`
-	RefreshTokenHash string     `json:"refresh_token_hash"`
-	UserAgent        string     `json:"user_agent"`
-	Ip               string     `json:"ip"`
-	CreatedAt        time.Time  `json:"created_at"`
-	LastUsedAt       time.Time  `json:"last_used_at"`
-	ExpiresAt        time.Time  `json:"expires_at"`
-	RevokedAt        *time.Time `json:"revoked_at"`
-}
-
 type EntityType struct {
 	ID        uuid.UUID `json:"id"`
 	Code      string    `json:"code"`
@@ -223,17 +123,6 @@ type Municipality struct {
 	Name       string `json:"name"`
 	Uf         string `json:"uf"`
 	SearchName string `json:"search_name"`
-}
-
-type OneTimeToken struct {
-	ID          uuid.UUID  `json:"id"`
-	SubjectType string     `json:"subject_type"`
-	SubjectID   uuid.UUID  `json:"subject_id"`
-	Purpose     string     `json:"purpose"`
-	TokenHash   string     `json:"token_hash"`
-	ExpiresAt   time.Time  `json:"expires_at"`
-	UsedAt      *time.Time `json:"used_at"`
-	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type OutboundEmail struct {
@@ -593,12 +482,6 @@ type RuleParameter struct {
 	Note      string      `json:"note"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
-}
-
-type Setting struct {
-	Key       string    `json:"key"`
-	Value     []byte    `json:"value"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type SigadocItem struct {

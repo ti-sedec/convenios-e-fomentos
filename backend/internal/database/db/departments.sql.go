@@ -43,7 +43,7 @@ const getDepartmentForUpdate = `-- name: GetDepartmentForUpdate :one
 SELECT id, name, is_finalistic FROM departments WHERE id = $1 FOR UPDATE
 `
 
-// Trava a linha: inserções/atualizações de administradores e documentos que referenciam o
+// Trava a linha: inserções/atualizações de administradores e projetos que referenciam o
 // departamento esperam a transação terminar.
 func (q *Queries) GetDepartmentForUpdate(ctx context.Context, id uuid.UUID) (Department, error) {
 	row := q.db.QueryRow(ctx, getDepartmentForUpdate, id)
@@ -55,7 +55,6 @@ func (q *Queries) GetDepartmentForUpdate(ctx context.Context, id uuid.UUID) (Dep
 const getDepartmentWithCounts = `-- name: GetDepartmentWithCounts :one
 SELECT d.id, d.name, d.is_finalistic,
        (SELECT count(*) FROM admins a WHERE a.department_id = d.id) AS user_count,
-       (SELECT count(*) FROM documents x WHERE x.department_id = d.id) AS document_count,
        (SELECT count(*) FROM admins a JOIN admin_users_roles ur ON ur.admin_id = a.id JOIN admin_roles r ON r.id = ur.role_id
          WHERE a.department_id = d.id AND r.code = 'department-reviewer' AND a.is_active AND NOT a.blocked) AS reviewer_count,
        (SELECT count(*) FROM projects pr WHERE pr.department_id = d.id) AS project_count
@@ -68,7 +67,6 @@ type GetDepartmentWithCountsRow struct {
 	Name          string    `json:"name"`
 	IsFinalistic  bool      `json:"is_finalistic"`
 	UserCount     int64     `json:"user_count"`
-	DocumentCount int64     `json:"document_count"`
 	ReviewerCount int64     `json:"reviewer_count"`
 	ProjectCount  int64     `json:"project_count"`
 }
@@ -81,7 +79,6 @@ func (q *Queries) GetDepartmentWithCounts(ctx context.Context, id uuid.UUID) (Ge
 		&i.Name,
 		&i.IsFinalistic,
 		&i.UserCount,
-		&i.DocumentCount,
 		&i.ReviewerCount,
 		&i.ProjectCount,
 	)
@@ -112,10 +109,38 @@ func (q *Queries) ListDepartments(ctx context.Context) ([]Department, error) {
 	return items, nil
 }
 
+const listDepartmentsByName = `-- name: ListDepartmentsByName :many
+SELECT id, name FROM departments WHERE name = ANY($1::text[])
+`
+
+type ListDepartmentsByNameRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+func (q *Queries) ListDepartmentsByName(ctx context.Context, dollar_1 []string) ([]ListDepartmentsByNameRow, error) {
+	rows, err := q.db.Query(ctx, listDepartmentsByName, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDepartmentsByNameRow{}
+	for rows.Next() {
+		var i ListDepartmentsByNameRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDepartmentsWithCounts = `-- name: ListDepartmentsWithCounts :many
 SELECT d.id, d.name, d.is_finalistic,
        (SELECT count(*) FROM admins a WHERE a.department_id = d.id) AS user_count,
-       (SELECT count(*) FROM documents x WHERE x.department_id = d.id) AS document_count,
        (SELECT count(*) FROM admins a JOIN admin_users_roles ur ON ur.admin_id = a.id JOIN admin_roles r ON r.id = ur.role_id
          WHERE a.department_id = d.id AND r.code = 'department-reviewer' AND a.is_active AND NOT a.blocked) AS reviewer_count,
        (SELECT count(*) FROM projects pr WHERE pr.department_id = d.id) AS project_count
@@ -129,7 +154,6 @@ type ListDepartmentsWithCountsRow struct {
 	Name          string    `json:"name"`
 	IsFinalistic  bool      `json:"is_finalistic"`
 	UserCount     int64     `json:"user_count"`
-	DocumentCount int64     `json:"document_count"`
 	ReviewerCount int64     `json:"reviewer_count"`
 	ProjectCount  int64     `json:"project_count"`
 }
@@ -149,7 +173,6 @@ func (q *Queries) ListDepartmentsWithCounts(ctx context.Context, onlyFinalistic 
 			&i.Name,
 			&i.IsFinalistic,
 			&i.UserCount,
-			&i.DocumentCount,
 			&i.ReviewerCount,
 			&i.ProjectCount,
 		); err != nil {

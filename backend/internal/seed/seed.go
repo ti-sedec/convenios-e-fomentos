@@ -2,8 +2,6 @@
 // novo não duplica nada nem desfaz alterações feitas depois pelos administradores.
 //
 //   - Roles de admin faltantes são criadas, com as permissões padrão aplicadas somente na criação.
-//   - As permissões padrão de usuário final (Public/Authenticated) são aplicadas uma única vez
-//     (controlado pela configuração "seed.enduser-permissions").
 //   - Os CPFs de SuperAdminCPFs viram Super Admin (login pelo MT Login), em qualquer ambiente.
 //   - Em desenvolvimento, cria um administrador de exemplo por role, com CPFs fictícios (DevUsers):
 //     servem para ver as listagens e para os testes, mas não conseguem entrar pelo MT Login.
@@ -11,8 +9,6 @@ package seed
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,14 +20,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/wagner/convenios-e-fomentos/backend/internal/admin"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/auth"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/authz"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/catalog"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/cpf"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/database"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/database/db"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/document"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/enduser"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/project"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/rules"
 )
@@ -39,9 +32,7 @@ import (
 // Deps são as dependências do seed.
 type Deps struct {
 	Pool        *pgxpool.Pool
-	Hasher      auth.Hasher
 	Engine      *authz.Engine
-	EndUsers    *enduser.Service
 	Log         *slog.Logger
 	Development bool
 	// SuperAdminCPFs são os CPFs que recebem a role Super Admin (ver SEED_SUPER_ADMIN_CPF).
@@ -51,8 +42,6 @@ type Deps struct {
 // Códigos das roles de administrador criadas pelo seed.
 const (
 	RoleSuperAdmin = authz.SuperAdminRoleCode
-	RoleEditor     = "editor"
-	RoleAuthor     = "author"
 	RoleReviewer   = "department-reviewer"
 	RoleProponent  = authz.ProponentRoleCode
 	// RoleSupervisor também é criado pela migração 00022.
@@ -87,8 +76,6 @@ func staffReference() []authz.Permission {
 // seed nunca altera a escolha feita depois.
 var Departments = []string{"Financeiro", "Jurídico"}
 
-const endUserFlag = "seed.enduser-permissions"
-
 type roleSpec struct {
 	code, name, description string
 	system                  bool
@@ -101,26 +88,6 @@ type roleSpec struct {
 func adminRoles() []roleSpec {
 	return []roleSpec{
 		{code: RoleSuperAdmin, name: "Super Admin", description: "Acesso total ao sistema.", system: true},
-		{
-			code: RoleEditor, name: "Editor", description: "Cria, lê, atualiza, exclui e publica qualquer documento.", system: true,
-			perms: []authz.Permission{
-				{Action: document.ActionAdminCreate}, {Action: document.ActionAdminRead}, {Action: document.ActionAdminUpdate},
-				{Action: document.ActionAdminDelete}, {Action: document.ActionAdminPublish},
-				{Action: document.ActionAdminFileRead}, {Action: document.ActionAdminFileUpload}, {Action: document.ActionAdminFileDelete},
-			},
-		},
-		{
-			code: RoleAuthor, name: "Author", description: "Cria e lê documentos; atualiza e exclui apenas os que criou. Não publica.", system: true,
-			perms: []authz.Permission{
-				{Action: document.ActionAdminCreate, Fields: []string{"titulo", "conteudo", "observacao_interna", "department_id"}},
-				{Action: document.ActionAdminRead},
-				{Action: document.ActionAdminUpdate, Fields: []string{"titulo", "conteudo", "observacao_interna", "department_id"}, Conditions: []string{"admin::is-creator"}},
-				{Action: document.ActionAdminDelete, Conditions: []string{"admin::is-creator"}},
-				{Action: document.ActionAdminFileRead},
-				{Action: document.ActionAdminFileUpload, Conditions: []string{"admin::is-creator"}},
-				{Action: document.ActionAdminFileDelete, Conditions: []string{"admin::is-creator"}},
-			},
-		},
 		{
 			code: RoleProponent, name: "Proponente", description: "Quem entra pelo MT Login e cadastra projetos de convênio ou fomento. Recebe esta role automaticamente no primeiro acesso.", system: true, topUp: true,
 			perms: []authz.Permission{
@@ -183,17 +150,9 @@ func DefaultPermissions(code string) []authz.Permission {
 	return nil
 }
 
-var endUserDefaults = map[string][]string{
-	enduser.RolePublic:        {document.ActionAPIFind, document.ActionAPIFindOne, document.ActionAPIFileFind, document.ActionAPIFileDownload},
-	enduser.RoleAuthenticated: {document.ActionAPIFind, document.ActionAPIFindOne, document.ActionAPIFileFind, document.ActionAPIFileDownload, document.ActionAPICreate, document.ActionAPIUpdate, document.ActionAPIDelete},
-}
-
 // Run executa o seed.
 func Run(ctx context.Context, d Deps) error {
 	q := db.New(d.Pool)
-	if err := d.EndUsers.EnsureDefaults(ctx); err != nil {
-		return fmt.Errorf("padrões de usuário final: %w", err)
-	}
 	for _, name := range Departments {
 		if _, err := q.UpsertDepartment(ctx, db.UpsertDepartmentParams{Name: name, IsFinalistic: d.Development}); err != nil {
 			return fmt.Errorf("departamento %q: %w", name, err)
@@ -209,9 +168,6 @@ func Run(ctx context.Context, d Deps) error {
 		return fmt.Errorf("role de proponente para quem não tem nenhuma: %w", err)
 	} else if n > 0 {
 		d.Log.Info("role de proponente atribuída a administradores sem nenhuma role", "quantidade", n)
-	}
-	if err := d.ensureEndUserPermissions(ctx, q); err != nil {
-		return err
 	}
 	if err := d.ensureSuperAdmins(ctx); err != nil {
 		return err
@@ -291,33 +247,6 @@ func marshalFields(f []string) ([]byte, error) {
 	return json.Marshal(f)
 }
 
-func (d Deps) ensureEndUserPermissions(ctx context.Context, q *db.Queries) error {
-	if _, err := q.GetSetting(ctx, endUserFlag); err == nil {
-		return nil
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return err
-	}
-	return database.WithTx(ctx, d.Pool, func(tx pgx.Tx) error {
-		tq := q.WithTx(tx)
-		for typ, actions := range endUserDefaults {
-			role, err := tq.GetEndUserRoleByType(ctx, typ)
-			if err != nil {
-				return fmt.Errorf("role %q: %w", typ, err)
-			}
-			for _, a := range actions {
-				if _, ok := d.Engine.Actions().Get(a); !ok {
-					return fmt.Errorf("ação %q não registrada", a)
-				}
-				if err := tq.InsertEndUserPermission(ctx, db.InsertEndUserPermissionParams{RoleID: role.ID, Action: a}); err != nil {
-					return err
-				}
-			}
-		}
-		_, err := tq.UpsertSetting(ctx, db.UpsertSettingParams{Key: endUserFlag, Value: []byte("true")})
-		return err
-	})
-}
-
 // DevUser é um administrador de exemplo do ambiente de desenvolvimento. O CPF é fictício (válido,
 // mas de ninguém): ninguém consegue autenticar com ele no MT Login.
 type DevUser struct {
@@ -327,8 +256,6 @@ type DevUser struct {
 // DevUsers são os administradores criados pelo seed em desenvolvimento, um por role.
 var DevUsers = []DevUser{
 	{"11144477735", "super@dev.local", "Super", "Admin", RoleSuperAdmin, ""},
-	{"22233344405", "editor@dev.local", "Eda", "Editora", RoleEditor, ""},
-	{"33322211169", "author@dev.local", "Augusto", "Autor", RoleAuthor, "Financeiro"},
 	{"44455566619", "revisor@dev.local", "Regina", "Revisora", RoleReviewer, "Financeiro"},
 	{"88899900078", "revisor.juridico@dev.local", "Rui", "Revisor", RoleReviewer, "Jurídico"},
 	{"55566677720", "analista@dev.local", "Ana", "Analista", RoleAnalyst, ""},
@@ -342,7 +269,7 @@ func (d Deps) devUsers(ctx context.Context, q *db.Queries) error {
 			return fmt.Errorf("usuário de desenvolvimento %s: %w", u.Email, err)
 		}
 	}
-	return d.devEndUser(ctx, q)
+	return nil
 }
 
 func (d Deps) ensureSuperAdmins(ctx context.Context) error {
@@ -375,14 +302,6 @@ func maskInput(s string) string {
 	return "(CPF inválido)"
 }
 
-func randomPassword() (string, error) {
-	b := make([]byte, 12)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
 func (d Deps) devAdmin(ctx context.Context, q *db.Queries, u DevUser) error {
 	if _, err := q.GetAdminByCPF(ctx, &u.CPF); err == nil {
 		return nil
@@ -413,29 +332,5 @@ func (d Deps) devAdmin(ctx context.Context, q *db.Queries, u DevUser) error {
 		return err
 	}
 	d.Log.Info("administrador de desenvolvimento criado (CPF fictício, sem login pelo MT Login)", "role", u.Role, "email", u.Email, "cpf", cpf.Mask(u.CPF))
-	return nil
-}
-
-func (d Deps) devEndUser(ctx context.Context, q *db.Queries) error {
-	const email, username = "usuario@dev.local", "usuario"
-	if users, err := q.GetEndUsersByEmail(ctx, email); err != nil || len(users) > 0 {
-		return err
-	}
-	role, err := q.GetEndUserRoleByType(ctx, enduser.RoleAuthenticated)
-	if err != nil {
-		return err
-	}
-	password, err := randomPassword()
-	if err != nil {
-		return err
-	}
-	hash, err := d.Hasher.Hash(password)
-	if err != nil {
-		return err
-	}
-	if _, err := q.CreateEndUser(ctx, db.CreateEndUserParams{Username: username, Email: email, PasswordHash: &hash, Confirmed: true, RoleID: role.ID, Profile: []byte("{}")}); err != nil {
-		return err
-	}
-	d.Log.Info("usuário de desenvolvimento criado (a senha não será exibida novamente)", "tipo", "usuário final", "role", enduser.RoleAuthenticated, "email", email, "usuario", username, "senha", password)
 	return nil
 }

@@ -103,8 +103,8 @@ export function DepartmentDialog(
           <DialogHeader>
             <DialogTitle>Editar departamento</DialogTitle>
             <DialogDescription>
-              Administradores e documentos vinculados continuam nele. Desmarcar a área finalística
-              só afeta indicações novas.
+              Administradores e projetos vinculados continuam nele. Desmarcar a área finalística só
+              afeta indicações novas.
             </DialogDescription>
           </DialogHeader>
           <DepartmentForm department={props.department} onDone={() => props.onOpenChange(false)} />

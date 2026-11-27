@@ -68,35 +68,3 @@ func SyncActions(ctx context.Context, q *db.Queries, reg *Registry, eng *Engine,
 	}
 	return nil
 }
-
-// EndUserStore lê as permissões (apenas ações) das roles de usuário final.
-type EndUserStore struct{ Q *db.Queries }
-
-// RolePermissions implementa Store.
-func (s EndUserStore) RolePermissions(ctx context.Context, roleID uuid.UUID) ([]Permission, error) {
-	actions, err := s.Q.ListEndUserPermissionActions(ctx, roleID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Permission, len(actions))
-	for i, a := range actions {
-		out[i] = Permission{Action: a}
-	}
-	return out, nil
-}
-
-// SyncEndUserActions remove das roles de usuário final as permissões de ações
-// api que não existem mais no código.
-func SyncEndUserActions(ctx context.Context, q *db.Queries, reg *Registry, eng *Engine, log *slog.Logger) error {
-	removed, err := q.DeleteEndUserPermissionsNotInActions(ctx, append([]string{}, reg.IDs(DomainAPI)...))
-	if err != nil {
-		return fmt.Errorf("sincronizando ações de usuário final: %w", err)
-	}
-	for _, r := range removed {
-		log.WarnContext(ctx, "permissão de usuário final removida: ação não existe mais no código", "role_id", r.RoleID, "action", r.Action)
-	}
-	if len(removed) > 0 {
-		return eng.Invalidate(ctx)
-	}
-	return nil
-}

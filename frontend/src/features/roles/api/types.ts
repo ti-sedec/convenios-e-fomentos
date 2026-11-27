@@ -37,8 +37,6 @@ export interface RoleInput {
   description: string;
 }
 
-export type CatalogDomain = 'admin' | 'api';
-
 export interface CatalogAction {
   id: string;
   name: string;
@@ -49,8 +47,6 @@ export interface CatalogAction {
   supportsLocales: boolean;
   /** Campos configuráveis (só em ações que suportam campos). */
   availableFields?: string[];
-  method?: string;
-  route?: string;
 }
 
 export interface CatalogGroup {

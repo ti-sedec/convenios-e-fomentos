@@ -12,7 +12,7 @@ A visibilidade de menus e botões segue as **permissões efetivas** do administr
 3. O `SessionProvider` (`src/features/auth/session-provider.tsx`) repassa isso ao cliente.
 4. Quem não é Super Admin e não tem nenhuma permissão vê "Aguardando liberação" em vez do painel.
 
-As ações têm o formato `admin::<recurso>.<verbo>` (ex.: `admin::settings.users.read`, `admin::content.document.update`). O catálogo
+As ações têm o formato `admin::<recurso>.<verbo>` (ex.: `admin::settings.users.read`, `admin::projects.read`). O catálogo
 completo está em `GET /api/admin/catalog/actions`.
 
 ## No cliente: `useCan` e `<Can>`
@@ -75,8 +75,7 @@ export default async function UsuariosPage() {
 
 ## Constantes de ação
 
-Cada feature declara suas ações em `api/types.ts` (ex.: `adminActions`, `roleActions`, `departmentActions`, `tokenActions`,
-`endUserActions`), para não espalhar strings pela interface.
+Cada feature declara suas ações em `api/types.ts` (ex.: `adminActions`, `roleActions`, `departmentActions`), para não espalhar strings pela interface.
 
 ## Leituras auxiliares
 
@@ -86,8 +85,6 @@ Alguns seletores precisam de listas que pertencem a outro recurso. O backend as 
 |---|---|
 | `GET /admin/departments` | `settings.users.read` |
 | `GET /admin/roles` (só nomes e contagens) | `settings.users.read` |
-| `GET /admin/catalog/actions` | `settings.api-tokens.read`, `plugin.enduser-roles.read` |
-| `GET /admin/end-user-roles` | `plugin.enduser-users.read`, `plugin.enduser-settings.read` |
 
 As permissões de cada role (`GET /admin/roles/{id}`) e o catálogo de condições continuam exigindo `admin::settings.roles.read`.
 

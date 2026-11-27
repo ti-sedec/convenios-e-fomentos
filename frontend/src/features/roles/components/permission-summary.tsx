@@ -22,7 +22,7 @@ export function PermissionSummary({
 }) {
   const can = useCan();
   const enabled = can(roleActions.read);
-  const catalog = useQuery({ ...catalogActionsQueryOptions('admin'), enabled });
+  const catalog = useQuery({ ...catalogActionsQueryOptions(), enabled });
   const conditions = useQuery({ ...catalogConditionsQueryOptions(), enabled });
 
   if (isSuperAdmin) {

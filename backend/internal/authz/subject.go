@@ -17,10 +17,7 @@ type SubjectType string
 
 // Tipos de sujeito.
 const (
-	SubjectAdmin     SubjectType = "admin"
-	SubjectEndUser   SubjectType = "end_user"
-	SubjectAPIToken  SubjectType = "api_token"
-	SubjectAnonymous SubjectType = "anonymous"
+	SubjectAdmin SubjectType = "admin"
 )
 
 // Role referencia uma role do sujeito.
@@ -29,26 +26,12 @@ type Role struct {
 	Code string
 }
 
-// Tipos de token de API.
-const (
-	TokenReadOnly   = "read-only"
-	TokenFullAccess = "full-access"
-	TokenCustom     = "custom"
-)
-
-// TokenGrant descreve o que um token de API pode fazer. Actions só vale para o tipo custom.
-type TokenGrant struct {
-	Type    string
-	Actions []string
-}
-
 // Subject é quem executa a ação, já autenticado.
 type Subject struct {
 	Type         SubjectType
 	ID           uuid.UUID
 	Roles        []Role
 	DepartmentID *uuid.UUID
-	APIToken     *TokenGrant // somente para SubjectAPIToken
 }
 
 // IsSuperAdmin informa se o sujeito é administrador com a role Super Admin.

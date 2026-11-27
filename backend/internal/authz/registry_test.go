@@ -18,15 +18,10 @@ func TestRegistroDeAcoes(t *testing.T) {
 		{"válida", func(*Action) {}, false},
 		{"id sem domínio", func(a *Action) { a.ID = "content.artigo.create" }, true},
 		{"id com maiúscula no recurso", func(a *Action) { a.ID = "admin::Content.artigo.create" }, true},
-		{"domínio diverge do prefixo", func(a *Action) { a.Domain = DomainAPI }, true},
+		{"domínio diverge do prefixo", func(a *Action) { a.Domain = "api" }, true},
+		{"prefixo api não existe mais", func(a *Action) { a.ID = "api::artigo.find"; a.Domain = "api" }, true},
 		{"sem nome", func(a *Action) { a.Name = "" }, true},
 		{"sem categoria", func(a *Action) { a.Category = "" }, true},
-		{"api sem rota", func(a *Action) { a.ID = "api::artigo.find"; a.Domain = DomainAPI }, true},
-		{"api com rota", func(a *Action) {
-			a.ID = "api::artigo.findOne"
-			a.Domain = DomainAPI
-			a.Method, a.Route = "GET", "/api/artigos/{id}"
-		}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.nome, func(t *testing.T) {
@@ -50,24 +45,21 @@ func TestRegistroDeAcoes(t *testing.T) {
 func TestAgrupamentoPorCategoria(t *testing.T) {
 	r := NewRegistry()
 	RegisterCoreActions(r)
-	r.MustRegister(Action{ID: "admin::content.document.read", Domain: DomainAdmin, Category: CategoryCollectionTypes, Name: "Ler", Resource: "document"},
-		Action{ID: "api::document.find", Domain: DomainAPI, Category: CategoryApplication, Name: "Listar", Method: "GET", Route: "/api/documents"})
+	r.MustRegister(Action{ID: "admin::content.document.read", Domain: DomainAdmin, Category: CategoryCollectionTypes, Name: "Ler", Resource: "document"})
 
 	groups := r.ByCategory(DomainAdmin)
-	require.GreaterOrEqual(t, len(groups), 3)
+	require.GreaterOrEqual(t, len(groups), 2)
 	assert.Equal(t, CategoryCollectionTypes, groups[0].Category, "ordem estável das categorias")
-	assert.Equal(t, CategoryPlugins, groups[1].Category)
-	assert.Equal(t, CategorySettings, groups[2].Category)
+	assert.Equal(t, CategorySettings, groups[1].Category)
 	for _, g := range groups {
 		for _, a := range g.Actions {
 			assert.Equal(t, DomainAdmin, a.Domain)
 		}
 	}
-	assert.Contains(t, r.IDs(DomainAPI), "api::document.find")
 	assert.Contains(t, r.Resources(DomainAdmin), "document")
 	_, found := r.Get("admin::settings.users.create")
 	assert.True(t, found)
-	assert.Len(t, r.All(), len(r.IDs(DomainAdmin))+1)
+	assert.Len(t, r.All(), len(r.IDs(DomainAdmin)))
 }
 
 func TestRegistroDeCondicoes(t *testing.T) {
