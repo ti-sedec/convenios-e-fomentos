@@ -58,7 +58,7 @@ Transversal: `restart: unless-stopped`, rotação de logs (`json-file`, 10 MB x 
 
 ## 4. Variáveis
 
-Obrigatórias (o compose falha com mensagem clara se faltarem): `APP_URL` (https), `POSTGRES_PASSWORD`, `JWT_API_SECRET`, `API_TOKEN_SALT`, `MINIO_ROOT_PASSWORD`, `MTLOGIN_*`, `JWKS_URI`, `OIDC_ISSUER`, `SEED_SUPER_ADMIN_CPF`, `SMTP_*`. Derivadas de `APP_URL`: `PUBLIC_URL`, `CORS_ALLOWED_ORIGINS`, `STORAGE_PUBLIC_URL` (`/storage`), `MTLOGIN_REDIRECT_URI` (`/auth/callback`), `NEXT_PUBLIC_APP_URL`. Modelo: `.env.prod.example`.
+Obrigatórias (o compose falha com mensagem clara se faltarem): `APP_URL` (https), `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, `MTLOGIN_*`, `JWKS_URI`, `OIDC_ISSUER`, `SEED_SUPER_ADMIN_CPF`, `SMTP_*`. Derivadas de `APP_URL`: `PUBLIC_URL`, `CORS_ALLOWED_ORIGINS`, `STORAGE_PUBLIC_URL` (`/storage`), `MTLOGIN_REDIRECT_URI` (`/auth/callback`), `NEXT_PUBLIC_APP_URL`. Modelo: `.env.prod.example`.
 
 ## 5. Plano de testes (tudo antes de entregar)
 
@@ -95,7 +95,7 @@ Obrigatórias (o compose falha com mensagem clara se faltarem): `APP_URL` (https
 
 Todos os critérios da seção 5 passaram, exceto a ressalva acima. Destaques:
 
-- T1: cada uma das 16 variáveis obrigatórias, removida sozinha, derruba o `config` com mensagem; segredo de desenvolvimento, `API_TOKEN_SALT` curto e `APP_URL` em http são recusados pela API.
+- T1: cada uma das variáveis obrigatórias, removida sozinha, derruba o `config` com mensagem; `APP_URL` em http é recusado pela API. (`JWT_API_SECRET` e `API_TOKEN_SALT` deixaram de existir com a remoção do portal público.)
 - T2/T3: build do zero sem erros (API 77 MB, Next 447 MB, HAProxy 66 MB); subida com `migrate`, `seed` e `minio-init` em `exited (0)` e o resto `healthy`.
 - T4/T5: roteamento e login conferidos; `/api/docs` e `/minio-console` não chegam ao backend; o redirecionamento ao MT Login leva o `redirect_uri` https e o cookie sai `Secure`; o CSRF do BFF aceita só a origem pública.
 - T6/T7/T8: envio de 150 MB e download íntegro (SHA-256) pelo HAProxy com o `Host` público; URL adulterada e `Host` diferente = 403; EICAR detectado, fluxo de 150 MB varrido, Word convertido em PDF.

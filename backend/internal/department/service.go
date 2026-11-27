@@ -22,9 +22,8 @@ type View struct {
 	ID   uuid.UUID `json:"id"`
 	Name string    `json:"name"`
 	// IsFinalistic marca a área finalística: só departamento marcado pode ser indicado para enquadrar um projeto.
-	IsFinalistic  bool  `json:"isFinalistic"`
-	UserCount     int64 `json:"userCount"`
-	DocumentCount int64 `json:"documentCount"`
+	IsFinalistic bool  `json:"isFinalistic"`
+	UserCount    int64 `json:"userCount"`
 	// ReviewerCount são os Revisores ativos do departamento (sem nenhum, ele não pode ser indicado para enquadrar projetos).
 	ReviewerCount int64 `json:"reviewerCount"`
 	// ProjectCount são os projetos que o referenciam (enquadramento pendente ou confirmado).
@@ -52,9 +51,9 @@ func errNameTaken() error {
 	return httpapi.ErrConflict("department_name_taken", "Já existe um departamento com este nome.")
 }
 
-func errInUse(users, documents, projects int64) error {
-	e := httpapi.ErrConflict("department_in_use", "O departamento tem administradores, documentos ou projetos vinculados e não pode ser excluído. Mude a lotação dos administradores e conclua os enquadramentos antes.")
-	e.Details = map[string]any{"userCount": users, "documentCount": documents, "projectCount": projects}
+func errInUse(users, projects int64) error {
+	e := httpapi.ErrConflict("department_in_use", "O departamento tem administradores ou projetos vinculados e não pode ser excluído. Mude a lotação dos administradores e conclua os enquadramentos antes.")
+	e.Details = map[string]any{"userCount": users, "projectCount": projects}
 	return e
 }
 
@@ -99,7 +98,7 @@ func (s *Service) List(ctx context.Context, onlyFinalistic bool) ([]View, error)
 	}
 	out := make([]View, len(rows))
 	for i, r := range rows {
-		out[i] = View{ID: r.ID, Name: r.Name, IsFinalistic: r.IsFinalistic, UserCount: r.UserCount, DocumentCount: r.DocumentCount, ReviewerCount: r.ReviewerCount, ProjectCount: r.ProjectCount}
+		out[i] = View{ID: r.ID, Name: r.Name, IsFinalistic: r.IsFinalistic, UserCount: r.UserCount, ReviewerCount: r.ReviewerCount, ProjectCount: r.ProjectCount}
 	}
 	return out, nil
 }
@@ -114,7 +113,7 @@ func (s *Service) view(ctx context.Context, q *db.Queries, id uuid.UUID) (*View,
 	if err != nil {
 		return nil, notFound(err)
 	}
-	return &View{ID: r.ID, Name: r.Name, IsFinalistic: r.IsFinalistic, UserCount: r.UserCount, DocumentCount: r.DocumentCount, ReviewerCount: r.ReviewerCount, ProjectCount: r.ProjectCount}, nil
+	return &View{ID: r.ID, Name: r.Name, IsFinalistic: r.IsFinalistic, UserCount: r.UserCount, ReviewerCount: r.ReviewerCount, ProjectCount: r.ProjectCount}, nil
 }
 
 // Create cria um departamento.
@@ -189,8 +188,8 @@ func (s *Service) Delete(ctx context.Context, actor Actor, id uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		if v.UserCount > 0 || v.DocumentCount > 0 || v.ProjectCount > 0 {
-			return errInUse(v.UserCount, v.DocumentCount, v.ProjectCount)
+		if v.UserCount > 0 || v.ProjectCount > 0 {
+			return errInUse(v.UserCount, v.ProjectCount)
 		}
 		if _, err := q.DeleteDepartment(ctx, id); err != nil {
 			return err

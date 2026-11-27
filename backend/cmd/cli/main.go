@@ -101,7 +101,7 @@ func run(ctx context.Context, cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
-		return seed.Run(ctx, seed.Deps{Pool: pool, Hasher: app.Hasher(cfg), Engine: a.Authz, EndUsers: a.EndUsers, Log: logging.New(os.Stdout, cfg.LogLevel), Development: cfg.AppEnv == "development", SuperAdminCPFs: cfg.SeedSuperAdminCPFs})
+		return seed.Run(ctx, seed.Deps{Pool: pool, Engine: a.Authz, Log: logging.New(os.Stdout, cfg.LogLevel), Development: cfg.AppEnv == "development", SuperAdminCPFs: cfg.SeedSuperAdminCPFs})
 	case "cleanup":
 		fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
 		days := fs.Int("days", 7, "carência, em dias, após o vencimento")
@@ -113,13 +113,9 @@ func run(ctx context.Context, cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Removidos: %d sessões de usuário final, %d tokens de uso único, %d e-mails já enviados.\n", res.EndUserSessions, res.OneTimeTokens, res.ResolvedEmails)
+		fmt.Printf("Removidos: %d e-mails já enviados.\n", res.ResolvedEmails)
 		// Arquivos com envio autorizado e nunca confirmado há mais de 24 horas.
 		a, err := app.New(ctx, cfg, logging.New(os.Stdout, cfg.LogLevel), pool, mailer.NopMailer{Log: logging.New(os.Stdout, cfg.LogLevel)})
-		if err != nil {
-			return err
-		}
-		n, err := a.Documents.CleanupPendingFiles(ctx)
 		if err != nil {
 			return err
 		}
@@ -127,7 +123,7 @@ func run(ctx context.Context, cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Removidos: %d envios de arquivo não confirmados (documentos) e %d (projetos).\n", n, m)
+		fmt.Printf("Removidos: %d envios de arquivo não confirmados.\n", m)
 		drafts, err := a.Projects.CleanupAbandonedDrafts(ctx, *draftDays)
 		if err != nil {
 			return err

@@ -61,8 +61,7 @@ func (h *Handler) rbacRoutes(r chi.Router) {
 	r.With(h.guard("admin::settings.roles.update")).Put("/admin/roles/{id}/permissions", h.replacePermissions)
 	r.With(h.guard("admin::settings.roles.create")).Post("/admin/roles/{id}/duplicate", h.duplicateRole)
 
-	// O catálogo de ações também alimenta os seletores de permissões de tokens de API e de roles de usuário final.
-	r.With(h.GuardAny("admin::settings.roles.read", "admin::settings.api-tokens.read", "admin::plugin.enduser-roles.read")).Get("/admin/catalog/actions", h.catalogActions)
+	r.With(h.guard("admin::settings.roles.read")).Get("/admin/catalog/actions", h.catalogActions)
 	r.With(h.guard("admin::settings.roles.read")).Get("/admin/catalog/conditions", h.catalogConditions)
 }
 
@@ -413,25 +412,19 @@ type actionView struct {
 	SupportsConditions bool     `json:"supportsConditions"`
 	SupportsLocales    bool     `json:"supportsLocales"`
 	AvailableFields    []string `json:"availableFields,omitempty"`
-	Method             string   `json:"method,omitempty"`
-	Route              string   `json:"route,omitempty"`
 }
 
 func (h *Handler) catalogActions(w http.ResponseWriter, r *http.Request) {
-	domain := authz.DomainAdmin
-	if r.URL.Query().Get("domain") == "api" {
-		domain = authz.DomainAPI
-	}
 	type group struct {
 		Category authz.Category `json:"category"`
 		Actions  []actionView   `json:"actions"`
 	}
 	groups := []group{}
-	for _, g := range h.engine.Actions().ByCategory(domain) {
+	for _, g := range h.engine.Actions().ByCategory(authz.DomainAdmin) {
 		views := make([]actionView, 0, len(g.Actions))
 		for _, a := range g.Actions {
 			v := actionView{ID: a.ID, Name: a.Name, Category: string(a.Category), Resource: a.Resource, SupportsFields: a.SupportsFields,
-				SupportsConditions: a.SupportsConditions, SupportsLocales: a.SupportsLocales, Method: a.Method, Route: a.Route}
+				SupportsConditions: a.SupportsConditions, SupportsLocales: a.SupportsLocales}
 			if s, ok := h.engine.Actions().Schema(a.Resource); ok && a.SupportsFields {
 				v.AvailableFields = s.Configurable()
 			}

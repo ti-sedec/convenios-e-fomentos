@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/google/uuid"
 )
@@ -49,12 +48,11 @@ func (d Decision) AllowsRecord(get Getter) bool { return d.Allowed && d.Filter.M
 
 // Engine avalia permissões.
 type Engine struct {
-	actions  *Registry
-	conds    *ConditionRegistry
-	cache    *cache // permissões das roles de administrador
-	apiCache *cache // permissões das roles de usuário final (nil até SetEndUserStore)
-	bus      Broadcaster
-	log      *slog.Logger
+	actions *Registry
+	conds   *ConditionRegistry
+	cache   *cache // permissões das roles de administrador
+	bus     Broadcaster
+	log     *slog.Logger
 }
 
 // NewEngine cria o motor. bus propaga invalidações para outras instâncias;
@@ -62,9 +60,6 @@ type Engine struct {
 func NewEngine(actions *Registry, conds *ConditionRegistry, store Store, bus Broadcaster, log *slog.Logger) *Engine {
 	return &Engine{actions: actions, conds: conds, cache: newCache(store), bus: bus, log: log}
 }
-
-// SetEndUserStore habilita a avaliação do domínio api (usuários finais e anônimos).
-func (e *Engine) SetEndUserStore(store Store) { e.apiCache = newCache(store) }
 
 // Actions expõe o registro de ações.
 func (e *Engine) Actions() *Registry { return e.actions }
@@ -91,25 +86,18 @@ func (e *Engine) Listen(ctx context.Context) error {
 	return e.bus.Subscribe(ctx, func(ids []uuid.UUID) { e.invalidateLocal(ids...) })
 }
 
-// invalidateLocal limpa os caches (admin e api); os IDs de role são UUIDs únicos entre as duas tabelas.
+// invalidateLocal limpa o cache de permissões desta instância.
 func (e *Engine) invalidateLocal(roleIDs ...uuid.UUID) {
 	e.cache.invalidate(roleIDs...)
-	if e.apiCache != nil {
-		e.apiCache.invalidate(roleIDs...)
-	}
 }
 
 // Can decide se o sujeito pode executar a ação. resource é opcional e, quando
 // informado, restringe às permissões daquele recurso. Ação não registrada,
-// sujeito sem permissão ou fora do domínio da ação resultam em negação (sem erro).
+// sujeito sem permissão ou que não é administrador resultam em negação (sem erro).
 func (e *Engine) Can(ctx context.Context, s Subject, action string, resource ...string) (Decision, error) {
-	a, ok := e.actions.Get(action)
-	if !ok {
+	if _, ok := e.actions.Get(action); !ok {
 		e.log.WarnContext(ctx, "verificação de ação não registrada; negando", "action", action)
 		return denied(), nil
-	}
-	if a.Domain == DomainAPI {
-		return e.canAPI(ctx, s, action)
 	}
 	if s.Type != SubjectAdmin {
 		return denied(), nil
@@ -174,50 +162,4 @@ func (e *Engine) permissionFilter(ctx context.Context, s Subject, p Permission) 
 		fs = append(fs, r.filter)
 	}
 	return Or(fs...), nil
-}
-
-// tokenAllows aplica o tipo do token: full-access libera toda ação api registrada;
-// read-only só as ações cuja rota vinculada é de leitura (GET/HEAD); custom só a lista.
-func (e *Engine) tokenAllows(g *TokenGrant, action string) bool {
-	if g == nil {
-		return false
-	}
-	a, ok := e.actions.Get(action)
-	if !ok || a.Domain != DomainAPI {
-		return false
-	}
-	switch g.Type {
-	case TokenFullAccess:
-		return true
-	case TokenReadOnly:
-		return a.Method == "GET" || a.Method == "HEAD"
-	case TokenCustom:
-		return slices.Contains(g.Actions, action)
-	}
-	return false
-}
-
-// canAPI decide ações do domínio api. Usuário final e anônimo (role Public)
-// têm uma única role, com permissões apenas por ação: sem campos nem condições
-// (regras de propriedade são policies nas rotas). Tokens de API seguem o tipo do token.
-func (e *Engine) canAPI(ctx context.Context, s Subject, action string) (Decision, error) {
-	if s.Type == SubjectAPIToken {
-		if e.tokenAllows(s.APIToken, action) {
-			return Decision{Allowed: true, Filter: FilterTrue(), Fields: AllFields(), rules: []rule{{FilterTrue(), AllFields()}}}, nil
-		}
-		return denied(), nil
-	}
-	if e.apiCache == nil || (s.Type != SubjectEndUser && s.Type != SubjectAnonymous) || len(s.Roles) != 1 {
-		return denied(), nil
-	}
-	perms, err := e.apiCache.get(ctx, s.Roles[0].ID)
-	if err != nil {
-		return Decision{}, fmt.Errorf("carregando permissões da role %s: %w", s.Roles[0].ID, err)
-	}
-	for _, p := range perms {
-		if p.Action == action {
-			return Decision{Allowed: true, Filter: FilterTrue(), Fields: AllFields(), rules: []rule{{FilterTrue(), AllFields()}}}, nil
-		}
-	}
-	return denied(), nil
 }

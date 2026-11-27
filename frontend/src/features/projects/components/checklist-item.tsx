@@ -13,8 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/errors';
 import { formatBytes } from '@/lib/utils';
-import { ACCEPT_ATTR, contentTypeOf, validateFile } from '@/features/documents/lib/file-rules';
-import { uploadToStorage } from '@/features/documents/lib/upload';
+import { ACCEPT_ATTR, contentTypeOf, validateFile } from '@/lib/file-rules';
+import { uploadToStorage } from '@/lib/upload';
 import { projectKeys } from '../api/queries';
 import {
   confirmFileUpload,

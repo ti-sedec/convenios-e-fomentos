@@ -11,30 +11,17 @@ import (
 )
 
 func TestValidateProducao(t *testing.T) {
-	forte := func() *Config {
-		return &Config{
-			AppEnv: "production", HTTPPort: 8080, PasswordMinLength: 8,
-			AccessTokenTTL: 1, RefreshTokenMaxTTL: 1, RefreshTokenIdleTTL: 1,
-			ResetTokenTTL: 1, EmailConfirmationTTL: 1, RateLimitAuthPerMin: 10,
-			Argon2MemoryKiB: 19456, Argon2Iterations: 2, Argon2Parallel: 1,
-			JWTAPISecret: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-			APITokenSalt: "cccccccccccccccccccccccccccccccccccc",
-		}
-	}
+	forte := func() *Config { return &Config{AppEnv: "production", HTTPPort: 8080} }
 	tests := []struct {
 		nome    string
 		mutar   func(*Config)
 		quebrou bool
 	}{
-		{"segredos fortes", func(*Config) {}, false},
-		{"segredo curto", func(c *Config) { c.JWTAPISecret = "curto" }, true},
-		{"segredo de desenvolvimento", func(c *Config) { c.APITokenSalt = "dev-only-api-token-salt-change-me-0000000" }, true},
+		{"configuração válida", func(*Config) {}, false},
 		{"ambiente inválido", func(c *Config) { c.AppEnv = "x" }, true},
-		{"argon2 fraco em produção", func(c *Config) { c.Argon2MemoryKiB = 1024 }, true},
+		{"porta inválida", func(c *Config) { c.HTTPPort = 0 }, true},
 		{"MT-ID simulado em produção", func(c *Config) { c.MTIDSimulate = true }, true},
-		{"argon2 sem iterações", func(c *Config) { c.Argon2Iterations = 0 }, true},
-		{"limite de login zerado", func(c *Config) { c.RateLimitAuthPerMin = 0 }, true},
-		{"validade de token zerada", func(c *Config) { c.EmailConfirmationTTL = 0 }, true},
+		{"limite de requisições negativo", func(c *Config) { c.RateLimitCEPPerMin = -1 }, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.nome, func(t *testing.T) {
@@ -49,7 +36,7 @@ func TestValidateProducao(t *testing.T) {
 	}
 }
 
-func TestSegredosDeDesenvolvimentoSoForaDeProducao(t *testing.T) {
+func TestCarregaPadroesEmDesenvolvimento(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	c, err := Load()
 	assert.NoError(t, err)

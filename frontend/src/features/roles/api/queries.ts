@@ -1,12 +1,11 @@
 import { queryOptions } from '@tanstack/react-query';
 import { getCatalogActions, getCatalogConditions, getRole, listRoles } from './service';
-import type { CatalogDomain } from './types';
 
 export const roleKeys = {
   all: ['roles'] as const,
   list: () => [...roleKeys.all, 'list'] as const,
   detail: (id: string) => [...roleKeys.all, 'detail', id] as const,
-  catalog: (domain: CatalogDomain) => [...roleKeys.all, 'catalog', domain] as const,
+  catalog: () => [...roleKeys.all, 'catalog'] as const,
   conditions: () => [...roleKeys.all, 'conditions'] as const
 };
 
@@ -17,10 +16,10 @@ export const roleQueryOptions = (id: string) =>
   queryOptions({ queryKey: roleKeys.detail(id), queryFn: () => getRole(id) });
 
 /** O catálogo só muda com um novo deploy, então fica em cache por mais tempo. */
-export const catalogActionsQueryOptions = (domain: CatalogDomain) =>
+export const catalogActionsQueryOptions = () =>
   queryOptions({
-    queryKey: roleKeys.catalog(domain),
-    queryFn: () => getCatalogActions(domain),
+    queryKey: roleKeys.catalog(),
+    queryFn: getCatalogActions,
     staleTime: 10 * 60_000
   });
 

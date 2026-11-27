@@ -12,7 +12,6 @@ import (
 
 	"github.com/wagner/convenios-e-fomentos/backend/api"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/admin"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/apitoken"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/audit"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/auth"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/authz"
@@ -21,8 +20,6 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/config"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/database/db"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/department"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/document"
-	"github.com/wagner/convenios-e-fomentos/backend/internal/enduser"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/httpapi"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/mailer"
 	"github.com/wagner/convenios-e-fomentos/backend/internal/mtid"
@@ -35,11 +32,6 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/storage"
 )
 
-// Hasher cria o hasher de senhas a partir da configuração.
-func Hasher(cfg *config.Config) auth.Hasher {
-	return auth.Hasher{Memory: cfg.Argon2MemoryKiB, Iterations: cfg.Argon2Iterations, Parallelism: cfg.Argon2Parallel, MinLength: cfg.PasswordMinLength}
-}
-
 // AdminService cria o serviço de administradores sem motor de permissões
 // (uso da CLI, que não avalia permissões).
 func AdminService(pool *pgxpool.Pool) *admin.Service {
@@ -50,17 +42,12 @@ func AdminService(pool *pgxpool.Pool) *admin.Service {
 type App struct {
 	Handler http.Handler
 	// Router permite registrar rotas dos recursos (Fase 7) e injetar rotas nos testes.
-	Router  *chi.Mux
-	Authz   *authz.Engine
-	Actions *authz.Registry
-	// Identifier e EndUsers servem para montar as rotas públicas dos recursos (Fase 7).
-	Identifier *enduser.Identifier
-	EndUsers   *enduser.Service
-	APITokens  *apitoken.Service
-	Documents  *document.Service
-	Catalog    *catalog.Service
-	Rules      *rules.Service
-	Projects   *project.Service
+	Router   *chi.Mux
+	Authz    *authz.Engine
+	Actions  *authz.Registry
+	Catalog  *catalog.Service
+	Rules    *rules.Service
+	Projects *project.Service
 	// Outbox envia a caixa de saída de e-mails em segundo plano (iniciado por Start).
 	Outbox *outbox.Worker
 
@@ -86,10 +73,17 @@ type options struct {
 	noReportWorker bool
 	// noSigadocWatcher: veja WithoutSigadocWatcher.
 	noSigadocWatcher bool
+	extraActions     []func(*authz.Registry)
 }
 
 // WithStore usa o armazenamento dado em vez de criar o S3 a partir da configuração.
 func WithStore(s storage.Store) Option { return func(o *options) { o.store = s } }
+
+// WithActions registra ações a mais no motor de permissões. Os testes usam para ter um recurso de exemplo com campos e condições,
+// que nenhum recurso real do sistema oferece.
+func WithActions(register func(*authz.Registry)) Option {
+	return func(o *options) { o.extraActions = append(o.extraActions, register) }
+}
 
 // WithMTID liga o MT-ID (assinatura das declarações). Sem ele, emitir declaração responde 503: o cliente HTTP real ainda não existe
 // (docs/debito-tecnico-mt-id.md).
@@ -144,16 +138,17 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	// Motor de permissões: ações e condições são registradas em código.
 	actions := authz.NewRegistry()
 	authz.RegisterCoreActions(actions)
-	document.Register(actions) // recurso de exemplo
 	catalog.Register(actions)
 	rules.Register(actions)
 	project.Register(actions)
+	for _, register := range o.extraActions {
+		register(actions)
+	}
 	conds := authz.NewConditionRegistry()
 	store := authz.DBStore{Q: q}
 	authz.RegisterStandardConditions(conds, store)
 	project.RegisterConditions(conds, q)
 	engine := authz.NewEngine(actions, conds, store, authz.PGBroadcaster{Pool: pool, Log: log}, log)
-	engine.SetEndUserStore(authz.EndUserStore{Q: q})
 
 	// Sem JWKS_URI (CLI) não há como validar tokens de administrador; o servidor da API exige a
 	// configuração antes de subir (Config.ValidateOIDC).
@@ -168,24 +163,7 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	adminSvc := admin.NewService(pool, engine)
 	adminHandler := admin.NewHandler(adminSvc, adminAuth, engine)
 
-	apiJWT := auth.NewJWTIssuer(cfg.JWTAPISecret, auth.AudienceAPI, cfg.AccessTokenTTL)
-	endUserSvc, err := enduser.NewService(pool, Hasher(cfg), apiJWT, mail, engine, enduser.Config{
-		RefreshMaxTTL: cfg.RefreshTokenMaxTTL, RefreshIdleTTL: cfg.RefreshTokenIdleTTL, ResetTTL: cfg.ResetTokenTTL,
-		ConfirmTTL: cfg.EmailConfirmationTTL, PublicURL: cfg.PublicURL, DefaultSender: cfg.SMTPFrom,
-	}, log)
-	if err != nil {
-		return nil, err
-	}
-	tokenSvc := apitoken.NewService(pool, engine, cfg.APITokenSalt, log)
-	identifier := &enduser.Identifier{Svc: endUserSvc, Engine: engine, Tokens: tokenSvc}
-	endUserHandler := enduser.NewHandler(endUserSvc, identifier, cfg.RateLimitAuthPerMin)
-	endUserAdmin := enduser.NewAdminHandler(endUserSvc, adminHandler.Guard, adminHandler.GuardAny)
-	tokenAdmin := apitoken.NewHandler(tokenSvc, adminHandler.Guard)
 	departmentAdmin := department.NewHandler(department.NewService(pool), adminHandler.Guard, adminHandler.GuardAny)
-	documentSvc := document.NewService(pool, engine)
-	if o.store != nil {
-		documentSvc.SetStorage(o.store, cfg.StorageUploadTTL, cfg.StorageDownloadTTL, log)
-	}
 	catalogSvc := catalog.NewService(pool)
 	rulesSvc := rules.NewService(pool)
 	projectSvc := project.NewService(pool, rulesSvc)
@@ -215,8 +193,6 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	if cfg.RateLimitCEPPerMin > 0 {
 		cepLimit = httpapi.RateLimitByIP(cfg.RateLimitCEPPerMin)
 	}
-	documentAdmin := document.NewAdminHandler(documentSvc, engine, adminHandler.Guard)
-	documentPublic := document.NewPublicHandler(documentSvc, identifier)
 
 	r := httpapi.NewRouter(httpapi.RouterOptions{
 		Log: log, DB: pool, AllowedOrigins: cfg.CORSAllowedOrigins, MaxBodyBytes: cfg.MaxBodyBytes, GlobalRatePerMinute: cfg.RateLimitGlobalPerMin,
@@ -224,29 +200,21 @@ func New(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 		Routes: func(r chi.Router) {
 			adminHandler.Routes(r)
 			audit.NewHandler(q).Routes(r, adminHandler.Guard)
-			endUserAdmin.Routes(r)
-			tokenAdmin.Routes(r)
 			departmentAdmin.Routes(r)
-			documentAdmin.Routes(r)
 			catalog.NewHandler(catalogSvc, adminHandler.Guard).Routes(r)
 			// Quem lê o catálogo de municípios (o proponente) também consulta o CEP, que serve para preencher município e UF.
 			cep.NewHandler(cepSvc, adminHandler.Guard(catalog.ActionMunicipalitiesRead), cepLimit).Routes(r)
 			rules.NewHandler(rulesSvc, adminHandler.Guard).Routes(r)
 			project.NewHandler(projectSvc, adminHandler.Guard, project.Limits{Upload: cfg.RateLimitUploadPerMin, Heavy: project.DefaultHeavyLimit}).Routes(r)
-			documentPublic.Routes(r)
-			endUserHandler.Routes(r)
 		},
 	})
 	mux := r.(*chi.Mux)
-	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Identifier: identifier, EndUsers: endUserSvc, APITokens: tokenSvc, Documents: documentSvc, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker, noReportWorker: o.noReportWorker, noSigadocWatcher: o.noSigadocWatcher}, nil
+	return &App{Handler: mux, Router: mux, Authz: engine, Actions: actions, Catalog: catalogSvc, Rules: rulesSvc, Projects: projectSvc, Outbox: outbox.NewWorker(pool, mail, log, outbox.DefaultConfig()), log: log, pool: pool, noOutboxWorker: o.noOutboxWorker, noReportWorker: o.noReportWorker, noSigadocWatcher: o.noSigadocWatcher}, nil
 }
 
 // Start sincroniza o registro de ações com o banco e passa a escutar as
 // invalidações de cache vindas de outras instâncias, até o contexto terminar.
 func (a *App) Start(ctx context.Context) error {
-	if err := a.EndUsers.EnsureDefaults(ctx); err != nil {
-		return err
-	}
 	if err := a.Catalog.EnsureDefaults(ctx); err != nil {
 		return err
 	}
@@ -254,9 +222,6 @@ func (a *App) Start(ctx context.Context) error {
 		return err
 	}
 	if err := a.Projects.EnsureDefaults(ctx); err != nil {
-		return err
-	}
-	if err := authz.SyncEndUserActions(ctx, db.New(a.pool), a.Actions, a.Authz, a.log); err != nil {
 		return err
 	}
 	if err := authz.SyncActions(ctx, db.New(a.pool), a.Actions, a.Authz, a.log); err != nil {

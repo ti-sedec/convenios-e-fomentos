@@ -10,13 +10,12 @@ import (
 	"strings"
 )
 
-// Domain separa as ações da API administrativa e da API pública.
+// Domain separa as ações por API. Hoje só existe a administrativa.
 type Domain string
 
 // Domínios de ações.
 const (
 	DomainAdmin Domain = "admin"
-	DomainAPI   Domain = "api"
 )
 
 // Category agrupa ações na futura tela de permissões.
@@ -43,13 +42,9 @@ type Action struct {
 	SupportsFields     bool
 	SupportsConditions bool
 	SupportsLocales    bool // reservado para i18n futuro
-
-	// Apenas para o domínio api: rota vinculada.
-	Method string
-	Route  string
 }
 
-var actionIDRe = regexp.MustCompile(`^(admin|api)::[a-z][a-z0-9-]*(\.[a-zA-Z][a-zA-Z0-9-]*)+$`)
+var actionIDRe = regexp.MustCompile(`^admin::[a-z][a-z0-9-]*(\.[a-zA-Z][a-zA-Z0-9-]*)+$`)
 
 // Registry é o registro central de ações (Action Registry). É preenchido na
 // inicialização e somente lido depois, então não precisa de lock.
@@ -75,9 +70,6 @@ func (r *Registry) Register(a Action) error {
 	}
 	if a.Category == "" {
 		return fmt.Errorf("ação %q: categoria é obrigatória", a.ID)
-	}
-	if a.Domain == DomainAPI && (a.Method == "" || a.Route == "") {
-		return fmt.Errorf("ação %q: ações do domínio api exigem método e rota vinculada", a.ID)
 	}
 	if _, dup := r.actions[a.ID]; dup {
 		return fmt.Errorf("ação %q já registrada", a.ID)

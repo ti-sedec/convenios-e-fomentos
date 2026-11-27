@@ -57,14 +57,13 @@ export function DepartmentsList() {
             <TableHead>Administradores</TableHead>
             <TableHead>Revisores ativos</TableHead>
             <TableHead>Projetos</TableHead>
-            <TableHead>Documentos</TableHead>
             <TableHead className='w-px' />
           </TableRow>
         </TableHeader>
         <TableBody>
           {departments.data?.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className='text-muted-foreground text-center'>
+              <TableCell colSpan={6} className='text-muted-foreground text-center'>
                 Nenhum departamento cadastrado.
               </TableCell>
             </TableRow>
@@ -89,7 +88,6 @@ export function DepartmentsList() {
                 )}
               </TableCell>
               <TableCell className='tabular-nums'>{d.projectCount}</TableCell>
-              <TableCell className='tabular-nums'>{d.documentCount}</TableCell>
               <TableCell>
                 <div className='flex justify-end gap-1'>
                   {can(departmentActions.update) && (
@@ -101,10 +99,10 @@ export function DepartmentsList() {
                     <Button
                       size='sm'
                       variant='ghost'
-                      disabled={d.userCount + d.documentCount + d.projectCount > 0}
+                      disabled={d.userCount + d.projectCount > 0}
                       title={
-                        d.userCount + d.documentCount + d.projectCount > 0
-                          ? 'Há administradores, documentos ou projetos vinculados.'
+                        d.userCount + d.projectCount > 0
+                          ? 'Há administradores ou projetos vinculados.'
                           : undefined
                       }
                       onClick={() => setToDelete(d)}

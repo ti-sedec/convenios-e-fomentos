@@ -15,6 +15,9 @@ import (
 	"github.com/wagner/convenios-e-fomentos/backend/internal/cpf"
 )
 
+// ErrInvalidToken indica JWT malformado, expirado, de outro emissor ou client, ou com assinatura inválida.
+var ErrInvalidToken = errors.New("token inválido")
+
 // ErrMissingCPF indica um token válido cujo claim de CPF está ausente ou inválido.
 var ErrMissingCPF = errors.New("token sem CPF válido")
 

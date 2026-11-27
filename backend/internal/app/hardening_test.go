@@ -13,7 +13,7 @@ import (
 
 func TestCabecalhosDeSeguranca(t *testing.T) {
 	e := newEnv(t)
-	for _, path := range []string{"/api/health", "/api/documents", "/api/admin/roles", "/nao-existe"} {
+	for _, path := range []string{"/api/health", "/api/admin/roles", "/nao-existe"} {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, nil)
 		req.RemoteAddr = "10.0.0.1:1"
 		rec := httptest.NewRecorder()

@@ -30,16 +30,7 @@ type Config struct {
 	// CPFs que o seed (e o cadastro inicial) torna Super Admin, separados por vírgula.
 	SeedSuperAdminCPFs []string `env:"SEED_SUPER_ADMIN_CPF" envSeparator:","`
 
-	// Segredo dos JWTs dos usuários finais (/api/*).
-	JWTAPISecret string `env:"JWT_API_SECRET" envDefault:"dev-only-api-secret-change-me-000000000000"`
-	APITokenSalt string `env:"API_TOKEN_SALT" envDefault:"dev-only-api-token-salt-change-me-0000000"`
-
-	AccessTokenTTL      time.Duration `env:"ACCESS_TOKEN_TTL" envDefault:"15m"`
-	RefreshTokenMaxTTL  time.Duration `env:"REFRESH_TOKEN_MAX_TTL" envDefault:"720h"`
-	RefreshTokenIdleTTL time.Duration `env:"REFRESH_TOKEN_IDLE_TTL" envDefault:"168h"`
-
-	CORSAllowedOrigins  []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000"`
-	RateLimitAuthPerMin int      `env:"RATE_LIMIT_AUTH_PER_MINUTE" envDefault:"10"`
+	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000"`
 	// Limite geral por IP em todas as rotas (0 desliga). Protege o banco de requisições em massa.
 	// RateLimitUploadPerMin limita, por usuário, os pedidos e confirmações de envio de arquivo dos projetos (0 desliga).
 	RateLimitUploadPerMin int `env:"RATE_LIMIT_UPLOAD_PER_MINUTE" envDefault:"120"`
@@ -77,18 +68,12 @@ type Config struct {
 	// analista pelo CPF (GET /siga/matricula exige um token). Não assina nada.
 	SigadocLookupMatricula string `env:"SIGADOC_LOOKUP_MATRICULA"`
 	MaxBodyBytes           int64  `env:"MAX_BODY_BYTES" envDefault:"1048576"`
-	PasswordMinLength      int    `env:"PASSWORD_MIN_LENGTH" envDefault:"8"`
 
 	SMTPHost     string `env:"SMTP_HOST"`
 	SMTPPort     int    `env:"SMTP_PORT" envDefault:"587"`
 	SMTPUser     string `env:"SMTP_USER"`
 	SMTPPassword string `env:"SMTP_PASSWORD"`
 	SMTPFrom     string `env:"SMTP_FROM" envDefault:"no-reply@localhost"`
-
-	// Validade do link de redefinição de senha dos usuários finais.
-	ResetTokenTTL time.Duration `env:"RESET_TOKEN_TTL" envDefault:"30m"`
-	// Validade do link de confirmação de e-mail dos usuários finais.
-	EmailConfirmationTTL time.Duration `env:"EMAIL_CONFIRMATION_TTL" envDefault:"72h"`
 
 	// CIDRs de proxies reversos confiáveis; só neles o X-Forwarded-For é aceito.
 	TrustedProxies []string `env:"TRUSTED_PROXIES" envSeparator:","`
@@ -127,11 +112,6 @@ type Config struct {
 	ReportMaxPages   int           `env:"REPORT_MAX_PAGES" envDefault:"5000"`
 	ReportTimeout    time.Duration `env:"REPORT_TIMEOUT" envDefault:"15m"`
 	ReportRetention  time.Duration `env:"REPORT_RETENTION" envDefault:"24h"`
-
-	// Parâmetros do Argon2id (padrão recomendado pela OWASP: m=19 MiB, t=2, p=1).
-	Argon2MemoryKiB  uint32 `env:"ARGON2_MEMORY_KIB" envDefault:"19456"`
-	Argon2Iterations uint32 `env:"ARGON2_ITERATIONS" envDefault:"2"`
-	Argon2Parallel   uint8  `env:"ARGON2_PARALLELISM" envDefault:"1"`
 }
 
 // Load lê o ambiente (carregando o .env apenas fora de produção) e valida o resultado.
@@ -174,13 +154,7 @@ func (c *Config) SigadocURL() string {
 	return strings.TrimRight(c.XViaBaseURL, "/") + "/" + service
 }
 
-const (
-	minSecretLen         = 32
-	owaspArgon2MemoryKiB = 19456
-)
-
-// Validate verifica a consistência das configurações. Em produção, segredos
-// ausentes, curtos ou iguais aos valores de desenvolvimento impedem a subida.
+// Validate verifica a consistência das configurações.
 func (c *Config) Validate() error {
 	var errs []error
 	switch c.AppEnv {
@@ -191,20 +165,8 @@ func (c *Config) Validate() error {
 	if c.HTTPPort < 1 || c.HTTPPort > 65535 {
 		errs = append(errs, errors.New("HTTP_PORT fora do intervalo 1-65535"))
 	}
-	if c.AccessTokenTTL <= 0 || c.RefreshTokenMaxTTL <= 0 || c.RefreshTokenIdleTTL <= 0 {
-		errs = append(errs, errors.New("as durações de token devem ser positivas"))
-	}
-	if c.ResetTokenTTL <= 0 || c.EmailConfirmationTTL <= 0 {
-		errs = append(errs, errors.New("RESET_TOKEN_TTL e EMAIL_CONFIRMATION_TTL devem ser positivos"))
-	}
-	if c.PasswordMinLength < 1 {
-		errs = append(errs, errors.New("PASSWORD_MIN_LENGTH deve ser >= 1"))
-	}
-	if c.RateLimitAuthPerMin < 1 || c.RateLimitGlobalPerMin < 0 || c.RateLimitUploadPerMin < 0 || c.RateLimitCEPPerMin < 0 {
-		errs = append(errs, errors.New("RATE_LIMIT_AUTH_PER_MINUTE deve ser >= 1 e RATE_LIMIT_GLOBAL_PER_MINUTE >= 0"))
-	}
-	if c.Argon2Iterations < 1 || c.Argon2Parallel < 1 || c.Argon2MemoryKiB < 8*uint32(c.Argon2Parallel) {
-		errs = append(errs, errors.New("parâmetros do Argon2 inválidos (iterações >= 1, paralelismo >= 1, memória >= 8 KiB por thread)"))
+	if c.RateLimitGlobalPerMin < 0 || c.RateLimitUploadPerMin < 0 || c.RateLimitCEPPerMin < 0 {
+		errs = append(errs, errors.New("os limites de requisições por minuto não podem ser negativos"))
 	}
 	if c.StorageEndpoint != "" {
 		if c.StorageAccessKey == "" || c.StorageSecretKey == "" || c.StorageBucket == "" {
@@ -243,20 +205,6 @@ func (c *Config) Validate() error {
 	}
 	if c.MTIDSimulate && c.MTIDSimulateDelay < 0 {
 		errs = append(errs, errors.New("MTID_SIMULATE_DELAY não pode ser negativo"))
-	}
-	if c.IsProduction() && c.Argon2MemoryKiB < owaspArgon2MemoryKiB {
-		errs = append(errs, fmt.Errorf("ARGON2_MEMORY_KIB abaixo do mínimo recomendado pela OWASP (%d) em produção", owaspArgon2MemoryKiB))
-	}
-	if c.IsProduction() {
-		secrets := map[string]string{
-			"JWT_API_SECRET": c.JWTAPISecret,
-			"API_TOKEN_SALT": c.APITokenSalt,
-		}
-		for name, v := range secrets {
-			if len(v) < minSecretLen || strings.HasPrefix(v, "dev-only-") {
-				errs = append(errs, fmt.Errorf("%s ausente ou fraco: em produção use um valor aleatório com ao menos %d caracteres", name, minSecretLen))
-			}
-		}
 	}
 	return errors.Join(errs...)
 }

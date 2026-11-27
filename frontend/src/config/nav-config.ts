@@ -54,20 +54,6 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
-    label: 'Conteúdo',
-    items: [
-      {
-        title: 'Documentos',
-        url: '/dashboard/documentos',
-        icon: 'post',
-        isActive: false,
-        shortcut: ['d', 'o'],
-        access: { permission: 'admin::content.document.read' },
-        items: []
-      }
-    ]
-  },
-  {
     label: 'Administração',
     items: [
       {
@@ -132,56 +118,6 @@ export const navGroups: NavGroup[] = [
         isActive: false,
         shortcut: ['a', 'a'],
         access: { permission: 'admin::settings.audit-logs.read' },
-        items: []
-      },
-      {
-        title: 'Tokens de API',
-        url: '/dashboard/tokens-api',
-        icon: 'key',
-        isActive: false,
-        shortcut: ['a', 't'],
-        access: { permission: 'admin::settings.api-tokens.read' },
-        items: []
-      }
-    ]
-  },
-  {
-    label: 'Portal público',
-    items: [
-      {
-        title: 'Usuários finais',
-        url: '/dashboard/portal/usuarios',
-        icon: 'user',
-        isActive: false,
-        shortcut: ['p', 'u'],
-        access: { permission: 'admin::plugin.enduser-users.read' },
-        items: []
-      },
-      {
-        title: 'Perfis públicos',
-        url: '/dashboard/portal/perfis',
-        icon: 'lock',
-        isActive: false,
-        shortcut: ['p', 'p'],
-        access: { permission: 'admin::plugin.enduser-roles.read' },
-        items: []
-      },
-      {
-        title: 'Configurações',
-        url: '/dashboard/portal/configuracoes',
-        icon: 'settings',
-        isActive: false,
-        shortcut: ['p', 'c'],
-        access: { permission: 'admin::plugin.enduser-settings.read' },
-        items: []
-      },
-      {
-        title: 'Templates de e-mail',
-        url: '/dashboard/portal/templates-email',
-        icon: 'send',
-        isActive: false,
-        shortcut: ['p', 't'],
-        access: { permission: 'admin::settings.email-templates.read' },
         items: []
       }
     ]
